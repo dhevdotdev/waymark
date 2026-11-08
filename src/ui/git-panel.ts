@@ -593,7 +593,7 @@ function remoteName(url: string | null): string {
 }
 
 /** A large read-only sheet for diffs and past revisions. Escape or a click outside closes it. */
-export function openSheet(title: string, subtitle: string, content: HTMLElement): void {
+function openSheet(title: string, subtitle: string, content: HTMLElement): void {
   document.querySelector(".sheet-overlay")?.remove();
   const overlay = el("div", "overlay sheet-overlay");
   const sheet = el("div", "sheet");

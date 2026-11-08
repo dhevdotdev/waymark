@@ -339,7 +339,9 @@ export class Trail {
       const children = this.childrenOf(node.id);
       out.push({ id: node.id, parent: node.parent, depth, row, branches: children.length, collapsed: node.collapsed });
       const shown = node.collapsed ? children.filter((c, i) => i === 0 || onRoute.has(c.id)) : children;
-      shown.forEach((child, i) => place(child, depth + 1, i === 0 ? row : ++lastRow));
+      shown.forEach((child, i) => {
+        place(child, depth + 1, i === 0 ? row : ++lastRow);
+      });
     };
     place(this.nodes.get(this.root)!, 0, 0);
     return out;

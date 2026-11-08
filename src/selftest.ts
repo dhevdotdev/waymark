@@ -9,7 +9,8 @@ import type { App } from "./ui/app";
 export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {
   const reader = app.reader;
   if (!reader) throw new Error("The self-test needs an open vault");
-  const { vault, gitPanel: panel } = reader;
+  const { vault, sync } = reader;
+  const panel = sync.panel;
   const results: { name: string; ok: boolean; detail?: unknown }[] = [];
   const check = (name: string, ok: boolean, detail?: unknown) => {
     results.push({ name, ok, detail });

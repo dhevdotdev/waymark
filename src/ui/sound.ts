@@ -98,17 +98,6 @@ function schedule(ctx: BaseAudioContext, destination: AudioNode, cue: Cue, t0: n
   return end;
 }
 
-/** Renders a cue to samples, for checking it and for adding it to recordings. */
-export async function renderCue(cue: Cue, sampleRate = 48000): Promise<Float32Array> {
-  const length = Math.ceil(sampleRate * 0.6);
-  const ctx = new OfflineAudioContext(1, length, sampleRate);
-  schedule(ctx, ctx.destination, cue, 0.005);
-  const buffer = await ctx.startRendering();
-  return buffer.getChannelData(0);
-}
-
-export const CUE_NAMES = Object.keys(CUES) as Cue[];
-
 export class Sound {
   private ctx: AudioContext | null = null;
   private last = new Map<Cue, number>();

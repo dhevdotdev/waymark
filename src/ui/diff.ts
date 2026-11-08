@@ -14,7 +14,7 @@ interface FileDiff {
   removed: number;
 }
 
-export function parseDiff(text: string): FileDiff[] {
+function parseDiff(text: string): FileDiff[] {
   const files: FileDiff[] = [];
   let file: FileDiff | null = null;
   let hunk: FileDiff["hunks"][number] | null = null;

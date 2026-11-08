@@ -1,4 +1,4 @@
-import { type GitStatus, isDesktop, native } from "../platform";
+import { isDesktop } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { renderDiagrams } from "../render/diagrams";
 import type { Highlighter } from "../render/highlight";
@@ -9,21 +9,20 @@ import type { GraphScope, View } from "../vault/trail";
 import { type Tab, Workspace } from "../vault/workspace";
 import { CommandTable } from "./commands";
 import { FindBar, paint } from "./find";
-import { GitPanel, type SyncState } from "./git-panel";
 import { type GraphTabView, GraphView } from "./graph-view";
-import { Inspector, type RailPane } from "./inspector";
+import { Inspector } from "./inspector";
 import { LinkPreview } from "./link-preview";
-import { isNarrow, railFloats, reducedMotion } from "./media";
-import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
+import { isNarrow, railFloats } from "./media";
 import { NoteView } from "./note-view";
-import { lightbox, toast } from "./overlays";
+import { toast } from "./overlays";
 import { Palette } from "./palette";
+import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
 import { toggleSettings } from "./settings";
 import { mountShell, type ShellElements } from "./shell";
 import { Sidebar } from "./sidebar";
 import type { Sound } from "./sound";
-import { describeSync } from "./sync-status";
+import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
 import { TrailMap } from "./trail-map";
@@ -68,18 +67,16 @@ interface ShowOptions {
   onPainted?: () => void;
 }
 
-const GIT_REFRESH_DEBOUNCE_MS = 400;
-const LINK_SELECTOR = "a.wikilink, a.wikilink-plain, .nav-item[data-path]";
-
 /** One open vault's window: its panels, its tabs and how the user moves between notes. */
 export class Reader {
   readonly vault: VaultStore;
   readonly commands: CommandTable;
   readonly palette: Palette;
   readonly find: FindBar;
-  readonly gitPanel: GitPanel;
+  readonly sync: SyncController;
   readonly sidebar: Sidebar;
   readonly inspector: Inspector;
+  readonly preview: LinkPreview;
   readonly workspace = new Workspace();
   /** The note on screen, or the note a graph tab was opened from. */
   current = "";
@@ -87,11 +84,8 @@ export class Reader {
   private readonly els: ShellElements;
   private readonly noteView: NoteView;
   private readonly trailMap: TrailMap;
-  private readonly preview: LinkPreview;
   private graph: GraphView | null = null;
   private renderSeq = 0;
-  private backgroundTimer = 0;
-  private gitRefreshTimer = 0;
 
   constructor(readonly deps: ReaderDeps) {
     const { host, vault, prefs } = deps;
@@ -121,19 +115,36 @@ export class Reader {
       persist: () => this.persist(),
     });
 
-    this.gitPanel = this.makeGitPanel();
     this.inspector = new Inspector(
       els,
       vault,
       {
-        status: () => this.gitPanel.status,
+        status: () => this.sync.panel.status,
         currentNote: () => this.current,
-        showWorktreeDiff: (change) => void this.gitPanel.showWorktreeDiff(change, change.unstaged === " " || !change.unstaged),
-        showCommit: (commit, path) => void this.gitPanel.showCommit(commit, path),
+        showWorktreeDiff: (change) => void this.sync.panel.showWorktreeDiff(change, change.unstaged === " " || !change.unstaged),
+        showCommit: (commit, path) => void this.sync.panel.showCommit(commit, path),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
       },
       p.railPane,
     );
+
+    this.sync = new SyncController({
+      els,
+      prefs,
+      root: deps.root,
+      panelHost: {
+        play: (cue) => deps.sound.play(cue),
+        toast,
+        openNote: (path) => void this.open(path),
+        renderNoteAt: async (markdown, path, into) => {
+          const rendered = await renderNote(markdown, path, this.renderContext());
+          into.append(rendered.fragment);
+          await renderDiagrams(into);
+        },
+        title: (path) => vault.index.title(path),
+      },
+      onStatusChanged: () => this.inspector.refreshHistory(),
+    });
 
     this.commands = new CommandTable(readerCommands(this), { desktop: isDesktop, hasNote: () => !this.workspace.isEmpty });
     this.palette = new Palette(
@@ -147,11 +158,7 @@ export class Reader {
       currentNote: () => this.current,
     });
 
-    this.renderSync(null, { kind: "idle" });
-    els.shell.addEventListener("click", (e) => this.onClick(e));
-    els.shell.addEventListener("auxclick", (e) => {
-      if (e.button === 1) this.onClick(e);
-    });
+    bindReaderClicks(els.shell, this);
     els.scroller.addEventListener("scroll", () => this.inspector.spy(), { passive: true });
     bindTooltips(els.shell);
   }
@@ -177,12 +184,11 @@ export class Reader {
     metrics.indexMs = performance.now() - startedAt;
     await this.show({ keepScroll: true, quiet: true });
     this.renderTree();
-    void this.initGit();
+    void this.sync.start();
   }
 
   dispose(): void {
-    clearInterval(this.backgroundTimer);
-    clearTimeout(this.gitRefreshTimer);
+    this.sync.dispose();
     this.preview.hide();
     this.closeGraphView();
   }
@@ -302,8 +308,8 @@ export class Reader {
 
   openSyncPanel(origin: "click" | "other"): void {
     if (origin === "other") {
-      if (isDesktop) this.gitPanel.open();
-    } else if (isDesktop) this.gitPanel.toggle(this.els.sync);
+      if (isDesktop) this.sync.panel.open();
+    } else if (isDesktop) this.sync.panel.toggle(this.els.sync);
     else toast("Git sync runs in the desktop app");
   }
 
@@ -315,7 +321,7 @@ export class Reader {
       setFamily: this.deps.setFamily,
       setAppearance: this.deps.setAppearance,
       setSound: (on) => this.setSound(on),
-      rescheduleBackground: () => this.scheduleBackground(),
+      rescheduleBackground: () => this.sync.scheduleBackground(),
     });
   }
 
@@ -333,11 +339,11 @@ export class Reader {
 
   /** External edits: re-read what changed, re-index it and re-render the open note in place. */
   async onVaultChanged(paths: string[]): Promise<void> {
-    if (paths.some((p) => p.startsWith(".git/"))) this.scheduleGitRefresh();
+    if (paths.some((p) => p.startsWith(".git/"))) this.sync.scheduleRefresh();
     const notes = paths.filter((p) => !p.startsWith("."));
     if (!notes.length || this.workspace.isEmpty) return;
     const { structural, changed } = await this.vault.applyChanges(notes);
-    this.scheduleGitRefresh();
+    this.sync.scheduleRefresh();
     if (this.onGraph) await this.show({ quiet: true });
     else if (!this.vault.texts.has(this.current)) this.noteView.showMissing(this.current);
     else if (changed.includes(this.current) || structural) await this.show({ keepScroll: true, quiet: true });
@@ -376,7 +382,7 @@ export class Reader {
     if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover")) return;
     if (this.find.isOpen) this.find.close();
     else if (!this.workspace.isEmpty && this.onGraph && !inField) this.leaveGraph();
-    else if (this.gitPanel.isOpen) this.gitPanel.close();
+    else if (this.sync.panel.isOpen) this.sync.panel.close();
     else if (shell.matches(".sidebar-peek, .rail-peek")) shell.classList.remove("sidebar-peek", "rail-peek");
     else if (this.sidebar.isSearching && !inField) this.sidebar.showFiles();
     else paint("search", []);
@@ -484,7 +490,7 @@ export class Reader {
           this.persist();
         },
       });
-      this.gitPanel.close();
+      this.sync.panel.close();
     }
     this.renderTabChrome(entering);
     this.renderTree();
@@ -565,149 +571,5 @@ export class Reader {
     this.tab.trail.toggleCollapsed(id);
     this.renderTrail();
     this.persist();
-  }
-
-  // Git
-
-  private makeGitPanel(): GitPanel {
-    const { prefs, sound, root } = this.deps;
-    return new GitPanel({
-      play: (cue) => sound.play(cue),
-      toast,
-      openNote: (path) => void this.open(path),
-      lastSync: () => prefs.value.vaults[root]?.lastSync ?? null,
-      onVisible: (open) => this.els.sync.classList.toggle("is-on", open),
-      setLastSync: (at) =>
-        prefs.update((p) => {
-          p.vaults[root] ??= { tabs: [], active: 0, lastSync: null };
-          p.vaults[root].lastSync = at;
-        }),
-      onStatus: (status, state) => this.renderSync(status, state),
-      renderNoteAt: async (markdown, path, into) => {
-        const rendered = await renderNote(markdown, path, this.renderContext());
-        into.append(rendered.fragment);
-        await renderDiagrams(into);
-      },
-      title: (path) => this.vault.index.title(path),
-    });
-  }
-
-  private async initGit(): Promise<void> {
-    if (!isDesktop) return;
-    await this.gitPanel.refresh();
-    if (this.gitPanel.status?.isRepo && this.deps.prefs.value.syncOnLaunch) void this.gitPanel.fetch();
-    this.scheduleBackground();
-  }
-
-  private scheduleBackground(): void {
-    clearInterval(this.backgroundTimer);
-    const minutes = this.deps.prefs.value.backgroundMinutes;
-    if (!minutes || !isDesktop) return;
-    this.backgroundTimer = window.setInterval(() => {
-      if (this.gitPanel.status?.isRepo && this.gitPanel.state.kind !== "busy") void this.gitPanel.fetch(true);
-    }, minutes * 60_000);
-  }
-
-  private scheduleGitRefresh(): void {
-    if (!isDesktop) return;
-    clearTimeout(this.gitRefreshTimer);
-    this.gitRefreshTimer = window.setTimeout(() => {
-      if (this.gitPanel.state.kind !== "busy") void this.gitPanel.refresh();
-    }, GIT_REFRESH_DEBOUNCE_MS);
-  }
-
-  private renderSync(status: GitStatus | null, state: SyncState): void {
-    const { sync, branch } = this.els;
-    const { prefs, root } = this.deps;
-    const branchName = isDesktop && status?.isRepo ? status.branch : null;
-    branch.hidden = !branchName;
-    branch.lastElementChild!.textContent = branchName ?? "";
-    const summary = describeSync(status, state, { desktop: isDesktop, everSynced: prefs.value.vaults[root]?.lastSync != null });
-    this.inspector?.refreshHistory();
-    sync.dataset.tone = summary.tone;
-    sync.querySelector(".sync-label")!.textContent = summary.text;
-    sync.dataset.tip = summary.tip;
-  }
-
-  // Clicks
-
-  /** First match wins, so more specific targets are listed before the elements that contain them. */
-  private readonly clickRoutes: [string, (el: HTMLElement, e: MouseEvent) => void][] = [
-    ["[data-tab-close]", (el) => this.closeTab(Number(el.closest<HTMLElement>(".tab")!.dataset.tab))],
-    ['[data-act="search-clear"]', () => this.sidebar.searchPane.clear()],
-    ["[data-act]", (el) => this.commands.run(el.dataset.act!, "click")],
-    [".tab", (el, e) => (e.button === 1 ? this.closeTab(Number(el.dataset.tab)) : this.switchTab(Number(el.dataset.tab)))],
-    ["[data-side]", (el) => (el.dataset.side === "search" ? this.sidebar.showSearch() : this.sidebar.showFiles())],
-    [".tree-head", (el) => this.sidebar.tree.toggle(el.dataset.folder!)],
-    ["[data-crumb]", (el) => this.sidebar.revealFolder(el.dataset.crumb!)],
-    ["[data-rail]", (el) => this.chooseRailPane(el.dataset.rail as RailPane)],
-    [".search-hit", (el, e) => this.sidebar.searchPane.openHit(Number(el.dataset.hit), e.metaKey)],
-    [".code-copy", (el) => void copyCode(el as HTMLButtonElement, () => this.deps.sound.play("copy"))],
-    ["button.callout-title", (el) => toggleCallout(el)],
-    [".diagram-expand", (el) => lightbox(el.closest(".diagram")!.querySelector("svg")!.cloneNode(true) as Element)],
-    ["img.embed-image", (el) => lightbox(el.cloneNode() as Element)],
-    [".outline a", (el, e) => this.followOutline(el, e)],
-    [LINK_SELECTOR, (el, e) => this.followLink(el, e)],
-    ["a.attachment-link, a.embed-file", (el, e) => this.openAttachment(el as HTMLAnchorElement, e)],
-    [".doc a[href^='http'], .doc a[href^='mailto:']", (el, e) => this.openExternal(el as HTMLAnchorElement, e)],
-    [".remote-image", (el) => el.dataset.src && void native.openExternal(el.dataset.src)],
-  ];
-
-  private onClick(e: MouseEvent): void {
-    const target = e.target as HTMLElement;
-    if (!target.closest(".sidebar, .rail, [data-act]")) this.els.shell.classList.remove("sidebar-peek", "rail-peek");
-    for (const [selector, handle] of this.clickRoutes) {
-      const el = target.closest<HTMLElement>(selector);
-      if (!el) continue;
-      if (el.matches("[data-act], [data-tab-close]")) e.preventDefault();
-      handle(el, e);
-      return;
-    }
-  }
-
-  private chooseRailPane(pane: RailPane): void {
-    this.deps.prefs.update((p) => {
-      p.railPane = pane;
-    });
-    this.inspector.setPane(pane);
-  }
-
-  private followOutline(el: HTMLElement, e: MouseEvent): void {
-    e.preventDefault();
-    document
-      .getElementById(el.dataset.target!)
-      ?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
-  }
-
-  private followLink(link: HTMLElement, e: MouseEvent): void {
-    if (link.closest(".sidebar, .rail")) this.els.shell.classList.remove("sidebar-peek", "rail-peek");
-    e.preventDefault();
-    this.preview.hide();
-    if (link.classList.contains("is-ambiguous")) {
-      const candidates = JSON.parse(link.dataset.candidates!) as string[];
-      chooseAmbiguous(link, candidates, this.vault.index, (path) => {
-        void this.open(path, { newTab: e.metaKey, focus: true, anchor: link.dataset.anchor });
-      });
-      return;
-    }
-    if (!link.dataset.path) return;
-    const newTab = e.metaKey || e.button === 1;
-    void this.open(link.dataset.path, {
-      anchor: link.dataset.anchor,
-      newTab,
-      focus: newTab ? e.shiftKey : true,
-      via: link.classList.contains("nav-item") ? "jump" : "link",
-    });
-  }
-
-  private openAttachment(link: HTMLAnchorElement, e: MouseEvent): void {
-    e.preventDefault();
-    if (isDesktop) void native.reveal(link.dataset.attachment ?? undefined);
-    else window.open(link.href, "_blank", "noopener");
-  }
-
-  private openExternal(link: HTMLAnchorElement, e: MouseEvent): void {
-    e.preventDefault();
-    void native.openExternal(link.href);
   }
 }

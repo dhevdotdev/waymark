@@ -754,8 +754,8 @@ button.callout-title:focus-visible {
 .doc eq {
   display: inline;
 }
-/* biome-ignore lint/correctness/noUnknownTypeSelector: markdown-it-texmath emits <eq> and <eqn>. */
 .doc section.eqno,
+/* biome-ignore lint/correctness/noUnknownTypeSelector: markdown-it-texmath emits <eq> and <eqn>. */
 .doc eqn {
   display: block;
   overflow-x: auto;

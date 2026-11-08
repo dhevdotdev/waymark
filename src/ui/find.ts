@@ -32,7 +32,7 @@ export function paint(name: string, ranges: Range[]): void {
 }
 
 /** Opens a collapsed callout so a match inside it can be seen. */
-export function reveal(range: Range): void {
+function reveal(range: Range): void {
   const el = range.startContainer.parentElement;
   const callout = el?.closest<HTMLElement>('.callout[data-fold="closed"]');
   if (callout) {

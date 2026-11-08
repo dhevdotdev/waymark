@@ -130,7 +130,7 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "git pull fetch update",
       inField: true,
       desktop: true,
-      run: () => void r.gitPanel.sync(),
+      run: () => void r.sync.panel.sync(),
     },
     {
       id: "sync-panel",
@@ -151,14 +151,14 @@ export function readerCommands(r: Reader): Command[] {
       inField: true,
       desktop: true,
       needsNote: true,
-      run: () => r.gitPanel.open(undefined, { historyPath: r.current }),
+      run: () => r.sync.panel.open(undefined, { historyPath: r.current }),
     },
     {
       id: "vault-history",
       label: "Show history of the vault",
       keywords: "git log",
       desktop: true,
-      run: () => r.gitPanel.open(undefined, { historyPath: null }),
+      run: () => r.sync.panel.open(undefined, { historyPath: null }),
     },
     { id: "reveal", label: "Reveal note in Finder", desktop: true, needsNote: true, run: () => void native.reveal(r.current) },
     { id: "terminal", label: "Open vault in Terminal", desktop: true, run: () => void native.openTerminal() },
@@ -167,15 +167,15 @@ export function readerCommands(r: Reader): Command[] {
     {
       id: "push",
       label: () => {
-        const ahead = r.gitPanel.status?.ahead ?? 0;
+        const ahead = r.sync.panel.status?.ahead ?? 0;
         return `Push ${ahead} commit${ahead === 1 ? "" : "s"}`;
       },
       desktop: true,
       when: () => {
-        const status = r.gitPanel.status;
+        const status = r.sync.panel.status;
         return Boolean(status?.ahead && !status.behind);
       },
-      run: () => r.gitPanel.open(),
+      run: () => r.sync.panel.open(),
     },
     { id: "back", keys: ["mod+["], needsNote: true, run: () => void r.go(-1) },
     { id: "forward", keys: ["mod+]"], needsNote: true, run: () => void r.go(1) },
