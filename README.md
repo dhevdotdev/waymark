@@ -57,6 +57,7 @@ pnpm tauri build --bundles app             # release .app
 pnpm check                  # lint, types, architecture, dead code, duplication, unit tests with coverage, Rust
 pnpm test:e2e               # the reader driven like a person, in WebKit, in normal and Reduce Motion
 pnpm test:sweep             # every fixture note: render time, diagrams, links, images, network
+pnpm test:visual <ref>      # every surface compared pixel by pixel with another commit
 pnpm test:native            # builds the app and runs its self-test against disposable vaults
 ```
 

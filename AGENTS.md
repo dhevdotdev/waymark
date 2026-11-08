@@ -12,6 +12,7 @@ A Mac reader for Markdown vaults kept in Git, built with Tauri 2, TypeScript and
 | Browser preview on a vault | `WAYMARK_VAULT=/path pnpm dev` (port 5178) |
 | Drive the reader in WebKit against the fixture | `pnpm test:e2e` |
 | Open every fixture note, report render cost | `pnpm test:sweep` |
+| Compare every surface pixel by pixel with another commit | `pnpm test:visual <ref>` |
 | Build the app and run its self-test | `pnpm test:native` |
 
 Rust needs `source $HOME/.cargo/env` in a fresh shell. To see a change working, follow `.agents/skills/verify-waymark/SKILL.md`.
