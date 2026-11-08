@@ -67,6 +67,8 @@ describe("renderNote", () => {
 describe("ordered lists", () => {
   it("keep their starting number with drawn markers", async () => {
     const { div } = await render("3. three\n4. four");
-    expect((div.querySelector("ol") as HTMLElement).style.getPropertyValue("--list-start")).toBe("2");
+    const list = div.querySelector("ol") as HTMLOListElement;
+    expect(list.getAttribute("start")).toBe("3");
+    expect(list.style.getPropertyValue("--list-start")).toBe("2");
   });
 });

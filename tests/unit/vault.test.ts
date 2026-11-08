@@ -265,9 +265,8 @@ describe("trail", () => {
     t.select(root);
     t.toggleCollapsed(root);
     expect(t.layout().map((p) => p.id)).toHaveLength(2);
-    t.select(t.layout()[1].id);
     t.toggleCollapsed(root);
-    t.toggleCollapsed(root);
+    expect(t.layout()).toHaveLength(3);
     const c = new Trail(note("a"));
     c.follow(note("b"));
     c.select(c.layout()[0].id);
