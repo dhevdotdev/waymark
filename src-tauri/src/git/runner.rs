@@ -262,6 +262,14 @@ pub fn classify(stderr: &str) -> GitError {
     )
 }
 
+/// True for `user:pa`, the start of a password containing "/", which ends the authority early.
+/// `host.example:8443` is a port and leaves the URL alone.
+fn looks_like_userinfo(authority: &str) -> bool {
+    authority.split_once(':').is_some_and(|(host, after)| {
+        !host.contains('.') || !after.chars().all(|c| c.is_ascii_digit())
+    })
+}
+
 /// Removes credentials from URLs and masks common token shapes before text
 /// reaches the UI or diagnostics.
 pub fn redact(text: &str) -> String {
@@ -276,10 +284,11 @@ pub fn redact(text: &str) -> String {
         let url = &tail[..end];
         let authority_end = url.find('/').unwrap_or(url.len());
         let authority = &url[..authority_end];
-        // A password may itself contain "/", which ends the authority early but leaves "user:pa" before it.
-        let userinfo_end = authority
-            .rfind('@')
-            .or_else(|| authority.contains(':').then(|| url.rfind('@')).flatten());
+        let userinfo_end = authority.rfind('@').or_else(|| {
+            looks_like_userinfo(authority)
+                .then(|| url.rfind('@'))
+                .flatten()
+        });
         match userinfo_end {
             Some(at) => {
                 out.push_str("***@");

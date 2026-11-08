@@ -219,6 +219,10 @@ fn clones_into_a_new_folder_only() {
 #[test]
 fn redacts_credentials() {
     assert_eq!(
+        redact("see https://example.com:8443/docs/@release"),
+        "see https://example.com:8443/docs/@release"
+    );
+    assert_eq!(
         redact("fatal: https://me:hunter/2@host.com/r.git failed"),
         "fatal: https://***@host.com/r.git failed"
     );

@@ -4,7 +4,6 @@ import { Highlighter } from "../render/highlight";
 import { applyTheme, findFamily, type Scheme } from "../themes";
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
-import { toast } from "./overlays";
 import { type Metrics, Reader } from "./reader";
 import { Sound } from "./sound";
 import { showWelcome } from "./welcome";
@@ -93,8 +92,9 @@ export class App {
 
   private async loadVault(source: VaultSource, root: string, name: string, initial?: string): Promise<void> {
     const t0 = performance.now();
-    const vault = await VaultStore.open(source);
     this.closeReader();
+    this.host.replaceChildren();
+    const vault = await VaultStore.open(source);
     this.reader = new Reader({
       host: this.host,
       vault,
@@ -127,7 +127,7 @@ export class App {
 
   private async pickVault(): Promise<void> {
     const path = await native.pickFolder("Open a vault");
-    if (path) await this.openVault(path).catch((err: Error) => toast(err.message));
+    if (path) await this.openVault(path).catch((err: Error) => this.welcome(err.message));
   }
 
   private scheme(): Scheme {
