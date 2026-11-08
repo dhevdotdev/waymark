@@ -24,7 +24,7 @@ struct VaultChange {
 type CmdResult<T> = Result<T, GitError>;
 
 fn plain_err(message: impl Into<String>) -> GitError {
-    git::classify(&message.into())
+    GitError::other(message)
 }
 
 async fn blocking<T: Send + 'static>(
@@ -48,14 +48,18 @@ fn open_vault(
     if !root.is_dir() {
         return Err("Choose a folder".into());
     }
+    let debouncer = watch(&app, &root)?;
     vault.set(root.clone());
-    watch(&app, &watcher, &root)?;
+    *watcher.0.lock().unwrap() = Some(debouncer);
     Ok(vault::info(&root))
 }
 
 /// Watches the vault for edits made by other apps. `.git` and `.obsidian`
 /// churn is ignored; Git state is refreshed separately.
-fn watch(app: &AppHandle, watcher: &Watcher, root: &Path) -> Result<(), String> {
+fn watch(
+    app: &AppHandle,
+    root: &Path,
+) -> Result<Debouncer<notify_debouncer_mini::notify::RecommendedWatcher>, String> {
     let handle = app.clone();
     let base = root.to_path_buf();
     let mut debouncer = new_debouncer(
@@ -87,65 +91,79 @@ fn watch(app: &AppHandle, watcher: &Watcher, root: &Path) -> Result<(), String> 
         .watcher()
         .watch(root, RecursiveMode::Recursive)
         .map_err(|e| e.to_string())?;
-    *watcher.0.lock().unwrap() = Some(debouncer);
-    Ok(())
+    Ok(debouncer)
 }
 
 fn is_git_signal(path: &str) -> bool {
     matches!(
         path,
-        ".git/HEAD" | ".git/index" | ".git/FETCH_HEAD" | ".git/ORIG_HEAD"
+        ".git/HEAD"
+            | ".git/index"
+            | ".git/FETCH_HEAD"
+            | ".git/ORIG_HEAD"
+            | ".git/packed-refs"
+            | ".git/MERGE_HEAD"
+            | ".git/CHERRY_PICK_HEAD"
+            | ".git/REVERT_HEAD"
     ) || path.starts_with(".git/refs/")
+        || path.starts_with(".git/rebase-merge")
+        || path.starts_with(".git/rebase-apply")
 }
 
 #[tauri::command]
-fn list_files(vault: State<Vault>) -> Result<Vec<String>, String> {
-    vault::list(&vault.root()?)
+async fn list_files(vault: State<'_, Vault>) -> CmdResult<Vec<String>> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || vault::list(&root).map_err(plain_err)).await
 }
 
 #[tauri::command]
-fn read_text(vault: State<Vault>, path: String) -> Result<String, String> {
-    let abs = vault.resolve(&path)?;
-    std::fs::read_to_string(abs).map_err(|e| format!("Could not read {path}: {e}"))
+async fn read_text(vault: State<'_, Vault>, path: String) -> CmdResult<String> {
+    let abs = vault.resolve(&path).map_err(plain_err)?;
+    blocking(move || {
+        std::fs::read_to_string(abs).map_err(|e| plain_err(format!("Could not read {path}: {e}")))
+    })
+    .await
 }
 
 #[tauri::command]
-fn read_many(vault: State<Vault>, paths: Vec<String>) -> Result<Vec<Option<String>>, String> {
-    let root = vault.root()?;
-    Ok(paths
-        .iter()
-        .map(|p| {
-            vault::resolve_in(&root, p)
-                .ok()
-                .and_then(|abs| std::fs::read_to_string(abs).ok())
-        })
-        .collect())
+async fn read_many(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Vec<Option<String>>> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || {
+        Ok(paths
+            .iter()
+            .map(|p| {
+                vault::resolve_in(&root, p)
+                    .ok()
+                    .and_then(|abs| std::fs::read_to_string(abs).ok())
+            })
+            .collect())
+    })
+    .await
 }
 
-#[tauri::command]
-fn reveal(vault: State<Vault>, path: Option<String>) -> Result<(), String> {
-    let target = match path {
-        Some(p) => vault.resolve(&p)?,
-        None => vault.root()?,
-    };
+fn run_open(args: Vec<std::ffi::OsString>) -> CmdResult<()> {
     std::process::Command::new("open")
-        .arg("-R")
-        .arg(target)
+        .args(args)
         .status()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| plain_err(e.to_string()))?;
     Ok(())
+}
+
+#[tauri::command]
+async fn reveal(vault: State<'_, Vault>, path: Option<String>) -> CmdResult<()> {
+    let target = match path {
+        Some(p) => vault.resolve(&p),
+        None => vault.root(),
+    }
+    .map_err(plain_err)?;
+    blocking(move || run_open(vec!["-R".into(), target.into()])).await
 }
 
 /// The external route for problems Waymark will not resolve itself.
 #[tauri::command]
-fn open_terminal(vault: State<Vault>) -> Result<(), String> {
-    let root = vault.root()?;
-    std::process::Command::new("open")
-        .args(["-a", "Terminal"])
-        .arg(root)
-        .status()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+async fn open_terminal(vault: State<'_, Vault>) -> CmdResult<()> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || run_open(vec!["-a".into(), "Terminal".into(), root.into()])).await
 }
 
 #[tauri::command]
@@ -157,37 +175,67 @@ async fn git_status(vault: State<'_, Vault>) -> CmdResult<Status> {
 #[tauri::command]
 async fn git_fetch(vault: State<'_, Vault>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::fetch(&root)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::fetch(&root)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn git_fast_forward(vault: State<'_, Vault>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::fast_forward(&root)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::fast_forward(&root)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn git_push(vault: State<'_, Vault>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::push(&root)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::push(&root)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn git_stage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::stage(&root, &paths)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::stage(&root, &paths)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn git_unstage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::unstage(&root, &paths)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::unstage(&root, &paths)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn git_commit(vault: State<'_, Vault>, message: String) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
-    blocking(move || git::commit(&root, &message)).await
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        git::commit(&root, &message)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -307,10 +355,14 @@ fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), Stri
 #[tauri::command]
 fn read_prefs(app: AppHandle) -> Result<serde_json::Value, String> {
     let path = prefs_path(&app)?;
-    match std::fs::read_to_string(path) {
-        Ok(text) => Ok(serde_json::from_str(&text).unwrap_or(serde_json::json!({}))),
-        Err(_) => Ok(serde_json::json!({})),
-    }
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Ok(serde_json::json!({}));
+    };
+    serde_json::from_str(&text).or_else(|_| {
+        // Keep a damaged file for inspection instead of overwriting it with defaults.
+        let _ = std::fs::rename(&path, path.with_extension("json.corrupt"));
+        Ok(serde_json::json!({}))
+    })
 }
 
 #[tauri::command]

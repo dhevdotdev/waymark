@@ -1,5 +1,5 @@
 use std::path::{Component, Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
@@ -8,6 +8,7 @@ use serde::Serialize;
 #[derive(Default)]
 pub struct Vault {
     root: Mutex<Option<PathBuf>>,
+    write_gate: Arc<Mutex<()>>,
 }
 
 #[derive(Serialize)]
@@ -31,28 +32,50 @@ impl Vault {
             .ok_or_else(|| "No vault is open".to_string())
     }
 
+    /// Held while a command changes the repository, so two writes never race for Git's index lock.
+    pub fn write_gate(&self) -> Arc<Mutex<()>> {
+        self.write_gate.clone()
+    }
+
     pub fn resolve(&self, rel: &str) -> Result<PathBuf, String> {
         resolve_in(&self.root()?, rel)
     }
 }
 
+/// Resolves a path inside the vault, refusing dot-folders whether named directly or reached through a symlink.
 pub fn resolve_in(root: &Path, rel: &str) -> Result<PathBuf, String> {
+    contained(root, rel, |part| !part.starts_with('.'))
+}
+
+/// A path relative to the repository, for files Git reports. Hidden files are allowed; `.git` is not.
+pub fn relative_in_repo(root: &Path, rel: &str) -> Result<String, String> {
+    let canonical = contained(root, rel, |part| part != ".git")?;
+    let canonical_root = root.canonicalize().map_err(|e| e.to_string())?;
+    let inside = canonical
+        .strip_prefix(&canonical_root)
+        .map_err(|e| e.to_string())?;
+    Ok(inside.to_string_lossy().into_owned())
+}
+
+fn contained(root: &Path, rel: &str, allowed: fn(&str) -> bool) -> Result<PathBuf, String> {
+    let refused = || format!("Refusing path outside the vault: {rel}");
+    let parts_allowed = |path: &Path| {
+        path.components()
+            .all(|c| matches!(c, Component::Normal(part) if allowed(&part.to_string_lossy())))
+    };
     let rel_path = Path::new(rel);
-    for component in rel_path.components() {
-        match component {
-            Component::Normal(part) if !part.to_string_lossy().starts_with('.') => {}
-            _ => return Err(format!("Refusing path outside the vault: {rel}")),
-        }
+    if !parts_allowed(rel_path) {
+        return Err(refused());
     }
-    let joined = root.join(rel_path);
-    let canonical = joined
+    let canonical = root
+        .join(rel_path)
         .canonicalize()
         .map_err(|_| format!("Not found: {rel}"))?;
     let canonical_root = root.canonicalize().map_err(|e| e.to_string())?;
-    if !canonical.starts_with(&canonical_root) {
-        return Err(format!("Refusing path outside the vault: {rel}"));
+    match canonical.strip_prefix(&canonical_root) {
+        Ok(inside) if parts_allowed(inside) => Ok(canonical),
+        _ => Err(refused()),
     }
-    Ok(canonical)
 }
 
 pub fn info(root: &Path) -> VaultInfo {
@@ -128,6 +151,16 @@ mod tests {
         assert!(resolve_in(dir.path(), ".git/config").is_err());
         assert!(resolve_in(dir.path(), "/etc/passwd").is_err());
         assert!(resolve_in(dir.path(), "Notes/../.git/config").is_err());
+    }
+
+    #[test]
+    fn refuses_symlinks_into_dot_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+        std::fs::write(dir.path().join(".git/config"), "secret").unwrap();
+        std::os::unix::fs::symlink(dir.path().join(".git/config"), dir.path().join("Note.md"))
+            .unwrap();
+        assert!(resolve_in(dir.path(), "Note.md").is_err());
     }
 
     #[test]
