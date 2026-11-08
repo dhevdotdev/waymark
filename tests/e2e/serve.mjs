@@ -5,9 +5,9 @@ import path from "node:path";
 import { createServer } from "vite";
 import { writeFixtureVault } from "./fixture-vault.mjs";
 
-export async function serveFixture() {
+export async function serveFixture({ empty = false } = {}) {
   const vault = await mkdtemp(path.join(tmpdir(), "waymark-fixture-"));
-  await writeFixtureVault(vault);
+  if (!empty) await writeFixtureVault(vault);
   process.env.WAYMARK_VAULT = vault;
   const server = await createServer({ logLevel: "error" });
   await server.listen();

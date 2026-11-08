@@ -103,6 +103,22 @@ ${Array.from({ length: 14 }, (_, i) => paragraph(i + 2)).join("\n\n")}
   "Sailing/Navigation/Tide charts, datums and harbour approach.md": `Heights are measured from chart datum. Plot the [[Compass declination and magnetic north]] first.\n\n## Approach\n\n${paragraph(1)}\n`,
   "Sailing/Navigation/Dead reckoning with a paper log.md": `Log speed and heading every half hour. See [[Compass declination and magnetic north]].\n\n## Log\n\n${paragraph(2)}\n`,
   "Sailing/Navigation/Leading lines and transit bearings.md": `Keep the two marks in line. See [[Compass declination and magnetic north]].\n\n## Marks\n\n${paragraph(3)}\n`,
+  "Untrusted content.md": `<script>window.pwned = "script"</script>
+
+<img src="x" onerror="window.pwned = 'img'">
+
+<a href="javascript:window.pwned='link'" id="js-link">a javascript link</a>
+
+<iframe src="https://example.invalid/frame"></iframe>
+
+<video src="https://example.invalid/v.mp4"></video>
+
+<span data-act="close-vault" id="forged">a forged app action</span>
+
+![remote](https://example.invalid/picture.png)
+
+[[A file ../../../etc/passwd]]
+`,
   "Welcome.md": `# Welcome\n\nThis vault exists for automated tests. Start at [[Crumb structure and the overproofing problem]].\n\nA link to [[A note that does not exist]] stays visibly missing, and [[Duplicate name]] asks which one you meant.\n`,
   "Baking/Duplicate name.md": "The baking one.\n",
   "Sailing/Duplicate name.md": "The sailing one.\n",

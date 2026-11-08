@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "tauri": "tauri",
     "test": "vitest run --dir tests/unit",
-    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced",
+    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs",
     "test:sweep": "node tests/e2e/sweep.mjs",
     "test:visual": "node tests/e2e/visual.mjs",
     "test:native": "tauri build --bundles app && node tests/native/run.mjs",
