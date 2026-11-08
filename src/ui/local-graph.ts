@@ -9,7 +9,7 @@ import {
   type SimulationNodeDatum,
 } from "d3-force";
 import { resolveColor } from "./colors";
-import { groupColor } from "./graph";
+import { groupColor } from "./graph-paint";
 import { reducedMotion } from "./media";
 
 export interface Neighbour {

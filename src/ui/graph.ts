@@ -1,15 +1,7 @@
-import {
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type Simulation,
-  type SimulationLinkDatum,
-  type SimulationNodeDatum,
-} from "d3-force";
+import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from "d3-force";
 import { resolveColor } from "./colors";
+import { settleGraph } from "./graph-layout";
+import { groupColor, lightSprite } from "./graph-paint";
 import { reducedMotion } from "./media";
 
 export interface GraphNode extends SimulationNodeDatum {
@@ -28,7 +20,7 @@ export interface GraphGroup {
   size: number;
 }
 
-type GraphLink = SimulationLinkDatum<GraphNode> & { source: GraphNode | string; target: GraphNode | string };
+export type GraphLink = SimulationLinkDatum<GraphNode> & { source: GraphNode | string; target: GraphNode | string };
 
 export interface GraphData {
   nodes: GraphNode[];
@@ -55,49 +47,11 @@ interface Centre {
   bottom: number;
 }
 
-const HUES = ["mauve", "teal", "peach", "blue", "pink", "green", "yellow", "sky", "red", "lavender"];
-
 /** The CSS colour for a link community, so every view of the graph agrees and follows the theme. */
-export const groupColor = (group: number): string =>
-  group < 0 ? "var(--ink-4)" : `var(--p-${HUES[group % HUES.length]}, var(--accent))`;
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-/** Finished layouts, so reopening the graph is immediate and notes stay where you left them. */
-const layouts = new Map<string, Map<string, [number, number]>>();
-
-function signature(nodes: GraphNode[], links: GraphLink[]): string {
-  let hash = 0;
-  for (const n of nodes) for (let i = 0; i < n.id.length; i++) hash = (hash * 31 + n.id.charCodeAt(i)) | 0;
-  return `${nodes.length}:${links.length}:${hash}`;
-}
-
-/** A soft round light in one colour: full at the centre and fading smoothly, with no visible edge. */
-function lightSprite(color: string): HTMLCanvasElement {
-  const size = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const x = c.getContext("2d")!;
-  const g = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, "rgba(0,0,0,1)");
-  g.addColorStop(0.2, "rgba(0,0,0,0.62)");
-  g.addColorStop(0.45, "rgba(0,0,0,0.24)");
-  g.addColorStop(0.72, "rgba(0,0,0,0.06)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
-  x.fillStyle = g;
-  x.fillRect(0, 0, size, size);
-  x.globalCompositeOperation = "source-in";
-  x.fillStyle = color;
-  x.fillRect(0, 0, size, size);
-  return c;
-}
-
-/**
- * The vault as a map of link communities. Each community gathers into its own
- * cluster in its own colour, links inside it arc gently, and links between
- * communities run through their centres so they read as threads, not a hairball.
- */
 export class GraphCanvas {
   readonly canvas = document.createElement("canvas");
   private ctx = this.canvas.getContext("2d")!;
@@ -189,62 +143,16 @@ export class GraphCanvas {
   /** Places communities relative to each other first, then settles each note around its community. */
   private layout(previous: Map<string, GraphNode>): void {
     this.sim?.stop();
-    const anchors = this.placeGroups();
-    const n = this.nodes.length;
-    const dense = n > 120;
-    const sim = forceSimulation<GraphNode, GraphLink>(this.nodes)
-      .force(
-        "link",
-        forceLink<GraphNode, GraphLink>(this.links)
-          .id((d) => d.id)
-          .distance((l) =>
-            (l.source as GraphNode).group === (l.target as GraphNode).group ? (dense ? 24 : 42) : dense ? 120 : 90,
-          )
-          .strength((l) =>
-            (l.source as GraphNode).group === (l.target as GraphNode).group && (l.source as GraphNode).group >= 0 ? 0.32 : 0.012,
-          ),
-      )
-      .force(
-        "charge",
-        forceManyBody<GraphNode>()
-          .strength(dense ? -30 : -110)
-          .distanceMax(dense ? 200 : 320),
-      )
-      .force(
-        "x",
-        forceX<GraphNode>((d) => anchors.get(d.group)?.x ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)),
-      )
-      .force(
-        "y",
-        forceY<GraphNode>((d) => anchors.get(d.group)?.y ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)),
-      )
-      .force(
-        "collide",
-        forceCollide<GraphNode>((d) => this.radius(d) + 2.5),
-      )
-      .alphaDecay(0.028)
-      .stop();
-    this.sim = sim;
+    this.sim = settleGraph(this.nodes, this.links, (d) => this.radius(d));
     this.inside.clear();
     this.between = [];
     for (const l of this.links) {
-      const a = (l.source as GraphNode).group,
-        b = (l.target as GraphNode).group;
+      const a = (l.source as GraphNode).group;
+      const b = (l.target as GraphNode).group;
       if (a === b && a >= 0) {
         if (!this.inside.has(a)) this.inside.set(a, []);
         this.inside.get(a)!.push(l);
       } else this.between.push(l);
-    }
-    const key = signature(this.nodes, this.links);
-    const known = layouts.get(key);
-    if (known) {
-      for (const d of this.nodes) [d.x, d.y] = known.get(d.id) ?? [0, 0];
-      sim.alpha(0);
-    } else {
-      for (let i = 0; i < 220; i++) sim.tick();
-      layouts.set(key, new Map(this.nodes.map((d) => [d.id, [d.x!, d.y!]])));
-      if (layouts.size > 12) layouts.delete(layouts.keys().next().value!);
-      sim.alpha(0);
     }
     const centres = this.centres(false);
     for (const d of this.nodes) {
@@ -253,43 +161,6 @@ export class GraphCanvas {
       d.sx = old?.x ?? c?.x ?? d.x! * 0.4;
       d.sy = old?.y ?? c?.y ?? d.y! * 0.4;
     }
-  }
-
-  private placeGroups(): Map<number, { x: number; y: number }> {
-    type Meta = SimulationNodeDatum & { id: number; r: number };
-    const counts = new Map<number, number>();
-    for (const n of this.nodes) if (n.group >= 0) counts.set(n.group, (counts.get(n.group) ?? 0) + 1);
-    const metas: Meta[] = [...counts].map(([id, size]) => ({ id, r: 16 * Math.sqrt(size) }));
-    const present = new Set(metas.map((m) => m.id));
-    const weight = new Map<string, { source: number; target: number; w: number }>();
-    const group = new Map(this.nodes.map((n) => [n.id, n.group]));
-    for (const l of this.links) {
-      const a = group.get(l.source as string)!,
-        b = group.get(l.target as string)!;
-      if (a === b || !present.has(a) || !present.has(b)) continue;
-      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
-      const e = weight.get(key) ?? { source: Math.min(a, b), target: Math.max(a, b), w: 0 };
-      e.w++;
-      weight.set(key, e);
-    }
-    const sim = forceSimulation<Meta>(metas)
-      .force(
-        "link",
-        forceLink<Meta, { source: number | Meta; target: number | Meta; w: number }>([...weight.values()])
-          .id((d) => d.id)
-          .distance((l) => 60 + 90 / Math.sqrt(l.w))
-          .strength(0.25),
-      )
-      .force("charge", forceManyBody<Meta>().strength(-260))
-      .force("x", forceX<Meta>(0).strength(0.04))
-      .force("y", forceY<Meta>(0).strength(0.17))
-      .force(
-        "collide",
-        forceCollide<Meta>((d) => d.r * 1.15),
-      )
-      .stop();
-    for (let i = 0; i < 240; i++) sim.tick();
-    return new Map(metas.map((m) => [m.id, { x: m.x!, y: m.y! }]));
   }
 
   private playIntro(): void {
