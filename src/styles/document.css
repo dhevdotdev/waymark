@@ -924,7 +924,8 @@ button.callout-title:focus-visible {
     animation: none;
     background: var(--row-hover);
   }
-  .callout-body {
+  .callout-body,
+  .callout-chevron {
     transition: none;
   }
 }

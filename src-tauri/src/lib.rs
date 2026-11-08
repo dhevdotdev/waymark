@@ -36,19 +36,24 @@ async fn blocking<T: Send + 'static>(
 }
 
 #[tauri::command]
-fn open_vault(
+async fn open_vault(
     app: AppHandle,
-    vault: State<Vault>,
-    watcher: State<Watcher>,
+    vault: State<'_, Vault>,
+    watcher: State<'_, Watcher>,
     path: String,
-) -> Result<VaultInfo, String> {
-    let root = PathBuf::from(&path)
-        .canonicalize()
-        .map_err(|_| format!("Folder not found: {path}"))?;
-    if !root.is_dir() {
-        return Err("Choose a folder".into());
-    }
-    let debouncer = watch(&app, &root)?;
+) -> CmdResult<VaultInfo> {
+    let handle = app.clone();
+    let (root, debouncer) = blocking(move || {
+        let root = PathBuf::from(&path)
+            .canonicalize()
+            .map_err(|_| plain_err(format!("Folder not found: {path}")))?;
+        if !root.is_dir() {
+            return Err(plain_err("Choose a folder"));
+        }
+        let debouncer = watch(&handle, &root).map_err(plain_err)?;
+        Ok((root, debouncer))
+    })
+    .await?;
     vault.set(root.clone());
     *watcher.0.lock().unwrap() = Some(debouncer);
     Ok(vault::info(&root))
@@ -353,28 +358,31 @@ fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), Stri
 }
 
 #[tauri::command]
-fn read_prefs(app: AppHandle) -> Result<serde_json::Value, String> {
-    let path = prefs_path(&app)?;
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        return Ok(serde_json::json!({}));
-    };
-    serde_json::from_str(&text).or_else(|_| {
-        // Keep a damaged file for inspection instead of overwriting it with defaults.
-        let _ = std::fs::rename(&path, path.with_extension("json.corrupt"));
-        Ok(serde_json::json!({}))
+async fn read_prefs(app: AppHandle) -> CmdResult<serde_json::Value> {
+    blocking(move || {
+        let path = prefs_path(&app).map_err(plain_err)?;
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return Ok(serde_json::json!({}));
+        };
+        Ok(serde_json::from_str(&text).unwrap_or_else(|_| {
+            // Keep a damaged file for inspection instead of overwriting it with defaults.
+            let _ = std::fs::rename(&path, path.with_extension("json.corrupt"));
+            serde_json::json!({})
+        }))
     })
+    .await
 }
 
 #[tauri::command]
-fn write_prefs(app: AppHandle, prefs: serde_json::Value) -> Result<(), String> {
-    let path = prefs_path(&app)?;
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(
-        &tmp,
-        serde_json::to_vec_pretty(&prefs).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    std::fs::rename(tmp, path).map_err(|e| e.to_string())
+async fn write_prefs(app: AppHandle, prefs: serde_json::Value) -> CmdResult<()> {
+    blocking(move || {
+        let path = prefs_path(&app).map_err(plain_err)?;
+        let tmp = path.with_extension("json.tmp");
+        let bytes = serde_json::to_vec_pretty(&prefs).map_err(|e| plain_err(e.to_string()))?;
+        std::fs::write(&tmp, bytes).map_err(|e| plain_err(e.to_string()))?;
+        std::fs::rename(tmp, path).map_err(|e| plain_err(e.to_string()))
+    })
+    .await
 }
 
 /// The standard Mac menus, without Close Window: ⌘W closes a tab in Waymark.
