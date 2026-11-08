@@ -1,5 +1,5 @@
-import type { App } from "./ui/app";
 import { git } from "./platform";
+import type { App } from "./ui/app";
 
 /**
  * Checks that run inside the packaged app (WKWebView + Rust), started with
@@ -7,6 +7,7 @@ import { git } from "./platform";
  * "git" drives sync against a disposable fixture repository.
  */
 export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {
+  // biome-ignore lint/suspicious/noExplicitAny: reaches private members until the app exposes a typed test port.
   const a = app as unknown as Record<string, any>;
   const results: { name: string; ok: boolean; detail?: unknown }[] = [];
   const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -90,7 +91,13 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     check("search finds text", hits.length > 0, hits.length);
 
     const st = await git.status();
-    check("git status over IPC", st.isRepo, { branch: st.branch, upstream: st.upstream, ahead: st.ahead, behind: st.behind, changed: st.files.length });
+    check("git status over IPC", st.isRepo, {
+      branch: st.branch,
+      upstream: st.upstream,
+      ahead: st.ahead,
+      behind: st.behind,
+      changed: st.files.length,
+    });
     const target = app.index.notes[0];
     const history = await git.log(target, 10, 0);
     check("per-note history", history.length > 0, history.length);
@@ -98,17 +105,27 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
       const diff = await git.show(history[0].sha, history[0].path ?? target);
       check("commit diff for a note", diff.includes("@@"), diff.length);
     }
-    const external = performance.getEntriesByType("resource").map((e) => e.name).filter((u) => !/^(vault|ipc|tauri|http:\/\/(ipc|tauri|vault)\.localhost)/.test(u) && !u.startsWith(location.origin));
+    const external = performance
+      .getEntriesByType("resource")
+      .map((e) => e.name)
+      .filter((u) => !/^(vault|ipc|tauri|http:\/\/(ipc|tauri|vault)\.localhost)/.test(u) && !u.startsWith(location.origin));
     check("no requests leave the machine", external.length === 0, external.slice(0, 5));
 
     await app.open(target);
     a.setRailPane("info");
     await until(() => !!document.querySelector(".rail-history .rail-commit"), 4000);
     const firstCommit = document.querySelector<HTMLElement>(".rail-history .rail-commit");
-    check("the Info pane lists this note's Git history", !!firstCommit, document.querySelectorAll(".rail-history .rail-commit").length);
+    check(
+      "the Info pane lists this note's Git history",
+      !!firstCommit,
+      document.querySelectorAll(".rail-history .rail-commit").length,
+    );
     firstCommit?.click();
     await until(() => !!document.querySelector(".sheet-overlay"), 4000);
-    check("a history entry opens that commit's change", !!document.querySelector(".sheet-overlay .diff, .sheet-overlay .sheet-body *"));
+    check(
+      "a history entry opens that commit's change",
+      !!document.querySelector(".sheet-overlay .diff, .sheet-overlay .sheet-body *"),
+    );
     check("a history entry offers the old version", !!document.querySelector(".sheet-actions .btn"));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     await wait(250);
@@ -129,7 +146,10 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     await panel.fetch(true);
     check("fetch sees incoming commits", panel.status?.behind === 1, { behind: panel.status?.behind });
     await panel.sync();
-    check("sync fast-forwards", panel.status?.behind === 0 && panel.state.kind === "idle", { behind: panel.status?.behind, state: panel.state.kind });
+    check("sync fast-forwards", panel.status?.behind === 0 && panel.state.kind === "idle", {
+      behind: panel.status?.behind,
+      state: panel.state.kind,
+    });
     await until(() => app.texts.get("Welcome.md")?.includes("updated remotely") ?? false, 4000);
     check("watcher re-reads the updated note", app.texts.get("Welcome.md")?.includes("updated remotely") ?? false);
     check("open note re-rendered", document.querySelector(".doc")?.textContent?.includes("updated remotely") ?? false);
@@ -152,11 +172,18 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     await wait(400);
     const notice = document.querySelector(".git-drawer .notice strong")?.textContent;
     check("sync panel explains the problem", !!notice, notice);
-    check("panel offers the external route", !!document.querySelector(".git-drawer .notice-actions .btn"), document.querySelector(".git-drawer .notice-actions .btn")?.textContent);
+    check(
+      "panel offers the external route",
+      !!document.querySelector(".git-drawer .notice-actions .btn"),
+      document.querySelector(".git-drawer .notice-actions .btn")?.textContent,
+    );
     if (mode === "blocked") {
       a.setRailPane("info");
       await until(() => !!document.querySelector(".rail-history .rail-commit"), 4000);
-      check("the Info pane flags uncommitted edits", document.querySelector(".rail-history .rail-commit-subject")?.textContent === "Uncommitted changes");
+      check(
+        "the Info pane flags uncommitted edits",
+        document.querySelector(".rail-history .rail-commit-subject")?.textContent === "Uncommitted changes",
+      );
       a.setRailPane("outline");
     }
     if (mode === "blocked") check("local edit preserved", (app.texts.get("Welcome.md") ?? "").includes("my local edit"));

@@ -22,15 +22,26 @@
   text-wrap: pretty;
   -webkit-font-smoothing: antialiased;
 }
-.doc > * { grid-column: text; min-width: 0; }
-.doc > :is(.diagram, .embed-block, .embed-pdf) { grid-column: wide; }
+.doc > * {
+  grid-column: text;
+  min-width: 0;
+}
+.doc > :is(.diagram, .embed-block, .embed-pdf) {
+  grid-column: wide;
+}
 /*
  * Surfaced blocks share one edge rule: each hangs outside the text column by
  * exactly its own padding, so its contents line up with the prose on both sides.
  */
-.doc > .code { margin-inline: -18px; }
-.doc > .callout { margin-inline: -16px; }
-.doc > .table-wrap { margin-inline: -8px; }
+.doc > .code {
+  margin-inline: -18px;
+}
+.doc > .callout {
+  margin-inline: -16px;
+}
+.doc > .table-wrap {
+  margin-inline: -8px;
+}
 
 /* Title block */
 .doc-title {
@@ -43,7 +54,9 @@
   font-variant-numeric: lining-nums;
 }
 /* Prose */
-.doc p { margin: 0 0 var(--s4); }
+.doc p {
+  margin: 0 0 var(--s4);
+}
 .doc :is(h2, h3, h4, h5, h6) {
   color: var(--ink);
   font-variant-numeric: lining-nums;
@@ -51,32 +64,66 @@
   text-wrap: balance;
 }
 .doc h2 {
-  font-size: var(--text-h2); line-height: var(--leading-tight); font-weight: 600;
+  font-size: var(--text-h2);
+  line-height: var(--leading-tight);
+  font-weight: 600;
   letter-spacing: -0.006em;
   margin: var(--s7) 0 var(--s3);
 }
 .doc h3 {
   font-family: var(--font-ui);
-  font-size: var(--text-h3); line-height: 1.35; font-weight: 620; letter-spacing: -0.003em;
+  font-size: var(--text-h3);
+  line-height: 1.35;
+  font-weight: 620;
+  letter-spacing: -0.003em;
   margin: var(--s6) 0 var(--s2);
 }
-.doc h4, .doc h5, .doc h6 {
-  font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 620;
-  color: var(--ink-2); margin: var(--s5) 0 var(--s2);
+.doc h4,
+.doc h5,
+.doc h6 {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 620;
+  color: var(--ink-2);
+  margin: var(--s5) 0 var(--s2);
 }
-.doc :is(h2, h3) + :is(h3, h4) { margin-top: var(--s4); }
+.doc :is(h2, h3) + :is(h3, h4) {
+  margin-top: var(--s4);
+}
 
-.doc strong { font-weight: 640; color: var(--ink); }
-.doc em { font-style: italic; }
+.doc strong {
+  font-weight: 640;
+  color: var(--ink);
+}
+.doc em {
+  font-style: italic;
+}
 .doc mark {
   background: linear-gradient(transparent 12%, var(--mark) 12%, var(--mark) 88%, transparent 88%);
-  color: inherit; padding: 0 1px; border-radius: 2px;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
 }
-.doc hr { border: 0; height: 1px; background: var(--rule); margin: var(--s7) 0; }
+.doc hr {
+  border: 0;
+  height: 1px;
+  background: var(--rule);
+  margin: var(--s7) 0;
+}
 
-.doc ul, .doc ol { margin: 0 0 var(--s4); padding-left: 1.35em; }
-.doc ul, .doc ol { list-style: none; }
-.doc li { margin: 0.2em 0; padding-left: 0.15em; }
+.doc ul,
+.doc ol {
+  margin: 0 0 var(--s4);
+  padding-left: 1.35em;
+}
+.doc ul,
+.doc ol {
+  list-style: none;
+}
+.doc li {
+  margin: 0.2em 0;
+  padding-left: 0.15em;
+}
 /*
  * Drawn rather than native list markers, which WebKit highlights as separate
  * boxes during a selection. Each sits in the flow of its first line, so it
@@ -84,66 +131,158 @@
  */
 .doc ul > li:where(:not(:has(> p:first-child)))::before,
 .doc ul > li > p:first-child::before {
-  content: ""; display: inline-block; vertical-align: 0.1em;
-  inline-size: 0.32em; block-size: 0.32em; margin-inline: -0.82em 0.5em;
-  border-radius: 50%; background: var(--ink-4);
+  content: "";
+  display: inline-block;
+  vertical-align: 0.1em;
+  inline-size: 0.32em;
+  block-size: 0.32em;
+  margin-inline: -0.82em 0.5em;
+  border-radius: 50%;
+  background: var(--ink-4);
 }
 .doc ul ul > li:where(:not(:has(> p:first-child)))::before,
-.doc ul ul > li > p:first-child::before { background: none; box-shadow: inset 0 0 0 1px var(--ink-4); }
-.doc ol { counter-reset: item var(--list-start, 0); }
-.doc ol > li { counter-increment: item; }
+.doc ul ul > li > p:first-child::before {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--ink-4);
+}
+.doc ol {
+  counter-reset: item var(--list-start, 0);
+}
+.doc ol > li {
+  counter-increment: item;
+}
 .doc ol > li:where(:not(:has(> p:first-child)))::before,
 .doc ol > li > p:first-child::before {
-  content: counter(item) "."; display: inline-block;
-  inline-size: 2em; margin-inline: -2.4em 0.4em; text-align: end;
-  font-family: var(--font-ui); font-size: 0.8em; font-variant-numeric: tabular-nums; font-weight: 550; color: var(--ink-4);
+  content: counter(item) ".";
+  display: inline-block;
+  inline-size: 2em;
+  margin-inline: -2.4em 0.4em;
+  text-align: end;
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 550;
+  color: var(--ink-4);
 }
-.doc .backlinks li::before { content: none; }
-.doc li > p { margin-bottom: var(--s2); }
-.doc li > p:last-child { margin-bottom: 0; }
-.doc li > ul, .doc li > ol { margin: 0.2em 0 0.3em; }
+.doc .backlinks li::before {
+  content: none;
+}
+.doc li > p {
+  margin-bottom: var(--s2);
+}
+.doc li > p:last-child {
+  margin-bottom: 0;
+}
+.doc li > ul,
+.doc li > ol {
+  margin: 0.2em 0 0.3em;
+}
 
 .doc blockquote:where(:not(.callout)) {
-  margin: 0 0 var(--s4); padding: 0 0 0 var(--s4);
-  border-left: 2px solid var(--rule-strong); color: var(--ink-2);
+  margin: 0 0 var(--s4);
+  padding: 0 0 0 var(--s4);
+  border-left: 2px solid var(--rule-strong);
+  color: var(--ink-2);
 }
-.doc blockquote:not(.callout) > :last-child { margin-bottom: 0; }
+.doc blockquote:not(.callout) > :last-child {
+  margin-bottom: 0;
+}
 
 /* Links */
-.doc a { color: var(--link); text-decoration: none; transition: color var(--t-hover); }
+.doc a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color var(--t-hover);
+}
 .doc a.wikilink {
   text-decoration: underline;
   text-decoration-color: color-mix(in oklab, var(--link) 30%, transparent);
-  text-decoration-thickness: 1px; text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
   transition: text-decoration-color var(--t-hover);
 }
-@media (hover: hover) and (pointer: fine) { .doc a.wikilink:hover { text-decoration-color: var(--link); } }
-.doc a.attachment-link { color: var(--link); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--link) 30%, transparent); text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
-.doc a.attachment-link::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.25em; vertical-align: -0.05em; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6v18h12V7z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6v18h12V7z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E") center / contain no-repeat; }
-.doc a.external { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+@media (hover: hover) and (pointer: fine) {
+  .doc a.wikilink:hover {
+    text-decoration-color: var(--link);
+  }
+}
+.doc a.attachment-link {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--link) 30%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+.doc a.attachment-link::before {
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.25em;
+  vertical-align: -0.05em;
+  background: currentColor;
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6v18h12V7z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6v18h12V7z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+.doc a.external {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
 .doc a.external::after {
-  content: "↗"; font-family: var(--font-ui); font-size: 0.7em; margin-left: 0.15em; color: var(--ink-4);
+  content: "↗";
+  font-family: var(--font-ui);
+  font-size: 0.7em;
+  margin-left: 0.15em;
+  color: var(--ink-4);
   vertical-align: 0.15em;
 }
-@media (hover: hover) and (pointer: fine) { .doc a.external:hover { color: var(--ink); text-decoration-color: currentColor; } }
-.doc .is-missing {
-  color: var(--ink-3); cursor: help;
-  text-decoration: underline dashed; text-decoration-color: var(--ink-4);
-  text-underline-offset: 0.2em; text-decoration-thickness: 1px;
+@media (hover: hover) and (pointer: fine) {
+  .doc a.external:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
+  }
 }
-.doc a.is-ambiguous { color: var(--warn-ink); text-decoration-color: color-mix(in oklab, var(--warn) 50%, transparent); text-decoration-style: wavy; }
+.doc .is-missing {
+  color: var(--ink-3);
+  cursor: help;
+  text-decoration: underline dashed;
+  text-decoration-color: var(--ink-4);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+.doc a.is-ambiguous {
+  color: var(--warn-ink);
+  text-decoration-color: color-mix(in oklab, var(--warn) 50%, transparent);
+  text-decoration-style: wavy;
+}
 
 /* Inline code */
 .doc :not(pre) > code {
-  font-family: var(--font-mono); font-size: 0.84em; font-weight: 450;
-  padding: 0.08em 0.2em; border-radius: var(--r-chip);
-  background: var(--inline-code-bg); color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  font-weight: 450;
+  padding: 0.08em 0.2em;
+  border-radius: var(--r-chip);
+  background: var(--inline-code-bg);
+  color: var(--ink);
   font-variant-ligatures: none;
   overflow-wrap: break-word;
-  box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
-.doc :is(h2, h3) code { font-size: 0.86em; }
-.doc a code { color: inherit; }
+.doc :is(h2, h3) code {
+  font-size: 0.86em;
+}
+.doc a code {
+  color: inherit;
+}
 
 /* Code blocks */
 .code {
@@ -153,70 +292,166 @@
   background: var(--code-bg);
 }
 .code-bar {
-  position: absolute; inset-block-start: 8px; inset-inline-end: 8px; z-index: 1;
-  opacity: 0; transition: opacity var(--t-hover) ease;
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity var(--t-hover) ease;
 }
-.code:focus-within .code-bar, .code-bar:has(.is-done) { opacity: 1; }
-@media (hover: hover) and (pointer: fine) { .code:hover .code-bar { opacity: 1; } }
+.code:focus-within .code-bar,
+.code-bar:has(.is-done) {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .code:hover .code-bar {
+    opacity: 1;
+  }
+}
 .code-copy {
-  appearance: none; border: 0; cursor: default; padding: 0;
-  display: grid; place-items: center; inline-size: 28px; block-size: 28px; border-radius: var(--r-control);
-  background: var(--code-bg); color: var(--ink-3);
+  appearance: none;
+  border: 0;
+  cursor: default;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--r-control);
+  background: var(--code-bg);
+  color: var(--ink-3);
   box-shadow: inset 0 0 0 1px var(--rule-strong);
-  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease;
 }
 .code-copy::before {
-  content: ""; inline-size: 15px; block-size: 15px; background: currentColor;
-  -webkit-mask: var(--glyph) center / contain no-repeat; mask: var(--glyph) center / contain no-repeat;
+  content: "";
+  inline-size: 15px;
+  block-size: 15px;
+  background: currentColor;
+  -webkit-mask: var(--glyph) center / contain no-repeat;
+  mask: var(--glyph) center / contain no-repeat;
   --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5.5' y='5.5' width='8' height='8' rx='1.6'/%3E%3Cpath d='M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5'/%3E%3C/svg%3E");
 }
-.code-copy.is-done::before { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8'/%3E%3C/svg%3E"); }
-.code-copy span { position: absolute; inline-size: 1px; block-size: 1px; overflow: clip; clip-path: inset(50%); white-space: nowrap; }
-.code-copy.is-done { color: var(--ok-ink); }
-.code-copy:active { background: color-mix(in oklab, var(--ink) 14%, var(--code-bg)); }
-@media (hover: hover) and (pointer: fine) { .code-copy:hover { background: color-mix(in oklab, var(--ink) 8%, var(--code-bg)); color: var(--ink); } .code-copy.is-done:hover { color: var(--ok-ink); } }
+.code-copy.is-done::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8'/%3E%3C/svg%3E");
+}
+.code-copy span {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: clip;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.code-copy.is-done {
+  color: var(--ok-ink);
+}
+.code-copy:active {
+  background: color-mix(in oklab, var(--ink) 14%, var(--code-bg));
+}
+@media (hover: hover) and (pointer: fine) {
+  .code-copy:hover {
+    background: color-mix(in oklab, var(--ink) 8%, var(--code-bg));
+    color: var(--ink);
+  }
+  .code-copy.is-done:hover {
+    color: var(--ok-ink);
+  }
+}
 .code pre {
-  margin: 0; padding: 14px 18px; overflow-x: auto;
+  margin: 0;
+  padding: 14px 18px;
+  overflow-x: auto;
   background: transparent !important;
-  font-family: var(--font-mono); font-size: var(--text-code); line-height: var(--leading-code);
-  font-variant-ligatures: none; tab-size: 4;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: var(--leading-code);
+  font-variant-ligatures: none;
+  tab-size: 4;
   scrollbar-width: thin;
 }
-.code pre code { font: inherit; }
+.code pre code {
+  font: inherit;
+}
 /* Box-drawing glyphs are 1.52em tall, so at this line height vertical strokes join up. */
-.code.is-text-art pre { line-height: 1.5; }
-.code pre.plain { color: var(--ink); }
-.code .shiki span { color: var(--shiki-light); }
-:root[data-scheme="dark"] .code .shiki span { color: var(--shiki-dark); }
+.code.is-text-art pre {
+  line-height: 1.5;
+}
+.code pre.plain {
+  color: var(--ink);
+}
+.code .shiki span {
+  color: var(--shiki-light);
+}
+:root[data-scheme="dark"] .code .shiki span {
+  color: var(--shiki-dark);
+}
 
 /* Tables */
 .table-wrap {
   margin: var(--s2) 0 var(--s5);
-  overflow-x: auto; overscroll-behavior-x: contain;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   border-radius: var(--r-block);
 }
-.table-wrap:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.table-wrap:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 .doc table {
-  width: 100%; border-collapse: collapse;
-  font-size: var(--text-small); line-height: 1.5;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-small);
+  line-height: 1.5;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .doc th {
-  font-family: var(--font-ui); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em;
-  color: var(--ink-2); text-align: left; vertical-align: bottom;
-  padding: 0 var(--s4) var(--s2); border-bottom: 1px solid var(--rule-strong);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  text-align: left;
+  vertical-align: bottom;
+  padding: 0 var(--s4) var(--s2);
+  border-bottom: 1px solid var(--rule-strong);
   white-space: nowrap;
 }
-.doc td { padding: 0.6rem var(--s4); vertical-align: top; border-bottom: 1px solid var(--rule); }
-.doc :is(th, td):first-child { padding-left: var(--s2); }
-.doc :is(th, td):last-child { padding-right: var(--s2); }
-.doc tr:last-child td { border-bottom: 0; }
-.doc td:first-child { color: var(--ink); }
-.doc td code { font-size: 0.82em; white-space: nowrap; }
-.doc tbody tr { transition: background var(--t-hover); }
-@media (hover: hover) and (pointer: fine) { .doc tbody tr:hover { background: var(--fill); } }
-.doc th:empty { padding: 0; }
+.doc td {
+  padding: 0.6rem var(--s4);
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+.doc :is(th, td):first-child {
+  padding-left: var(--s2);
+}
+.doc :is(th, td):last-child {
+  padding-right: var(--s2);
+}
+.doc tr:last-child td {
+  border-bottom: 0;
+}
+.doc td:first-child {
+  color: var(--ink);
+}
+.doc td code {
+  font-size: 0.82em;
+  white-space: nowrap;
+}
+.doc tbody tr {
+  transition: background var(--t-hover);
+}
+@media (hover: hover) and (pointer: fine) {
+  .doc tbody tr:hover {
+    background: var(--fill);
+  }
+}
+.doc th:empty {
+  padding: 0;
+}
 
 /* Callouts */
 .callout {
@@ -227,160 +462,404 @@
   font-size: var(--text-small);
   line-height: 1.6;
 }
-.callout[data-callout="abstract"] { --c: var(--c-abstract); }
-.callout[data-callout="info"] { --c: var(--c-info); }
-.callout[data-callout="tip"] { --c: var(--c-tip); }
-.callout[data-callout="success"] { --c: var(--c-success); }
-.callout[data-callout="question"] { --c: var(--c-question); }
-.callout[data-callout="warning"] { --c: var(--c-warning); }
-.callout[data-callout="failure"], .callout[data-callout="danger"] { --c: var(--c-danger); }
-.callout[data-callout="bug"] { --c: var(--c-bug); }
-.callout[data-callout="example"] { --c: var(--c-example); }
-.callout[data-callout="quote"] { --c: var(--c-quote); }
-.callout[data-callout="todo"] { --c: var(--c-todo); }
+.callout[data-callout="abstract"] {
+  --c: var(--c-abstract);
+}
+.callout[data-callout="info"] {
+  --c: var(--c-info);
+}
+.callout[data-callout="tip"] {
+  --c: var(--c-tip);
+}
+.callout[data-callout="success"] {
+  --c: var(--c-success);
+}
+.callout[data-callout="question"] {
+  --c: var(--c-question);
+}
+.callout[data-callout="warning"] {
+  --c: var(--c-warning);
+}
+.callout[data-callout="failure"],
+.callout[data-callout="danger"] {
+  --c: var(--c-danger);
+}
+.callout[data-callout="bug"] {
+  --c: var(--c-bug);
+}
+.callout[data-callout="example"] {
+  --c: var(--c-example);
+}
+.callout[data-callout="quote"] {
+  --c: var(--c-quote);
+}
+.callout[data-callout="todo"] {
+  --c: var(--c-todo);
+}
 
 .callout-title {
-  display: flex; align-items: center; gap: 8px; width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   padding: 11px 16px 0;
-  font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 620; line-height: 1.35;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 620;
+  line-height: 1.35;
   color: color-mix(in oklab, var(--c) 78%, var(--ink));
   text-align: left;
 }
 button.callout-title {
-  appearance: none; border: 0; background: none; cursor: default; font: inherit;
-  font-family: var(--font-ui); font-size: 0.8125rem; font-weight: 620;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: default;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 620;
   color: color-mix(in oklab, var(--c) 78%, var(--ink));
-  padding-bottom: 11px; border-radius: var(--r-block);
+  padding-bottom: 11px;
+  border-radius: var(--r-block);
 }
-button.callout-title:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.callout-label code { font-size: 0.9em; }
+button.callout-title:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.callout-label code {
+  font-size: 0.9em;
+}
 .callout-icon {
-  flex: none; width: 15px; height: 15px; background: currentColor;
-  -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
   --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 16v-4M12 8h.01'/%3E%3C/svg%3E");
 }
-.callout[data-callout="abstract"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h10'/%3E%3C/svg%3E"); }
-.callout[data-callout="tip"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z'/%3E%3C/svg%3E"); }
+.callout[data-callout="abstract"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h10'/%3E%3C/svg%3E");
+}
+.callout[data-callout="tip"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z'/%3E%3C/svg%3E");
+}
 .callout[data-callout="warning"] .callout-icon,
-.callout[data-callout="danger"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 2 20h20L12 3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E"); }
-.callout[data-type="summary"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
-.callout[data-type="important"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12M12 20h.01'/%3E%3C/svg%3E"); }
-.callout[data-callout="question"] .callout-icon { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01'/%3E%3C/svg%3E"); }
+.callout[data-callout="danger"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 2 20h20L12 3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
+}
+.callout[data-type="summary"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.callout[data-type="important"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12M12 20h.01'/%3E%3C/svg%3E");
+}
+.callout[data-callout="question"] .callout-icon {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01'/%3E%3C/svg%3E");
+}
 
 .callout-chevron {
-  width: 14px; height: 14px; margin-left: auto; flex: none;
-  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
-  opacity: 0.7; transition: transform var(--t-menu) var(--ease-out);
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+  transition: transform var(--t-menu) var(--ease-out);
 }
-.callout[data-fold="open"] .callout-chevron { transform: rotate(90deg); }
+.callout[data-fold="open"] .callout-chevron {
+  transform: rotate(90deg);
+}
 
 .callout-body {
-  display: grid; grid-template-rows: 1fr;
+  display: grid;
+  grid-template-rows: 1fr;
   transition: grid-template-rows var(--t-menu) var(--ease-out);
 }
-.callout[data-fold="closed"] .callout-body { grid-template-rows: 0fr; }
-.callout-content { overflow: hidden; padding: 6px 16px 12px; }
-.callout[data-fold] .callout-content { padding-top: 0; }
-.callout[data-fold="closed"] .callout-content { padding-bottom: 0; }
-.callout-content > :last-child { margin-bottom: 0; }
-.callout-content > p { margin-bottom: var(--s2); }
-.callout-content :is(.code, .table-wrap) { margin: var(--s2) 0; }
-.callout-content .code { background: color-mix(in oklab, var(--paper) 70%, transparent); }
+.callout[data-fold="closed"] .callout-body {
+  grid-template-rows: 0fr;
+}
+.callout-content {
+  overflow: hidden;
+  padding: 6px 16px 12px;
+}
+.callout[data-fold] .callout-content {
+  padding-top: 0;
+}
+.callout[data-fold="closed"] .callout-content {
+  padding-bottom: 0;
+}
+.callout-content > :last-child {
+  margin-bottom: 0;
+}
+.callout-content > p {
+  margin-bottom: var(--s2);
+}
+.callout-content :is(.code, .table-wrap) {
+  margin: var(--s2) 0;
+}
+.callout-content .code {
+  background: color-mix(in oklab, var(--paper) 70%, transparent);
+}
 
 /* Summary: the note's takeaway reads a step larger than a callout body. */
 .callout[data-type="summary"] .callout-content > p:only-child,
 .callout[data-type="summary"] .callout-content > p:first-child:last-child {
-  font-size: var(--text-body); line-height: 1.6;
+  font-size: var(--text-body);
+  line-height: 1.6;
 }
 
 /* Diagrams */
 .diagram {
-  position: relative; margin: var(--s3) 0 var(--s5);
+  position: relative;
+  margin: var(--s3) 0 var(--s5);
   padding: var(--s5) var(--s4);
   border-radius: var(--r-block);
   background: var(--code-bg);
-  display: grid; place-items: center;
+  display: grid;
+  place-items: center;
   overflow-x: auto;
 }
-.diagram-svg { justify-self: stretch; display: flex; justify-content: center; min-width: 0; }
-.diagram-svg svg { width: 100%; height: auto; display: block; }
-.diagram-source { margin: 0; font-family: var(--font-mono); font-variant-ligatures: none; font-size: var(--text-code); color: var(--ink-3); white-space: pre-wrap; justify-self: stretch; }
-.diagram.is-pending .diagram-source { visibility: hidden; height: 4rem; overflow: hidden; }
-.diagram.is-error .diagram-source { visibility: visible; height: auto; }
-.diagram-error { font-family: var(--font-ui); font-size: var(--ui-small); color: var(--warn-ink); justify-self: start; margin-bottom: var(--s2); }
-.diagram-expand {
-  position: absolute; top: 8px; right: 8px;
-  appearance: none; border: 0; cursor: zoom-in;
-  width: 28px; height: 28px; border-radius: var(--r-control);
-  display: grid; place-items: center;
-  background: color-mix(in oklab, var(--paper) 80%, transparent); color: var(--ink-2);
-  box-shadow: 0 0 0 1px var(--rule);
-  opacity: 0; transition: opacity var(--t-hover);
+.diagram-svg {
+  justify-self: stretch;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
 }
-.diagram-expand:focus-visible { opacity: 1; }
-@media (hover: hover) and (pointer: fine) { .diagram:hover .diagram-expand { opacity: 1; } }
-.diagram-expand svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.diagram-svg svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.diagram-source {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-size: var(--text-code);
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  justify-self: stretch;
+}
+.diagram.is-pending .diagram-source {
+  visibility: hidden;
+  height: 4rem;
+  overflow: hidden;
+}
+.diagram.is-error .diagram-source {
+  visibility: visible;
+  height: auto;
+}
+.diagram-error {
+  font-family: var(--font-ui);
+  font-size: var(--ui-small);
+  color: var(--warn-ink);
+  justify-self: start;
+  margin-bottom: var(--s2);
+}
+.diagram-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  appearance: none;
+  border: 0;
+  cursor: zoom-in;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--paper) 80%, transparent);
+  color: var(--ink-2);
+  box-shadow: 0 0 0 1px var(--rule);
+  opacity: 0;
+  transition: opacity var(--t-hover);
+}
+.diagram-expand:focus-visible {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .diagram:hover .diagram-expand {
+    opacity: 1;
+  }
+}
+.diagram-expand svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
 
 /* Images and embeds */
-.doc img { max-width: 100%; height: auto; }
-.doc p:has(> .embed-image:only-child) { grid-column: wide; text-align: center; }
+.doc img {
+  max-width: 100%;
+  height: auto;
+}
+.doc p:has(> .embed-image:only-child) {
+  grid-column: wide;
+  text-align: center;
+}
 .embed-image {
-  max-height: min(80vh, 900px); width: auto; object-fit: contain;
+  max-height: min(80vh, 900px);
+  width: auto;
+  object-fit: contain;
   border-radius: var(--r-block);
   background: transparent;
   box-shadow: 0 0 0 1px var(--rule);
   cursor: zoom-in;
 }
-:root[data-scheme="dark"] .embed-image { filter: brightness(0.92); }
-.embed-missing, .remote-image {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-ui); font-size: var(--ui-small); color: var(--ink-3);
-  padding: 4px 10px; border-radius: var(--r-control); border: 1px dashed var(--rule-strong);
+:root[data-scheme="dark"] .embed-image {
+  filter: brightness(0.92);
 }
-.embed-pdf { margin: var(--s3) 0 var(--s5); }
-.embed-pdf iframe { width: 100%; height: 70vh; border: 0; border-radius: var(--r-block); background: var(--code-bg); }
-.embed-pdf figcaption { font-family: var(--font-ui); font-size: var(--ui-small); color: var(--ink-3); margin-top: var(--s2); }
+.embed-missing,
+.remote-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: var(--ui-small);
+  color: var(--ink-3);
+  padding: 4px 10px;
+  border-radius: var(--r-control);
+  border: 1px dashed var(--rule-strong);
+}
+.embed-pdf {
+  margin: var(--s3) 0 var(--s5);
+}
+.embed-pdf iframe {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+  border-radius: var(--r-block);
+  background: var(--code-bg);
+}
+.embed-pdf figcaption {
+  font-family: var(--font-ui);
+  font-size: var(--ui-small);
+  color: var(--ink-3);
+  margin-top: var(--s2);
+}
 
 /* Math */
-.doc .katex { font-size: 1.04em; }
-.doc eq { display: inline; }
-.doc section.eqno, .doc eqn { display: block; overflow-x: auto; margin: var(--s3) 0 var(--s4); }
+.doc .katex {
+  font-size: 1.04em;
+}
+/* biome-ignore lint/correctness/noUnknownTypeSelector: markdown-it-texmath emits <eq> and <eqn>. */
+.doc eq {
+  display: inline;
+}
+/* biome-ignore lint/correctness/noUnknownTypeSelector: markdown-it-texmath emits <eq> and <eqn>. */
+.doc section.eqno,
+.doc eqn {
+  display: block;
+  overflow-x: auto;
+  margin: var(--s3) 0 var(--s4);
+}
 
 /* Heading anchors land with a brief accent flash so the eye finds the target. */
-.doc .is-target { animation: target-flash 1.2s var(--ease-out); border-radius: var(--r-chip); }
+.doc .is-target {
+  animation: target-flash 1.2s var(--ease-out);
+  border-radius: var(--r-chip);
+}
 @keyframes target-flash {
-  0%, 25% { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); }
-  100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+  0%,
+  25% {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
 }
 
 /* Selection */
 /* One flat colour with one text colour, so a selection reads as a single shape across links, code and panels. */
-.doc ::selection, .doc a::selection { background: var(--select); color: var(--ink); }
-.callout-title, .callout-title * { user-select: none; -webkit-user-select: none; }
+.doc ::selection,
+.doc a::selection {
+  background: var(--select);
+  color: var(--ink);
+}
+.callout-title,
+.callout-title * {
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 /* Narrow windows: give the text back its margins. */
 @container reader (max-width: 640px) {
-  .doc { --gutter: 1.25rem; padding-top: var(--s6); }
-  .doc-title { font-size: 1.75rem; }
+  .doc {
+    --gutter: 1.25rem;
+    padding-top: var(--s6);
+  }
+  .doc-title {
+    font-size: 1.75rem;
+  }
 }
-.diagram:has(.diagram-svg) .diagram-source { display: none; }
+.diagram:has(.diagram-svg) .diagram-source {
+  display: none;
+}
 
 /* Backlinks close the note only when the inspector is not there to hold them. */
-@media (min-width: 1241px) { .shell:not(.rail-closed) .backlinks { display: none; } }
+@media (min-width: 1241px) {
+  .shell:not(.rail-closed) .backlinks {
+    display: none;
+  }
+}
 .backlinks {
   padding-top: var(--s5);
   border-top: 1px solid var(--rule);
-  font-family: var(--font-ui); font-size: 0.8125rem; line-height: 1.45;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 .doc .backlinks-title {
-  font-family: var(--font-ui); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em;
-  color: var(--ink-3); margin: 0 0 var(--s3);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  margin: 0 0 var(--s3);
 }
-.backlinks ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
-.backlinks li { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; margin: 0; }
-.doc .backlinks a.wikilink { font-weight: 550; text-decoration: none; }
-@media (hover: hover) and (pointer: fine) { .doc .backlinks a.wikilink:hover { text-decoration: underline; text-underline-offset: 0.2em; } }
-.backlink-context { color: var(--ink-3); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.backlinks ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+.backlinks li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 0;
+  margin: 0;
+}
+.doc .backlinks a.wikilink {
+  font-weight: 550;
+  text-decoration: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .doc .backlinks a.wikilink:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+.backlink-context {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 
 /*
  * Vertical rhythm of the note body. Grid items never collapse margins, so every
@@ -388,23 +867,60 @@ button.callout-title:focus-visible { outline: 2px solid var(--focus); outline-of
  * is the same whatever came before it. The doubled class outranks the element
  * margins that blocks keep for use inside callouts and list items.
  */
-.doc.doc > * { margin-block: 0; }
-.doc.doc > * + * { margin-top: var(--s4); }
-.doc.doc > :where(p, ul, ol) + :where(ul, ol) { margin-top: var(--s2); }
+.doc.doc > * {
+  margin-block: 0;
+}
+.doc.doc > * + * {
+  margin-top: var(--s4);
+}
+.doc.doc > :where(p, ul, ol) + :where(ul, ol) {
+  margin-top: var(--s2);
+}
 .doc.doc > :where(.code, .table-wrap, .callout, .diagram, .embed-pdf, p:has(> .embed-image:only-child)) + *,
-.doc.doc > * + :where(.code, .table-wrap, .callout, .diagram, .embed-pdf, p:has(> .embed-image:only-child)) { margin-top: var(--s5); }
-.doc.doc > * + h2 { margin-top: 2.5rem; }
-.doc.doc > * + h3 { margin-top: 1.75rem; }
-.doc.doc > * + :is(h4, h5, h6) { margin-top: var(--s5); }
-.doc.doc > h2 + * { margin-top: var(--s3); }
-.doc.doc > h3 + * { margin-top: var(--s2); }
-.doc.doc > :is(h4, h5, h6) + * { margin-top: var(--s1); }
-.doc.doc > h2 + h3 { margin-top: var(--s4); }
-.doc.doc > * + hr, .doc.doc > hr + * { margin-top: var(--s6); }
-.doc.doc > .doc-head + * { margin-top: var(--s5); }
-.doc.doc > .backlinks { margin-top: var(--s7); }
+.doc.doc > * + :where(.code, .table-wrap, .callout, .diagram, .embed-pdf, p:has(> .embed-image:only-child)) {
+  margin-top: var(--s5);
+}
+.doc.doc > * + h2 {
+  margin-top: 2.5rem;
+}
+.doc.doc > * + h3 {
+  margin-top: 1.75rem;
+}
+.doc.doc > * + :is(h4, h5, h6) {
+  margin-top: var(--s5);
+}
+.doc.doc > h2 + * {
+  margin-top: var(--s3);
+}
+.doc.doc > h3 + * {
+  margin-top: var(--s2);
+}
+.doc.doc > :is(h4, h5, h6) + * {
+  margin-top: var(--s1);
+}
+.doc.doc > h2 + h3 {
+  margin-top: var(--s4);
+}
+.doc.doc > * + hr,
+.doc.doc > hr + * {
+  margin-top: var(--s6);
+}
+.doc.doc > .doc-head + * {
+  margin-top: var(--s5);
+}
+.doc.doc > .backlinks {
+  margin-top: var(--s7);
+}
 
-.doc.is-revision { padding-top: var(--s4); }
-.doc.is-revision > * { grid-column: text; }
+.doc.is-revision {
+  padding-top: var(--s4);
+}
+.doc.is-revision > * {
+  grid-column: text;
+}
 
-@media (prefers-reduced-motion: reduce) { .doc .is-target { animation-duration: 0.6s; } }
+@media (prefers-reduced-motion: reduce) {
+  .doc .is-target {
+    animation-duration: 0.6s;
+  }
+}

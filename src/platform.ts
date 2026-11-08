@@ -3,11 +3,22 @@ import type { VaultSource } from "./vault/source";
 export const isDesktop = "__TAURI_INTERNALS__" in window;
 
 export type GitErrorKind =
-  | "offline" | "auth" | "diverged" | "localChangesBlock" | "rejected"
-  | "notARepo" | "noUpstream" | "inProgress" | "timeout" | "other";
+  | "offline"
+  | "auth"
+  | "diverged"
+  | "localChangesBlock"
+  | "rejected"
+  | "notARepo"
+  | "noUpstream"
+  | "inProgress"
+  | "timeout"
+  | "other";
 
 export class GitError extends Error {
-  constructor(readonly kind: GitErrorKind, message: string) {
+  constructor(
+    readonly kind: GitErrorKind,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -107,7 +118,8 @@ export const git = {
   show: (sha: string, path: string | null) => call<string>("git_show", { sha, path }),
   fileAt: (sha: string, path: string) => call<string>("git_file_at", { sha, path }),
   diffRevs: (from: string, to: string, path: string) => call<string>("git_diff_revs", { from, to, path }),
-  storeCredential: (url: string, username: string, secret: string) => call<void>("git_store_credential", { url, username, secret }),
+  storeCredential: (url: string, username: string, secret: string) =>
+    call<void>("git_store_credential", { url, username, secret }),
   clone: (url: string, dest: string) => call<void>("git_clone", { url, dest }),
 };
 

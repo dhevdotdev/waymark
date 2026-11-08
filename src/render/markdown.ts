@@ -1,7 +1,7 @@
+import katex from "katex";
 import markdownit, { type MarkdownIt, type StateCore, type StateInline, type Token } from "markdown-it";
 import mark from "markdown-it-mark";
 import texmath from "markdown-it-texmath";
-import katex from "katex";
 import { headingId, headingKey, type VaultIndex } from "../vault/index";
 
 export interface RenderEnv {
@@ -35,7 +35,11 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 export function createMarkdown(): MarkdownIt {
   const md = markdownit({ html: true, linkify: true, typographer: false });
   md.use(mark);
-  md.use(texmath, { engine: katex, delimiters: "dollars", katexOptions: { throwOnError: false, output: "htmlAndMathml", trust: false } });
+  md.use(texmath, {
+    engine: katex,
+    delimiters: "dollars",
+    katexOptions: { throwOnError: false, output: "htmlAndMathml", trust: false },
+  });
   md.inline.ruler.before("link", "wikilink", wikilinkRule);
   md.core.ruler.after("block", "callouts", calloutRule);
   md.core.ruler.push("heading_ids", headingRule);
@@ -45,13 +49,15 @@ export function createMarkdown(): MarkdownIt {
   md.renderer.rules.blockquote_open = (tokens, i, opts, _env, self) => {
     const c = tokens[i].meta?.callout as Callout | undefined;
     if (!c) return self.renderToken(tokens, i, opts);
-    const title = c.title ? md.renderInline(c.title, _env) : escape(c.label);
-    const kind = escape(c.kind);
+    const title = c.title ? md.renderInline(c.title, _env) : escapeAttr(c.label);
+    const kind = escapeAttr(c.kind);
     const head = c.fold
       ? `<button class="callout-title" type="button" aria-expanded="${c.fold === "+"}">`
       : `<div class="callout-title">`;
-    const headEnd = c.fold ? `<svg class="callout-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>` : `</div>`;
-    return `<div class="callout" data-callout="${kind}" data-type="${escape(c.type)}"${c.fold ? ` data-fold="${c.fold === "+" ? "open" : "closed"}"` : ""}>${head}<span class="callout-icon" aria-hidden="true"></span><span class="callout-label">${title}</span>${headEnd}<div class="callout-body"><div class="callout-content">`;
+    const headEnd = c.fold
+      ? `<svg class="callout-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>`
+      : `</div>`;
+    return `<div class="callout" data-callout="${kind}" data-type="${escapeAttr(c.type)}"${c.fold ? ` data-fold="${c.fold === "+" ? "open" : "closed"}"` : ""}>${head}<span class="callout-icon" aria-hidden="true"></span><span class="callout-label">${title}</span>${headEnd}<div class="callout-body"><div class="callout-content">`;
   };
   md.renderer.rules.blockquote_close = (tokens, i, opts, _env, self) => {
     const open = findOpen(tokens, i, "blockquote_open");
@@ -65,8 +71,8 @@ export function createMarkdown(): MarkdownIt {
     const env = rawEnv as unknown as RenderEnv;
     const src = String(tokens[i].attrGet("src") ?? "");
     if (/^(https?:)?\/\//i.test(src)) {
-      const alt = escape(tokens[i].content || src);
-      return `<span class="remote-image" data-src="${escape(src)}" title="Remote image not loaded">${alt}</span>`;
+      const alt = escapeAttr(tokens[i].content || src);
+      return `<span class="remote-image" data-src="${escapeAttr(src)}" title="Remote image not loaded">${alt}</span>`;
     }
     const res = env.index.resolve(decodeURIComponent(src.split("/").pop() ?? src), false);
     if (res.kind === "found") tokens[i].attrSet("src", env.assetUrl(res.path));
@@ -177,40 +183,41 @@ function renderWikilink(md: MarkdownIt, token: Token, env: RenderEnv): string {
   if (embed && isAsset) {
     const res = env.index.resolve(target, false);
     if (res.kind !== "found") {
-      return `<span class="embed-missing" title="${escape(target)} is not in the vault"><span class="embed-missing-icon" aria-hidden="true"></span>${escape(target)}</span>`;
+      return `<span class="embed-missing" title="${escapeAttr(target)} is not in the vault"><span class="embed-missing-icon" aria-hidden="true"></span>${escapeAttr(target)}</span>`;
     }
     const url = env.assetUrl(res.path);
     if (IMAGE_EXT.test(target)) {
       const size = /^(\d+)(?:x(\d+))?$/.exec(alias);
       const dims = size ? ` width="${size[1]}"${size[2] ? ` height="${size[2]}"` : ""}` : "";
       const alt = size ? target : alias || target;
-      return `<img class="embed-image" src="${escape(url)}" alt="${escape(alt)}" loading="lazy" decoding="async"${dims}>`;
+      return `<img class="embed-image" src="${escapeAttr(url)}" alt="${escapeAttr(alt)}" loading="lazy" decoding="async"${dims}>`;
     }
     if (/\.pdf$/i.test(target)) {
-      return `<figure class="embed-pdf"><iframe src="${escape(url)}#toolbar=0" title="${escape(target)}" sandbox></iframe><figcaption>${escape(target)}</figcaption></figure>`;
+      return `<figure class="embed-pdf"><iframe src="${escapeAttr(url)}#toolbar=0" title="${escapeAttr(target)}" sandbox></iframe><figcaption>${escapeAttr(target)}</figcaption></figure>`;
     }
-    return `<a class="embed-file" href="${escape(url)}">${escape(target)}</a>`;
+    return `<a class="embed-file" href="${escapeAttr(url)}">${escapeAttr(target)}</a>`;
   }
 
   const label = alias || (target ? target + (anchor ? ` › ${anchor}` : "") : anchor);
   if (isAsset) {
     const res = env.index.resolve(target, false);
-    if (res.kind !== "found") return `<span class="wikilink is-missing" title="${escape(target)} is not in the vault">${md.utils.escapeHtml(label)}</span>`;
-    return `<a class="attachment-link" href="${escape(env.assetUrl(res.path))}" data-attachment="${escape(res.path)}">${md.utils.escapeHtml(label)}</a>`;
+    if (res.kind !== "found")
+      return `<span class="wikilink is-missing" title="${escapeAttr(target)} is not in the vault">${md.utils.escapeHtml(label)}</span>`;
+    return `<a class="attachment-link" href="${escapeAttr(env.assetUrl(res.path))}" data-attachment="${escapeAttr(res.path)}">${md.utils.escapeHtml(label)}</a>`;
   }
-  const anchorAttr = anchor ? ` data-anchor="${escape(anchor)}"` : "";
+  const anchorAttr = anchor ? ` data-anchor="${escapeAttr(anchor)}"` : "";
   if (!target) {
-    return `<a class="wikilink" href="#" data-path="${escape(env.currentPath)}"${anchorAttr}>${md.utils.escapeHtml(label)}</a>`;
+    return `<a class="wikilink" href="#" data-path="${escapeAttr(env.currentPath)}"${anchorAttr}>${md.utils.escapeHtml(label)}</a>`;
   }
   const res = env.index.resolve(target, true);
   if (res.kind === "found") {
     const note = embed ? ` data-embed` : "";
-    return `<a class="wikilink" href="#" data-path="${escape(res.path)}"${anchorAttr}${note}>${md.utils.escapeHtml(label)}</a>`;
+    return `<a class="wikilink" href="#" data-path="${escapeAttr(res.path)}"${anchorAttr}${note}>${md.utils.escapeHtml(label)}</a>`;
   }
   if (res.kind === "ambiguous") {
-    return `<a class="wikilink is-ambiguous" href="#" data-candidates="${escape(JSON.stringify(res.candidates))}"${anchorAttr} title="${res.candidates.length} notes share this name">${md.utils.escapeHtml(label)}</a>`;
+    return `<a class="wikilink is-ambiguous" href="#" data-candidates="${escapeAttr(JSON.stringify(res.candidates))}"${anchorAttr} title="${res.candidates.length} notes share this name">${md.utils.escapeHtml(label)}</a>`;
   }
-  return `<span class="wikilink is-missing" title="No note named “${escape(target)}”">${md.utils.escapeHtml(label)}</span>`;
+  return `<span class="wikilink is-missing" title="No note named “${escapeAttr(target)}”">${md.utils.escapeHtml(label)}</span>`;
 }
 
 function renderFence(md: MarkdownIt, token: Token, env: RenderEnv): string {
@@ -223,9 +230,9 @@ function renderFence(md: MarkdownIt, token: Token, env: RenderEnv): string {
   const body = highlighted ?? `<pre class="shiki plain"><code>${md.utils.escapeHtml(code)}</code></pre>`;
   const lines = code.split("\n").length;
   const textArt = /[\u2500-\u257F]/.test(code) ? " is-text-art" : "";
-  return `<div class="code${textArt}" data-lang="${escape(lang)}" data-lines="${lines}"><div class="code-bar"><button class="code-copy" type="button" aria-label="Copy code"><span>Copy</span></button></div>${body}</div>`;
+  return `<div class="code${textArt}" data-lang="${escapeAttr(lang)}" data-lines="${lines}"><div class="code-bar"><button class="code-copy" type="button" aria-label="Copy code"><span>Copy</span></button></div>${body}</div>`;
 }
 
-function escape(s: string): string {
+function escapeAttr(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

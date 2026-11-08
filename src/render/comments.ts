@@ -12,9 +12,8 @@ export function stripComments(markdown: string): string {
         spans.push(m);
         return `\u0000${spans.length - 1}\u0000`;
       });
-      return masked
-        .replace(/%%[\s\S]*?%%/g, "")
-        .replace(/\u0000(\d+)\u0000/g, (_, n) => spans[Number(n)]);
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: NUL cannot appear in note text, so it safely delimits placeholders.
+      return masked.replace(/%%[\s\S]*?%%/g, "").replace(/\u0000(\d+)\u0000/g, (_, n) => spans[Number(n)]);
     })
     .join("");
 }

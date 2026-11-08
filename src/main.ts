@@ -1,7 +1,7 @@
 import "./styles/app.css";
+import { isDesktop } from "./platform";
 import { App } from "./ui/app";
 import { devVaultSource } from "./vault/source";
-import { isDesktop } from "./platform";
 
 const root = document.getElementById("app")!;
 const params = new URLSearchParams(location.search);
@@ -16,7 +16,9 @@ async function boot(): Promise<void> {
   const log = (line: string) => void invoke("selftest_log", { line });
   window.addEventListener("error", (e) => log(`error: ${e.message}`));
   window.addEventListener("unhandledrejection", (e) => log(`rejection: ${String(e.reason)}`));
-  document.addEventListener("securitypolicyviolation", (e) => log(`csp: ${e.violatedDirective} blocked ${e.blockedURI} (policy: ${e.originalPolicy.slice(0, 400)})`));
+  document.addEventListener("securitypolicyviolation", (e) =>
+    log(`csp: ${e.violatedDirective} blocked ${e.blockedURI} (policy: ${e.originalPolicy.slice(0, 400)})`),
+  );
   log("starting");
   await app.start(undefined, undefined, selftest.vault);
   log(`started: ${JSON.stringify(app.metrics)}`);

@@ -1,5 +1,5 @@
 const BOUNDARY = /[\s\-_/(.,:]/;
-const escape = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Title matching for the palette. Every query word must appear in the title,
@@ -14,14 +14,17 @@ export function fuzzy(query: string, text: string): { score: number; marks: numb
   const direct = t.indexOf(q);
   if (direct >= 0) {
     const atWord = direct === 0 || BOUNDARY.test(t[direct - 1]);
-    return { score: 1000 - direct * 2 + (atWord ? 300 : 0) - t.length * 0.5, marks: [...Array(q.length).keys()].map((i) => i + direct) };
+    return {
+      score: 1000 - direct * 2 + (atWord ? 300 : 0) - t.length * 0.5,
+      marks: [...Array(q.length).keys()].map((i) => i + direct),
+    };
   }
   const words = q.split(/\s+/);
   const marks: number[] = [];
   let score = 0;
   let allFound = true;
   for (const w of words) {
-    const m = new RegExp(`(^|${BOUNDARY.source})${escape(w)}`).exec(t);
+    const m = new RegExp(`(^|${BOUNDARY.source})${escapeRegExp(w)}`).exec(t);
     const at = m ? m.index + m[1].length : w.length >= 3 ? t.indexOf(w) : -1;
     if (at >= 0) {
       score += m ? 120 : 40;
@@ -51,7 +54,7 @@ export function fuzzy(query: string, text: string): { score: number; marks: numb
 
 /** `w` as an abbreviation of one title word that starts with the same letter ("certs" → "certificates"). */
 function abbreviation(w: string, t: string): number[] | null {
-  for (const m of t.matchAll(new RegExp(`(^|${BOUNDARY.source})(${escape(w[0])}[^\\s,:;]*)`, "g"))) {
+  for (const m of t.matchAll(new RegExp(`(^|${BOUNDARY.source})(${escapeRegExp(w[0])}[^\\s,:;]*)`, "g"))) {
     const start = m.index! + m[1].length;
     const word = m[2];
     const marks = [start];

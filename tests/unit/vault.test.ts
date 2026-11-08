@@ -1,10 +1,10 @@
-import { Trail, type View } from "../../src/vault/trail";
-import { detectCommunities } from "../../src/vault/communities";
-import { ancestors, buildTree } from "../../src/vault/tree";
 import { describe, expect, it } from "vitest";
-import { VaultIndex, headingKey } from "../../src/vault/index";
 import { stripComments } from "../../src/render/comments";
-import { parseFrontmatter } from "../../src/render/frontmatter";
+import { detectCommunities } from "../../src/vault/communities";
+import { parseFrontmatter } from "../../src/vault/frontmatter";
+import { headingKey, VaultIndex } from "../../src/vault/index";
+import { Trail, type View } from "../../src/vault/trail";
+import { ancestors, buildTree } from "../../src/vault/tree";
 
 const files = [
   "Notes/Tide and wind.md",
@@ -53,6 +53,7 @@ describe("stripComments", () => {
     expect(stripComments("x\n%%\nsecret\n%%\ny")).toBe("x\n\ny");
   });
   it("keeps %% inside code", () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell parameter expansion is the input under test.
     const src = 'printf("%%d") `%%` and\n```bash\necho "${1%%/}"\n```\n';
     expect(stripComments(src)).toBe(src);
   });
@@ -90,7 +91,10 @@ describe("file tree", () => {
 });
 
 describe("link communities", () => {
-  const ring = (prefix: string): [string, string][] => ["a", "b", "c", "d"].flatMap((x, i, all) => all.slice(i + 1).map((y) => [`${prefix}${x}`, `${prefix}${y}`] as [string, string]));
+  const ring = (prefix: string): [string, string][] =>
+    ["a", "b", "c", "d"].flatMap((x, i, all) =>
+      all.slice(i + 1).map((y) => [`${prefix}${x}`, `${prefix}${y}`] as [string, string]),
+    );
   const notes = [..."abcd"].flatMap((x) => [`p${x}`, `q${x}`]).concat("lonely");
   const edges = [...ring("p"), ...ring("q"), ["pa", "qa"] as [string, string]];
 
@@ -114,7 +118,10 @@ describe("link communities", () => {
 
 describe("trail", () => {
   const note = (path: string): View => ({ kind: "note", path });
-  const here = (t: Trail) => { const v = t.current.view; return v.kind === "note" ? v.path : "graph"; };
+  const here = (t: Trail) => {
+    const v = t.current.view;
+    return v.kind === "note" ? v.path : "graph";
+  };
 
   it("grows a branch when a second link is followed from the same note", () => {
     const t = new Trail(note("a"));
@@ -193,7 +200,17 @@ describe("trail", () => {
     expect(restored.crossLinks()).toHaveLength(1);
     restored.back();
     expect(here(restored)).toBe("b");
-    const older = Trail.restore({ nodes: [{ id: 1, view: note("a"), parent: null, scroll: 0, lastChild: 2 }, { id: 2, view: note("b"), parent: 1, scroll: 0, lastChild: null }], root: 1, current: 2 }, () => true)!;
+    const older = Trail.restore(
+      {
+        nodes: [
+          { id: 1, view: note("a"), parent: null, scroll: 0, lastChild: 2 },
+          { id: 2, view: note("b"), parent: 1, scroll: 0, lastChild: null },
+        ],
+        root: 1,
+        current: 2,
+      },
+      () => true,
+    )!;
     expect(older.canBack).toBe(true);
     older.back();
     expect(here(older)).toBe("a");

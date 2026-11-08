@@ -1,5 +1,15 @@
+import {
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+  type Simulation,
+  type SimulationLinkDatum,
+  type SimulationNodeDatum,
+} from "d3-force";
 import { resolveColor } from "./colors";
-import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
 
 export interface GraphNode extends SimulationNodeDatum {
   id: string;
@@ -53,7 +63,7 @@ export const groupColor = (group: number): string =>
 const reduceMotion = () =>
   matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
 
-const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /** Finished layouts, so reopening the graph is immediate and notes stay where you left them. */
@@ -185,20 +195,43 @@ export class GraphCanvas {
     const n = this.nodes.length;
     const dense = n > 120;
     const sim = forceSimulation<GraphNode, GraphLink>(this.nodes)
-      .force("link", forceLink<GraphNode, GraphLink>(this.links).id((d) => d.id)
-        .distance((l) => ((l.source as GraphNode).group === (l.target as GraphNode).group ? (dense ? 24 : 42) : dense ? 120 : 90))
-        .strength((l) => ((l.source as GraphNode).group === (l.target as GraphNode).group && (l.source as GraphNode).group >= 0 ? 0.32 : 0.012)))
-      .force("charge", forceManyBody<GraphNode>().strength(dense ? -30 : -110).distanceMax(dense ? 200 : 320))
-      .force("x", forceX<GraphNode>((d) => anchors.get(d.group)?.x ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)))
-      .force("y", forceY<GraphNode>((d) => anchors.get(d.group)?.y ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)))
-      .force("collide", forceCollide<GraphNode>((d) => this.radius(d) + 2.5))
+      .force(
+        "link",
+        forceLink<GraphNode, GraphLink>(this.links)
+          .id((d) => d.id)
+          .distance((l) =>
+            (l.source as GraphNode).group === (l.target as GraphNode).group ? (dense ? 24 : 42) : dense ? 120 : 90,
+          )
+          .strength((l) =>
+            (l.source as GraphNode).group === (l.target as GraphNode).group && (l.source as GraphNode).group >= 0 ? 0.32 : 0.012,
+          ),
+      )
+      .force(
+        "charge",
+        forceManyBody<GraphNode>()
+          .strength(dense ? -30 : -110)
+          .distanceMax(dense ? 200 : 320),
+      )
+      .force(
+        "x",
+        forceX<GraphNode>((d) => anchors.get(d.group)?.x ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)),
+      )
+      .force(
+        "y",
+        forceY<GraphNode>((d) => anchors.get(d.group)?.y ?? 0).strength((d) => (d.group < 0 ? 0.02 : 0.11)),
+      )
+      .force(
+        "collide",
+        forceCollide<GraphNode>((d) => this.radius(d) + 2.5),
+      )
       .alphaDecay(0.028)
       .stop();
     this.sim = sim;
     this.inside.clear();
     this.between = [];
     for (const l of this.links) {
-      const a = (l.source as GraphNode).group, b = (l.target as GraphNode).group;
+      const a = (l.source as GraphNode).group,
+        b = (l.target as GraphNode).group;
       if (a === b && a >= 0) {
         if (!this.inside.has(a)) this.inside.set(a, []);
         this.inside.get(a)!.push(l);
@@ -233,7 +266,8 @@ export class GraphCanvas {
     const weight = new Map<string, { source: number; target: number; w: number }>();
     const group = new Map(this.nodes.map((n) => [n.id, n.group]));
     for (const l of this.links) {
-      const a = group.get(l.source as string)!, b = group.get(l.target as string)!;
+      const a = group.get(l.source as string)!,
+        b = group.get(l.target as string)!;
       if (a === b || !present.has(a) || !present.has(b)) continue;
       const key = a < b ? `${a}:${b}` : `${b}:${a}`;
       const e = weight.get(key) ?? { source: Math.min(a, b), target: Math.max(a, b), w: 0 };
@@ -241,11 +275,20 @@ export class GraphCanvas {
       weight.set(key, e);
     }
     const sim = forceSimulation<Meta>(metas)
-      .force("link", forceLink<Meta, { source: number | Meta; target: number | Meta; w: number }>([...weight.values()]).id((d) => d.id).distance((l) => 60 + 90 / Math.sqrt(l.w)).strength(0.25))
+      .force(
+        "link",
+        forceLink<Meta, { source: number | Meta; target: number | Meta; w: number }>([...weight.values()])
+          .id((d) => d.id)
+          .distance((l) => 60 + 90 / Math.sqrt(l.w))
+          .strength(0.25),
+      )
       .force("charge", forceManyBody<Meta>().strength(-260))
       .force("x", forceX<Meta>(0).strength(0.04))
       .force("y", forceY<Meta>(0).strength(0.17))
-      .force("collide", forceCollide<Meta>((d) => d.r * 1.15))
+      .force(
+        "collide",
+        forceCollide<Meta>((d) => d.r * 1.15),
+      )
       .stop();
     for (let i = 0; i < 240; i++) sim.tick();
     return new Map(metas.map((m) => [m.id, { x: m.x!, y: m.y! }]));
@@ -295,17 +338,29 @@ export class GraphCanvas {
   /** On-screen dots grow only gently when zooming in. */
   private drawRadius(d: GraphNode): number {
     const k = this.view.k;
-    return this.radius(d) * (k > 1 ? Math.pow(k, -0.65) : 1);
+    return this.radius(d) * (k > 1 ? k ** -0.65 : 1);
   }
 
   private fitView(): { x: number; y: number; k: number } {
     const xs = this.nodes.map((n) => n.x!).sort((a, b) => a - b);
     const ys = this.nodes.map((n) => n.y!).sort((a, b) => a - b);
     const cut = this.nodes.length > 40 ? Math.floor(this.nodes.length * 0.01) : 0;
-    const minX = xs[cut], maxX = xs[xs.length - 1 - cut], minY = ys[cut], maxY = ys[ys.length - 1 - cut];
-    const top = 72, bottom = 64, side = 56;
-    const k = Math.max(0.15, Math.min((this.size.w - side * 2) / Math.max(1, maxX - minX), (this.size.h - top - bottom) / Math.max(1, maxY - minY), 2.4));
-    return { k, x: this.size.w / 2 - ((minX + maxX) / 2) * k, y: top + (this.size.h - top - bottom) / 2 - ((minY + maxY) / 2) * k };
+    const minX = xs[cut],
+      maxX = xs[xs.length - 1 - cut],
+      minY = ys[cut],
+      maxY = ys[ys.length - 1 - cut];
+    const top = 72,
+      bottom = 64,
+      side = 56;
+    const k = Math.max(
+      0.15,
+      Math.min((this.size.w - side * 2) / Math.max(1, maxX - minX), (this.size.h - top - bottom) / Math.max(1, maxY - minY), 2.4),
+    );
+    return {
+      k,
+      x: this.size.w / 2 - ((minX + maxX) / 2) * k,
+      y: top + (this.size.h - top - bottom) / 2 - ((minY + maxY) / 2) * k,
+    };
   }
 
   private fit(): void {
@@ -383,8 +438,11 @@ export class GraphCanvas {
     }
     const out = new Map<number, Centre>();
     for (const [g, s] of sum) {
-      const x = s.x / s.n, y = s.y / s.n;
-      let mean = 0, top = Infinity, bottom = -Infinity;
+      const x = s.x / s.n,
+        y = s.y / s.n;
+      let mean = 0,
+        top = Infinity,
+        bottom = -Infinity;
       for (const d of s.list) {
         mean += Math.hypot(X(d) - x, Y(d) - y);
         top = Math.min(top, Y(d));
@@ -397,14 +455,29 @@ export class GraphCanvas {
 
   /** Control points. Links between communities bend through both centres, which gathers them into threads. */
   private curve(l: GraphLink, centres: Map<number, Centre>): [number, number, number, number, number, number, number, number] {
-    const s = l.source as GraphNode, t = l.target as GraphNode;
-    const sx = this.px(s), sy = this.py(s), tx = this.px(t), ty = this.py(t);
-    const a = centres.get(s.group), b = centres.get(t.group);
+    const s = l.source as GraphNode,
+      t = l.target as GraphNode;
+    const sx = this.px(s),
+      sy = this.py(s),
+      tx = this.px(t),
+      ty = this.py(t);
+    const a = centres.get(s.group),
+      b = centres.get(t.group);
     if (s.group !== t.group && a && b) {
       return [sx, sy, sx + (a.x - sx) * 0.62, sy + (a.y - sy) * 0.62, tx + (b.x - tx) * 0.62, ty + (b.y - ty) * 0.62, tx, ty];
     }
-    const dx = tx - sx, dy = ty - sy;
-    return [sx, sy, sx + dx / 3 - dy * 0.1, sy + dy / 3 + dx * 0.1, sx + (dx * 2) / 3 - dy * 0.1, sy + (dy * 2) / 3 + dx * 0.1, tx, ty];
+    const dx = tx - sx,
+      dy = ty - sy;
+    return [
+      sx,
+      sy,
+      sx + dx / 3 - dy * 0.1,
+      sy + dy / 3 + dx * 0.1,
+      sx + (dx * 2) / 3 - dy * 0.1,
+      sy + (dy * 2) / 3 + dx * 0.1,
+      tx,
+      ty,
+    ];
   }
 
   private draw(): void {
@@ -417,8 +490,9 @@ export class GraphCanvas {
     ctx.scale(k, k);
 
     const focus = this.hover;
-    const near = focus ? this.neighbours.get(focus.id) ?? new Set<string>() : null;
-    const lit = (n: GraphNode) => this.matches(n) && (this.spot === null || n.group === this.spot) && (!near || n === focus || near.has(n.id));
+    const near = focus ? (this.neighbours.get(focus.id) ?? new Set<string>()) : null;
+    const lit = (n: GraphNode) =>
+      this.matches(n) && (this.spot === null || n.group === this.spot) && (!near || n === focus || near.has(n.id));
     const dimmed = !!focus || this.spot !== null || !!this.filter;
     const centres = this.centres();
     const light = p.dark ? "lighter" : "source-over";
@@ -525,7 +599,7 @@ export class GraphCanvas {
       return { n, box: [n.x! - r, n.y! - r, n.x! + r, n.y! + r] as Box };
     });
     const labelNote = (n: GraphNode, forced: boolean, alpha: number) => {
-      const label = n.label.length > 42 ? n.label.slice(0, 40) + "…" : n.label;
+      const label = n.label.length > 42 ? `${n.label.slice(0, 40)}…` : n.label;
       const w = ctx.measureText(label).width;
       const r = this.drawRadius(n);
       const gap = 3 / k;
@@ -554,7 +628,7 @@ export class GraphCanvas {
       for (const g of this.groups) {
         const c = centres.get(g.id);
         if (!c || g.size < 5 || (this.spot !== null && this.spot !== g.id)) continue;
-        const text = g.label.length > 30 ? g.label.slice(0, 28) + "…" : g.label;
+        const text = g.label.length > 30 ? `${g.label.slice(0, 28)}…` : g.label;
         const w = ctx.measureText(text).width;
         const gap = 8 / k;
         const choices = [c.top - gap - size, c.bottom + gap];
@@ -602,7 +676,8 @@ export class GraphCanvas {
     const c = this.canvas;
     c.addEventListener("pointermove", (e) => {
       if (this.drag) {
-        const dx = e.clientX - this.drag.startX, dy = e.clientY - this.drag.startY;
+        const dx = e.clientX - this.drag.startX,
+          dy = e.clientY - this.drag.startY;
         if (Math.hypot(dx, dy) > 3) this.drag.moved = true;
         if (this.drag.node) {
           const [x, y] = this.toWorld(e.clientX, e.clientY);
@@ -651,19 +726,24 @@ export class GraphCanvas {
       d.node.fy = null;
       if (!d.moved) this.opts.onOpen(d.node.id, e.metaKey);
     });
-    c.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      cancelAnimationFrame(this.frame);
-      this.intro = 1;
-      const rect = c.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0022));
-      const k = Math.min(6, Math.max(0.12, this.view.k * factor));
-      this.view.x = mx - ((mx - this.view.x) * k) / this.view.k;
-      this.view.y = my - ((my - this.view.y) * k) / this.view.k;
-      this.view.k = k;
-      this.draw();
-    }, { passive: false });
+    c.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        cancelAnimationFrame(this.frame);
+        this.intro = 1;
+        const rect = c.getBoundingClientRect();
+        const mx = e.clientX - rect.left,
+          my = e.clientY - rect.top;
+        const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0022));
+        const k = Math.min(6, Math.max(0.12, this.view.k * factor));
+        this.view.x = mx - ((mx - this.view.x) * k) / this.view.k;
+        this.view.y = my - ((my - this.view.y) * k) / this.view.k;
+        this.view.k = k;
+        this.draw();
+      },
+      { passive: false },
+    );
   }
 
   private kick(alpha: number): void {
@@ -680,7 +760,8 @@ export class GraphCanvas {
 
   zoomBy(factor: number): void {
     const k = Math.min(6, Math.max(0.12, this.view.k * factor));
-    const mx = this.size.w / 2, my = this.size.h / 2;
+    const mx = this.size.w / 2,
+      my = this.size.h / 2;
     this.animateView({ k, x: mx - ((mx - this.view.x) * k) / this.view.k, y: my - ((my - this.view.y) * k) / this.view.k });
   }
 

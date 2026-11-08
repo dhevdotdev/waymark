@@ -40,7 +40,10 @@ pub struct GitError {
 
 impl GitError {
     fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
-        GitError { kind, message: redact(&message.into()) }
+        GitError {
+            kind,
+            message: redact(&message.into()),
+        }
     }
 }
 
@@ -57,8 +60,14 @@ fn base_command(root: &Path, network: bool) -> Command {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if network && !has_config(root, "core.sshCommand") && std::env::var_os("GIT_SSH_COMMAND").is_none() {
-        cmd.env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes -o ConnectTimeout=15");
+    if network
+        && !has_config(root, "core.sshCommand")
+        && std::env::var_os("GIT_SSH_COMMAND").is_none()
+    {
+        cmd.env(
+            "GIT_SSH_COMMAND",
+            "ssh -o BatchMode=yes -o ConnectTimeout=15",
+        );
     }
     cmd
 }
@@ -97,7 +106,12 @@ fn run(root: &Path, args: &[&str], network: bool) -> GitResult<Output> {
     run_with_input(root, args, network, None)
 }
 
-fn run_with_input(root: &Path, args: &[&str], network: bool, input: Option<&str>) -> GitResult<Output> {
+fn run_with_input(
+    root: &Path,
+    args: &[&str],
+    network: bool,
+    input: Option<&str>,
+) -> GitResult<Output> {
     let mut cmd = base_command(root, network);
     cmd.args(args);
     if input.is_some() {
@@ -113,7 +127,10 @@ fn run_with_input(root: &Path, args: &[&str], network: bool, input: Option<&str>
     let mut stderr = child.stderr.take().unwrap();
     let out_reader = std::thread::spawn(move || {
         let mut buf = Vec::new();
-        let _ = stdout.by_ref().take(MAX_OUTPUT as u64).read_to_end(&mut buf);
+        let _ = stdout
+            .by_ref()
+            .take(MAX_OUTPUT as u64)
+            .read_to_end(&mut buf);
         let _ = std::io::copy(&mut stdout, &mut std::io::sink());
         buf
     });
@@ -122,7 +139,11 @@ fn run_with_input(root: &Path, args: &[&str], network: bool, input: Option<&str>
         let _ = stderr.read_to_end(&mut buf);
         buf
     });
-    let limit = if network { NETWORK_TIMEOUT } else { LOCAL_TIMEOUT };
+    let limit = if network {
+        NETWORK_TIMEOUT
+    } else {
+        LOCAL_TIMEOUT
+    };
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
@@ -130,7 +151,14 @@ fn run_with_input(root: &Path, args: &[&str], network: bool, input: Option<&str>
             Ok(None) if start.elapsed() > limit => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(GitError::new(ErrorKind::Timeout, format!("git {} took longer than {}s and was stopped", args[0], limit.as_secs())));
+                return Err(GitError::new(
+                    ErrorKind::Timeout,
+                    format!(
+                        "git {} took longer than {}s and was stopped",
+                        args[0],
+                        limit.as_secs()
+                    ),
+                ));
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(20)),
             Err(e) => return Err(GitError::new(ErrorKind::Other, e.to_string())),
@@ -176,13 +204,22 @@ pub fn classify(stderr: &str) -> GitError {
         || s.contains("could not resolve hostname")
     {
         ErrorKind::Offline
-    } else if s.contains("would be overwritten by merge") || s.contains("your local changes to the following files") {
+    } else if s.contains("would be overwritten by merge")
+        || s.contains("your local changes to the following files")
+    {
         ErrorKind::LocalChangesBlock
     } else if s.contains("not possible to fast-forward") || s.contains("diverging branches") {
         ErrorKind::Diverged
-    } else if s.contains("[rejected]") || s.contains("non-fast-forward") || s.contains("fetch first") || s.contains("failed to push") {
+    } else if s.contains("[rejected]")
+        || s.contains("non-fast-forward")
+        || s.contains("fetch first")
+        || s.contains("failed to push")
+    {
         ErrorKind::Rejected
-    } else if s.contains("no upstream") || s.contains("no tracking information") || s.contains("does not point to a branch") {
+    } else if s.contains("no upstream")
+        || s.contains("no tracking information")
+        || s.contains("does not point to a branch")
+    {
         ErrorKind::NoUpstream
     } else {
         ErrorKind::Other
@@ -193,7 +230,14 @@ pub fn classify(stderr: &str) -> GitError {
         .filter(|l| !l.is_empty() && !l.starts_with("hint:"))
         .collect::<Vec<_>>()
         .join("\n");
-    GitError::new(kind, if message.is_empty() { "git failed without a message".to_string() } else { message })
+    GitError::new(
+        kind,
+        if message.is_empty() {
+            "git failed without a message".to_string()
+        } else {
+            message
+        },
+    )
 }
 
 /// Removes credentials from URLs and masks common token shapes before text
@@ -204,7 +248,9 @@ pub fn redact(text: &str) -> String {
     while let Some(idx) = rest.find("://") {
         let (head, tail) = rest.split_at(idx + 3);
         out.push_str(head);
-        let end = tail.find(|c: char| c.is_whitespace() || c == '/' || c == '\'' || c == '"').unwrap_or(tail.len());
+        let end = tail
+            .find(|c: char| c.is_whitespace() || c == '/' || c == '\'' || c == '"')
+            .unwrap_or(tail.len());
         let authority = &tail[..end];
         match authority.rfind('@') {
             Some(at) => {
@@ -216,7 +262,16 @@ pub fn redact(text: &str) -> String {
         rest = &tail[end..];
     }
     out.push_str(rest);
-    let prefixes = ["ghp_", "gho_", "ghu_", "ghs_", "github_pat_", "glpat-", "xoxb-", "xoxp-"];
+    let prefixes = [
+        "ghp_",
+        "gho_",
+        "ghu_",
+        "ghs_",
+        "github_pat_",
+        "glpat-",
+        "xoxb-",
+        "xoxp-",
+    ];
     let mut masked = String::with_capacity(out.len());
     let mut i = 0;
     let bytes = out.as_bytes();
@@ -268,7 +323,17 @@ pub fn status(root: &Path) -> GitResult<Status> {
     if !root.join(".git").exists() {
         return Ok(Status::default());
     }
-    let raw = checked(root, &["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"], false)?;
+    let raw = checked(
+        root,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "-z",
+            "--untracked-files=all",
+        ],
+        false,
+    )?;
     let mut st = parse_status(&raw);
     st.is_repo = true;
     let git_dir = root.join(".git");
@@ -316,7 +381,12 @@ pub fn parse_status(raw: &str) -> Status {
                 }
             }
         } else if let Some(path) = rec.strip_prefix("? ") {
-            st.files.push(FileChange { path: path.into(), staged: ".".into(), unstaged: "?".into(), ..Default::default() });
+            st.files.push(FileChange {
+                path: path.into(),
+                staged: ".".into(),
+                unstaged: "?".into(),
+                ..Default::default()
+            });
         } else if rec.starts_with("1 ") || rec.starts_with("2 ") || rec.starts_with("u ") {
             let kind = &rec[..1];
             let fields_before_path = match kind {
@@ -326,8 +396,16 @@ pub fn parse_status(raw: &str) -> Status {
             };
             let parts: Vec<&str> = rec.splitn(fields_before_path + 1, ' ').collect();
             let xy = parts.get(1).copied().unwrap_or("..");
-            let path = parts.get(fields_before_path).copied().unwrap_or("").to_string();
-            let orig_path = if kind == "2" { records.next().map(str::to_string) } else { None };
+            let path = parts
+                .get(fields_before_path)
+                .copied()
+                .unwrap_or("")
+                .to_string();
+            let orig_path = if kind == "2" {
+                records.next().map(str::to_string)
+            } else {
+                None
+            };
             st.files.push(FileChange {
                 path,
                 orig_path,
@@ -348,7 +426,11 @@ pub fn fetch(root: &Path) -> GitResult<Status> {
         .and_then(|u| u.split('/').next())
         .unwrap_or("origin")
         .to_string();
-    checked(root, &["fetch", "--prune", "--no-recurse-submodules", &remote], true)?;
+    checked(
+        root,
+        &["fetch", "--prune", "--no-recurse-submodules", &remote],
+        true,
+    )?;
     status(root)
 }
 
@@ -356,10 +438,18 @@ pub fn fetch(root: &Path) -> GitResult<Status> {
 pub fn fast_forward(root: &Path) -> GitResult<Status> {
     let st = status(root)?;
     if let Some(op) = &st.operation {
-        return Err(GitError::new(ErrorKind::InProgress, format!("A {op} is unfinished in this repository. Finish or abort it in a terminal first.")));
+        return Err(GitError::new(
+            ErrorKind::InProgress,
+            format!(
+                "A {op} is unfinished in this repository. Finish or abort it in a terminal first."
+            ),
+        ));
     }
     if st.upstream.is_none() {
-        return Err(GitError::new(ErrorKind::NoUpstream, "This branch has no upstream branch to update from."));
+        return Err(GitError::new(
+            ErrorKind::NoUpstream,
+            "This branch has no upstream branch to update from.",
+        ));
     }
     if st.behind == 0 {
         return Ok(st);
@@ -367,20 +457,33 @@ pub fn fast_forward(root: &Path) -> GitResult<Status> {
     if st.ahead > 0 {
         return Err(GitError::new(
             ErrorKind::Diverged,
-            format!("Local and remote histories have diverged: {} local and {} remote commits. Waymark will not merge or rebase them.", st.ahead, st.behind),
+            format!(
+                "Local and remote histories have diverged: {} local and {} remote commits. Waymark will not merge or rebase them.",
+                st.ahead, st.behind
+            ),
         ));
     }
-    checked(root, &["merge", "--ff-only", "--no-edit", "@{upstream}"], false)?;
+    checked(
+        root,
+        &["merge", "--ff-only", "--no-edit", "@{upstream}"],
+        false,
+    )?;
     status(root)
 }
 
 pub fn push(root: &Path) -> GitResult<Status> {
     let st = status(root)?;
     if st.upstream.is_none() {
-        return Err(GitError::new(ErrorKind::NoUpstream, "This branch has no upstream branch to push to."));
+        return Err(GitError::new(
+            ErrorKind::NoUpstream,
+            "This branch has no upstream branch to push to.",
+        ));
     }
     if st.behind > 0 {
-        return Err(GitError::new(ErrorKind::Rejected, "The remote has commits you do not have. Update first; Waymark never force-pushes."));
+        return Err(GitError::new(
+            ErrorKind::Rejected,
+            "The remote has commits you do not have. Update first; Waymark never force-pushes.",
+        ));
     }
     checked(root, &["push", "--porcelain"], true)?;
     status(root)
@@ -396,7 +499,11 @@ pub fn stage(root: &Path, paths: &[String]) -> GitResult<Status> {
 /// Removes paths from the index only. The working tree is never touched.
 pub fn unstage(root: &Path, paths: &[String]) -> GitResult<Status> {
     let st = status(root)?;
-    let mut args: Vec<&str> = if st.head.is_some() { vec!["restore", "--staged", "--"] } else { vec!["rm", "--cached", "--quiet", "--"] };
+    let mut args: Vec<&str> = if st.head.is_some() {
+        vec!["restore", "--staged", "--"]
+    } else {
+        vec!["rm", "--cached", "--quiet", "--"]
+    };
     args.extend(paths.iter().map(String::as_str));
     checked(root, &args, false)?;
     status(root)
@@ -413,14 +520,22 @@ pub fn commit(root: &Path, message: &str) -> GitResult<Status> {
     }
     let out = run_with_input(root, &["commit", "--file=-"], false, Some(message))?;
     if !out.ok {
-        return Err(classify(if out.stderr.trim().is_empty() { &out.stdout } else { &out.stderr }));
+        return Err(classify(if out.stderr.trim().is_empty() {
+            &out.stdout
+        } else {
+            &out.stderr
+        }));
     }
     status(root)
 }
 
 pub fn diff_worktree(root: &Path, path: &str, staged: bool, untracked: bool) -> GitResult<String> {
     if untracked {
-        let out = run(root, &["diff", "--no-index", "--", "/dev/null", path], false)?;
+        let out = run(
+            root,
+            &["diff", "--no-index", "--", "/dev/null", path],
+            false,
+        )?;
         return Ok(out.stdout);
     }
     let mut args = vec!["diff", "--no-color", "--find-renames"];
@@ -446,7 +561,12 @@ pub struct Commit {
 pub fn log(root: &Path, path: Option<&str>, limit: u32, skip: u32) -> GitResult<Vec<Commit>> {
     let limit_arg = format!("-n{limit}");
     let skip_arg = format!("--skip={skip}");
-    let mut args = vec!["log", "--format=%x1e%H%x1f%h%x1f%an%x1f%aI%x1f%s", limit_arg.as_str(), skip_arg.as_str()];
+    let mut args = vec![
+        "log",
+        "--format=%x1e%H%x1f%h%x1f%an%x1f%aI%x1f%s",
+        limit_arg.as_str(),
+        skip_arg.as_str(),
+    ];
     if let Some(p) = path {
         args.extend(["--follow", "--name-only", "--", p]);
     }
@@ -465,7 +585,10 @@ pub fn log(root: &Path, path: Option<&str>, limit: u32, skip: u32) -> GitResult<
             let mut lines = r.lines();
             let header = lines.next()?;
             let f: Vec<&str> = header.split('\u{1f}').collect();
-            let file = lines.map(str::trim).find(|l| !l.is_empty()).map(str::to_string);
+            let file = lines
+                .map(str::trim)
+                .find(|l| !l.is_empty())
+                .map(str::to_string);
             Some(Commit {
                 sha: f.first()?.to_string(),
                 short: f.get(1)?.to_string(),
@@ -489,7 +612,14 @@ fn valid_rev(rev: &str) -> GitResult<()> {
 /// The patch a commit introduced, optionally limited to one path.
 pub fn show_commit(root: &Path, sha: &str, path: Option<&str>) -> GitResult<String> {
     valid_rev(sha)?;
-    let mut args = vec!["show", "--no-color", "--format=", "--find-renames", "--patch", sha];
+    let mut args = vec![
+        "show",
+        "--no-color",
+        "--format=",
+        "--find-renames",
+        "--patch",
+        sha,
+    ];
     if let Some(p) = path {
         args.extend(["--", p]);
     }
@@ -505,34 +635,64 @@ pub fn file_at(root: &Path, sha: &str, path: &str) -> GitResult<String> {
 pub fn diff_revs(root: &Path, from: &str, to: &str, path: &str) -> GitResult<String> {
     valid_rev(from)?;
     valid_rev(to)?;
-    checked(root, &["diff", "--no-color", "--find-renames", from, to, "--", path], false)
+    checked(
+        root,
+        &["diff", "--no-color", "--find-renames", from, to, "--", path],
+        false,
+    )
 }
 
 /// Stores HTTPS credentials through the user's configured credential helper
 /// (the macOS Keychain with Apple's git). Waymark never keeps them itself.
 pub fn store_credential(root: &Path, url: &str, username: &str, secret: &str) -> GitResult<()> {
-    let (protocol, rest) = url.split_once("://").ok_or_else(|| GitError::new(ErrorKind::Other, "Only HTTPS remotes use stored passwords"))?;
+    let (protocol, rest) = url.split_once("://").ok_or_else(|| {
+        GitError::new(ErrorKind::Other, "Only HTTPS remotes use stored passwords")
+    })?;
     if protocol != "https" {
-        return Err(GitError::new(ErrorKind::Other, "Only HTTPS remotes use stored passwords; SSH remotes use your SSH agent"));
+        return Err(GitError::new(
+            ErrorKind::Other,
+            "Only HTTPS remotes use stored passwords; SSH remotes use your SSH agent",
+        ));
     }
-    let host = rest.split('/').next().unwrap_or_default().rsplit('@').next().unwrap_or_default();
+    let host = rest
+        .split('/')
+        .next()
+        .unwrap_or_default()
+        .rsplit('@')
+        .next()
+        .unwrap_or_default();
     if host.is_empty() || username.contains('\n') || secret.contains('\n') {
         return Err(GitError::new(ErrorKind::Other, "Invalid credential"));
     }
     let input = format!("protocol=https\nhost={host}\nusername={username}\npassword={secret}\n\n");
     let out = run_with_input(root, &["credential", "approve"], false, Some(&input))?;
-    if out.ok { Ok(()) } else { Err(classify(&out.stderr)) }
+    if out.ok {
+        Ok(())
+    } else {
+        Err(classify(&out.stderr))
+    }
 }
 
 pub fn clone(url: &str, dest: &Path, mut progress: impl FnMut(String)) -> GitResult<()> {
-    if dest.exists() && std::fs::read_dir(dest).map(|mut d| d.next().is_some()).unwrap_or(true) {
-        return Err(GitError::new(ErrorKind::Other, "Choose an empty or new folder to clone into."));
+    if dest.exists()
+        && std::fs::read_dir(dest)
+            .map(|mut d| d.next().is_some())
+            .unwrap_or(true)
+    {
+        return Err(GitError::new(
+            ErrorKind::Other,
+            "Choose an empty or new folder to clone into.",
+        ));
     }
-    let parent = dest.parent().ok_or_else(|| GitError::new(ErrorKind::Other, "Invalid destination"))?;
+    let parent = dest
+        .parent()
+        .ok_or_else(|| GitError::new(ErrorKind::Other, "Invalid destination"))?;
     std::fs::create_dir_all(parent).map_err(|e| GitError::new(ErrorKind::Other, e.to_string()))?;
     let mut cmd = base_command(parent, true);
     cmd.args(["clone", "--progress", "--", url]).arg(dest);
-    let mut child = cmd.spawn().map_err(|e| GitError::new(ErrorKind::Other, format!("Could not start git: {e}")))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| GitError::new(ErrorKind::Other, format!("Could not start git: {e}")))?;
     let stderr = child.stderr.take().unwrap();
     let mut all = String::new();
     let mut reader = BufReader::new(stderr);
@@ -552,8 +712,14 @@ pub fn clone(url: &str, dest: &Path, mut progress: impl FnMut(String)) -> GitRes
         }
         all.push_str(&chunk);
     }
-    let status = child.wait().map_err(|e| GitError::new(ErrorKind::Other, e.to_string()))?;
-    if status.success() { Ok(()) } else { Err(classify(&all)) }
+    let status = child
+        .wait()
+        .map_err(|e| GitError::new(ErrorKind::Other, e.to_string()))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(classify(&all))
+    }
 }
 
 #[cfg(test)]
@@ -584,10 +750,16 @@ mod tests {
     fn fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "-b", "main", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+        );
         let a = tmp.path().join("a");
         let b = tmp.path().join("b");
-        git(tmp.path(), &["clone", remote.to_str().unwrap(), a.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["clone", remote.to_str().unwrap(), a.to_str().unwrap()],
+        );
         for (k, v) in [("user.name", "T"), ("user.email", "t@example.com")] {
             git(&a, &["config", k, v]);
         }
@@ -596,7 +768,10 @@ mod tests {
         git(&a, &["add", "."]);
         git(&a, &["commit", "-m", "first"]);
         git(&a, &["push", "-u", "origin", "main"]);
-        git(tmp.path(), &["clone", remote.to_str().unwrap(), b.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["clone", remote.to_str().unwrap(), b.to_str().unwrap()],
+        );
         for (k, v) in [("user.name", "T"), ("user.email", "t@example.com")] {
             git(&b, &["config", k, v]);
         }
@@ -644,7 +819,10 @@ mod tests {
         fetch(&b).unwrap();
         let err = fast_forward(&b).unwrap_err();
         assert_eq!(err.kind, ErrorKind::LocalChangesBlock);
-        assert_eq!(std::fs::read_to_string(b.join("Note.md")).unwrap(), "my unsaved edit\n");
+        assert_eq!(
+            std::fs::read_to_string(b.join("Note.md")).unwrap(),
+            "my unsaved edit\n"
+        );
     }
 
     #[test]
@@ -652,11 +830,19 @@ mod tests {
         let (_t, a, _b) = fixture();
         write(&a, "New.md", "new\n");
         let st = status(&a).unwrap();
-        assert!(st.files.iter().any(|f| f.path == "New.md" && f.unstaged == "?"));
+        assert!(
+            st.files
+                .iter()
+                .any(|f| f.path == "New.md" && f.unstaged == "?")
+        );
         assert!(commit(&a, "nothing staged").is_err());
         stage(&a, &["New.md".into()]).unwrap();
         let st = unstage(&a, &["New.md".into()]).unwrap();
-        assert!(st.files.iter().any(|f| f.path == "New.md" && f.unstaged == "?"));
+        assert!(
+            st.files
+                .iter()
+                .any(|f| f.path == "New.md" && f.unstaged == "?")
+        );
         assert!(a.join("New.md").exists());
         stage(&a, &["New.md".into()]).unwrap();
         let st = commit(&a, "Add note").unwrap();
@@ -671,7 +857,13 @@ mod tests {
         write(&a, "Note.md", "two\n");
         git(&a, &["commit", "-am", "second"]);
         let commits = log(&a, Some("Note.md"), 10, 0).unwrap();
-        assert_eq!(commits.iter().map(|c| c.subject.as_str()).collect::<Vec<_>>(), ["second", "first"]);
+        assert_eq!(
+            commits
+                .iter()
+                .map(|c| c.subject.as_str())
+                .collect::<Vec<_>>(),
+            ["second", "first"]
+        );
         assert_eq!(file_at(&a, &commits[1].sha, "Note.md").unwrap(), "one\n");
         let diff = diff_revs(&a, &commits[1].sha, &commits[0].sha, "Note.md").unwrap();
         assert!(diff.contains("-one") && diff.contains("+two"));
@@ -681,7 +873,15 @@ mod tests {
     #[test]
     fn reports_offline_remotes() {
         let (_t, a, _b) = fixture();
-        git(&a, &["remote", "set-url", "origin", "https://folio-test.invalid/repo.git"]);
+        git(
+            &a,
+            &[
+                "remote",
+                "set-url",
+                "origin",
+                "https://folio-test.invalid/repo.git",
+            ],
+        );
         let err = fetch(&a).unwrap_err();
         assert_eq!(err.kind, ErrorKind::Offline, "{}", err.message);
     }
@@ -700,7 +900,10 @@ mod tests {
 
     #[test]
     fn redacts_credentials() {
-        assert_eq!(redact("fatal: https://me:s3cret@host.com/r.git failed"), "fatal: https://***@host.com/r.git failed");
+        assert_eq!(
+            redact("fatal: https://me:s3cret@host.com/r.git failed"),
+            "fatal: https://***@host.com/r.git failed"
+        );
         assert_eq!(redact("token ghp_abcDEF123 leaked"), "token ghp_*** leaked");
         assert_eq!(redact("git@github.com:me/r.git"), "git@github.com:me/r.git");
     }

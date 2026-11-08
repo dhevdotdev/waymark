@@ -1,8 +1,6 @@
 export type GraphScope = "vault" | "local";
 
-export type View =
-  | { kind: "note"; path: string }
-  | { kind: "graph"; note: string; scope: GraphScope };
+export type View = { kind: "note"; path: string } | { kind: "graph"; note: string; scope: GraphScope };
 
 export interface TrailNode {
   id: number;
@@ -44,22 +42,39 @@ const sameView = (a: View, b: View) => (a.kind === "note" && b.kind === "note" ?
 function isView(value: unknown): value is View {
   if (typeof value !== "object" || value === null || !("kind" in value)) return false;
   if (value.kind === "note") return "path" in value && typeof value.path === "string";
-  if (value.kind === "graph") return "note" in value && typeof value.note === "string" && "scope" in value && (value.scope === "vault" || value.scope === "local");
+  if (value.kind === "graph")
+    return (
+      "note" in value &&
+      typeof value.note === "string" &&
+      "scope" in value &&
+      (value.scope === "vault" || value.scope === "local")
+    );
   return false;
 }
 
 function isTrailNode(value: unknown): value is TrailNode {
   if (typeof value !== "object" || value === null) return false;
-  return "id" in value && typeof value.id === "number"
-    && "view" in value && isView(value.view)
-    && "parent" in value && (value.parent === null || typeof value.parent === "number")
-    && "scroll" in value && typeof value.scroll === "number";
+  return (
+    "id" in value &&
+    typeof value.id === "number" &&
+    "view" in value &&
+    isView(value.view) &&
+    "parent" in value &&
+    (value.parent === null || typeof value.parent === "number") &&
+    "scroll" in value &&
+    typeof value.scroll === "number"
+  );
 }
 
 function isCrossLink(value: unknown): value is CrossLink {
-  return typeof value === "object" && value !== null
-    && "from" in value && typeof value.from === "number"
-    && "to" in value && typeof value.to === "number";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "from" in value &&
+    typeof value.from === "number" &&
+    "to" in value &&
+    typeof value.to === "number"
+  );
 }
 
 /**
@@ -95,7 +110,13 @@ export class Trail {
     for (const node of value.nodes) {
       if (!isTrailNode(node) || !exists(node.view)) continue;
       if (node.parent !== null && !trail.nodes.has(node.parent)) continue;
-      trail.nodes.set(node.id, { id: node.id, view: node.view, parent: node.parent, scroll: node.scroll, collapsed: "collapsed" in node && node.collapsed === true });
+      trail.nodes.set(node.id, {
+        id: node.id,
+        view: node.view,
+        parent: node.parent,
+        scroll: node.scroll,
+        collapsed: "collapsed" in node && node.collapsed === true,
+      });
       trail.nextId = Math.max(trail.nextId, node.id + 1);
     }
     if (typeof value.root !== "number" || !trail.nodes.has(value.root)) return null;
@@ -104,7 +125,10 @@ export class Trail {
     if ("links" in value && Array.isArray(value.links)) {
       trail.links = value.links.filter(isCrossLink).filter((l) => trail.nodes.has(l.from) && trail.nodes.has(l.to));
     }
-    const visits = "visits" in value && Array.isArray(value.visits) ? value.visits.filter((v): v is number => typeof v === "number" && trail.nodes.has(v)) : [];
+    const visits =
+      "visits" in value && Array.isArray(value.visits)
+        ? value.visits.filter((v): v is number => typeof v === "number" && trail.nodes.has(v))
+        : [];
     const position = "position" in value && typeof value.position === "number" ? value.position : -1;
     if (visits[position] === trail.cur) {
       trail.visits = visits;
@@ -262,18 +286,24 @@ export class Trail {
     const doomed = new Set<number>();
     const collect = (n: number) => {
       doomed.add(n);
-      this.childrenOf(n).forEach((c) => collect(c.id));
+      this.childrenOf(n).forEach((c) => {
+        collect(c.id);
+      });
     };
     collect(id);
     /* A note also linked from somewhere that stays keeps its place, reattached to that link. */
-    for (let rescued = true; rescued;) {
+    for (let rescued = true; rescued; ) {
       rescued = false;
       for (const link of this.links) {
         if (link.to === id || !doomed.has(link.to) || doomed.has(link.from)) continue;
         this.nodes.get(link.to)!.parent = link.from;
         const free = (n: number) => {
           doomed.delete(n);
-          this.childrenOf(n).filter((c) => doomed.has(c.id)).forEach((c) => free(c.id));
+          this.childrenOf(n)
+            .filter((c) => doomed.has(c.id))
+            .forEach((c) => {
+              free(c.id);
+            });
         };
         free(link.to);
         this.links = this.links.filter((l) => l !== link);
@@ -317,7 +347,8 @@ export class Trail {
 
   private routeToCurrent(): number[] {
     const route: number[] = [];
-    for (let n: TrailNode | undefined = this.current; n; n = n.parent === null ? undefined : this.nodes.get(n.parent)) route.push(n.id);
+    for (let n: TrailNode | undefined = this.current; n; n = n.parent === null ? undefined : this.nodes.get(n.parent))
+      route.push(n.id);
     return route;
   }
 

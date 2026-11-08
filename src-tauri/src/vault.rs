@@ -24,7 +24,11 @@ impl Vault {
     }
 
     pub fn root(&self) -> Result<PathBuf, String> {
-        self.root.lock().unwrap().clone().ok_or_else(|| "No vault is open".to_string())
+        self.root
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "No vault is open".to_string())
     }
 
     pub fn resolve(&self, rel: &str) -> Result<PathBuf, String> {
@@ -41,7 +45,9 @@ pub fn resolve_in(root: &Path, rel: &str) -> Result<PathBuf, String> {
         }
     }
     let joined = root.join(rel_path);
-    let canonical = joined.canonicalize().map_err(|_| format!("Not found: {rel}"))?;
+    let canonical = joined
+        .canonicalize()
+        .map_err(|_| format!("Not found: {rel}"))?;
     let canonical_root = root.canonicalize().map_err(|e| e.to_string())?;
     if !canonical.starts_with(&canonical_root) {
         return Err(format!("Refusing path outside the vault: {rel}"));
@@ -52,7 +58,10 @@ pub fn resolve_in(root: &Path, rel: &str) -> Result<PathBuf, String> {
 pub fn info(root: &Path) -> VaultInfo {
     VaultInfo {
         root: root.to_string_lossy().into_owned(),
-        name: root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        name: root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default(),
         is_git: root.join(".git").exists(),
     }
 }
@@ -75,10 +84,8 @@ pub fn list(root: &Path) -> Result<Vec<String>, String> {
             };
             if file_type.is_dir() {
                 stack.push(path);
-            } else if file_type.is_file() {
-                if let Ok(rel) = path.strip_prefix(root) {
-                    out.push(rel.to_string_lossy().replace('\\', "/"));
-                }
+            } else if let (true, Ok(rel)) = (file_type.is_file(), path.strip_prefix(root)) {
+                out.push(rel.to_string_lossy().replace('\\', "/"));
             }
         }
     }
@@ -87,7 +94,12 @@ pub fn list(root: &Path) -> Result<Vec<String>, String> {
 }
 
 pub fn mime_for(path: &Path) -> &'static str {
-    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
         Some("png") => "image/png",
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("gif") => "image/gif",
@@ -123,7 +135,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
         std::fs::write(outside.path().join("secret.md"), "x").unwrap();
-        std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("link.md")).unwrap();
+        std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("link.md"))
+            .unwrap();
         assert!(resolve_in(dir.path(), "link.md").is_err());
     }
 

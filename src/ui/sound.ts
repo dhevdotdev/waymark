@@ -13,13 +13,64 @@ interface Note {
 }
 
 const CUES: Record<Cue, { notes: Note[]; type: OscillatorType; gain: number }> = {
-  copy: { type: "sine", gain: 0.05, notes: [{ f: 1568, t: 0, d: 0.06 }, { f: 2093, t: 0.04, d: 0.09 }] },
-  open: { type: "sine", gain: 0.035, notes: [{ f: 880, t: 0, d: 0.09 }, { f: 1318.5, t: 0.05, d: 0.14 }] },
-  synced: { type: "sine", gain: 0.05, notes: [{ f: 659.3, t: 0, d: 0.12 }, { f: 987.8, t: 0.08, d: 0.22 }] },
-  incoming: { type: "triangle", gain: 0.045, notes: [{ f: 523.3, t: 0, d: 0.1 }, { f: 659.3, t: 0.07, d: 0.1 }, { f: 784, t: 0.14, d: 0.22 }] },
-  problem: { type: "triangle", gain: 0.05, notes: [{ f: 392, t: 0, d: 0.14 }, { f: 311.1, t: 0.1, d: 0.24 }] },
-  commit: { type: "sine", gain: 0.05, notes: [{ f: 587.3, t: 0, d: 0.08 }, { f: 880, t: 0.06, d: 0.18 }] },
-  pushed: { type: "sine", gain: 0.05, notes: [{ f: 784, t: 0, d: 0.08 }, { f: 1174.7, t: 0.06, d: 0.1 }, { f: 1568, t: 0.12, d: 0.24 }] },
+  copy: {
+    type: "sine",
+    gain: 0.05,
+    notes: [
+      { f: 1568, t: 0, d: 0.06 },
+      { f: 2093, t: 0.04, d: 0.09 },
+    ],
+  },
+  open: {
+    type: "sine",
+    gain: 0.035,
+    notes: [
+      { f: 880, t: 0, d: 0.09 },
+      { f: 1318.5, t: 0.05, d: 0.14 },
+    ],
+  },
+  synced: {
+    type: "sine",
+    gain: 0.05,
+    notes: [
+      { f: 659.3, t: 0, d: 0.12 },
+      { f: 987.8, t: 0.08, d: 0.22 },
+    ],
+  },
+  incoming: {
+    type: "triangle",
+    gain: 0.045,
+    notes: [
+      { f: 523.3, t: 0, d: 0.1 },
+      { f: 659.3, t: 0.07, d: 0.1 },
+      { f: 784, t: 0.14, d: 0.22 },
+    ],
+  },
+  problem: {
+    type: "triangle",
+    gain: 0.05,
+    notes: [
+      { f: 392, t: 0, d: 0.14 },
+      { f: 311.1, t: 0.1, d: 0.24 },
+    ],
+  },
+  commit: {
+    type: "sine",
+    gain: 0.05,
+    notes: [
+      { f: 587.3, t: 0, d: 0.08 },
+      { f: 880, t: 0.06, d: 0.18 },
+    ],
+  },
+  pushed: {
+    type: "sine",
+    gain: 0.05,
+    notes: [
+      { f: 784, t: 0, d: 0.08 },
+      { f: 1174.7, t: 0.06, d: 0.1 },
+      { f: 1568, t: 0.12, d: 0.24 },
+    ],
+  },
 };
 
 const COOLDOWN_MS = 900;

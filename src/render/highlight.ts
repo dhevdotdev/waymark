@@ -33,9 +33,23 @@ const LANGS: Record<string, () => Promise<unknown>> = {
 };
 
 const ALIASES: Record<string, string> = {
-  js: "javascript", ts: "typescript", sh: "bash", shell: "bash", zsh: "bash", console: "bash",
-  "c++": "cpp", hpp: "cpp", yml: "yaml", kt: "kotlin", py: "python", proto: "protobuf",
-  gradle: "groovy", make: "makefile", docker: "dockerfile", ini: "properties", rs: "rust",
+  js: "javascript",
+  ts: "typescript",
+  sh: "bash",
+  shell: "bash",
+  zsh: "bash",
+  console: "bash",
+  "c++": "cpp",
+  hpp: "cpp",
+  yml: "yaml",
+  kt: "kotlin",
+  py: "python",
+  proto: "protobuf",
+  gradle: "groovy",
+  make: "makefile",
+  docker: "dockerfile",
+  ini: "properties",
+  rs: "rust",
 };
 
 const THEMES: Record<string, () => Promise<unknown>> = {
@@ -96,7 +110,16 @@ export class Highlighter {
   highlight = (code: string, lang: string): string | null => {
     const id = canonical(lang);
     if (!this.core || !id || !this.loaded.has(id)) return null;
-    const grammar = id === "properties" ? "ini" : id === "protobuf" ? "proto" : id === "makefile" ? "make" : id === "dockerfile" ? "docker" : id;
+    const grammar =
+      id === "properties"
+        ? "ini"
+        : id === "protobuf"
+          ? "proto"
+          : id === "makefile"
+            ? "make"
+            : id === "dockerfile"
+              ? "docker"
+              : id;
     return this.core.codeToHtml(code, {
       lang: grammar,
       themes: this.themes,

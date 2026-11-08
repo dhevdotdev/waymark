@@ -27,7 +27,11 @@ export function parseFrontmatter(source: string): Frontmatter {
       data[key] = [];
       listKey = key;
     } else if (/^\[.*\]$/.test(value)) {
-      data[key] = value.slice(1, -1).split(",").map((v) => unquote(v.trim())).filter(Boolean);
+      data[key] = value
+        .slice(1, -1)
+        .split(",")
+        .map((v) => unquote(v.trim()))
+        .filter(Boolean);
       listKey = null;
     } else {
       data[key] = unquote(value);

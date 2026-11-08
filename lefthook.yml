@@ -1,0 +1,18 @@
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,mjs,json,css}"
+      run: pnpm biome check --no-errors-on-unmatched {staged_files}
+    typecheck:
+      glob: "*.ts"
+      run: pnpm typecheck
+    rustfmt:
+      glob: "*.rs"
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+    secrets:
+      run: command -v gitleaks >/dev/null && gitleaks git --staged --no-banner --redact . || true
+pre-push:
+  commands:
+    check:
+      run: pnpm check

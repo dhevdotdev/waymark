@@ -20,6 +20,8 @@ describe("fuzzy", () => {
     expect(fuzzy("sailing kn", "Sailing boat storage racks - WinterCover")).toBeNull();
   });
   it("prefers a direct substring", () => {
-    expect(fuzzy("slow", "Tea eager and slow brewing")!.score).toBeGreaterThan(fuzzy("tes", "Tea eager and slow brewing")?.score ?? -Infinity);
+    expect(fuzzy("slow", "Tea eager and slow brewing")!.score).toBeGreaterThan(
+      fuzzy("tes", "Tea eager and slow brewing")?.score ?? -Infinity,
+    );
   });
 });

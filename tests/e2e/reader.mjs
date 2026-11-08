@@ -10,12 +10,14 @@ const videoDir = args.includes("--video") ? args[args.indexOf("--video") + 1] : 
 const app = await serveFixture();
 const browser = await webkit.launch();
 const ctx = await browser.newContext({
-  viewport: { width: 1280, height: 800 }, colorScheme: "light", reducedMotion: reduced ? "reduce" : "no-preference",
+  viewport: { width: 1280, height: 800 },
+  colorScheme: "light",
+  reducedMotion: reduced ? "reduce" : "no-preference",
   ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } } } : {}),
 });
 const page = await ctx.newPage();
 const results = [];
-const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  (" + detail + ")" : ""}`);
+const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`);
 const title = () => page.textContent(".doc-title");
 const pause = (ms) => page.waitForTimeout(ms);
 
@@ -31,7 +33,10 @@ await page.click('.doc a.wikilink[data-anchor="Fixes"]');
 await pause(500);
 const fixesTop = await page.evaluate(() => document.querySelector('[data-key="fixes"]').getBoundingClientRect().top);
 check("[[#Fixes]] scrolls to its heading", fixesTop >= 40 && fixesTop < 140, `top=${fixesTop.toFixed(0)}`);
-check("target heading flashes", await page.evaluate(() => document.querySelector('[data-key="fixes"]').classList.contains("is-target")));
+check(
+  "target heading flashes",
+  await page.evaluate(() => document.querySelector('[data-key="fixes"]').classList.contains("is-target")),
+);
 
 // Copy button
 await page.hover(".doc .code");
@@ -62,7 +67,10 @@ await pause(500);
 // Cmd-click opens a background tab
 await page.click('.doc a.wikilink[data-path$="Proofing baskets and banneton care.md"]', { modifiers: ["Meta"] });
 await pause(500);
-check("⌘-click opens a background tab", (await page.locator(".tab").count()) === 2 && (await title()).startsWith("Crumb structure"));
+check(
+  "⌘-click opens a background tab",
+  (await page.locator(".tab").count()) === 2 && (await title()).startsWith("Crumb structure"),
+);
 await page.click(".tab:nth-child(2)");
 await pause(500);
 check("switching tabs shows the other note", (await title()).startsWith("Proofing baskets"));
@@ -71,8 +79,13 @@ await pause(500);
 check("⌘W closes the tab", (await page.locator(".tab").count()) === 1);
 
 // File tree navigation and collapse
-const flyway = await page.evaluate(() => window.folio.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
-const flywayFolders = flyway.split("/").slice(0, -1).map((_, i, all) => all.slice(0, i + 1).join("/"));
+const flyway = await page.evaluate(() =>
+  window.folio.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")),
+);
+const flywayFolders = flyway
+  .split("/")
+  .slice(0, -1)
+  .map((_, i, all) => all.slice(0, i + 1).join("/"));
 for (const f of flywayFolders) {
   const head = page.locator(`.tree-head[data-folder="${f}"]`);
   if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
@@ -88,13 +101,31 @@ check("a folder collapses", (await leaf.getAttribute("aria-expanded")) === "fals
 await leaf.click();
 await pause(350);
 const treeFolders = await page.evaluate(() => {
-  const onDisk = new Set(window.folio.index.notes.flatMap((p) => p.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/"))));
+  const onDisk = new Set(
+    window.folio.index.notes.flatMap((p) =>
+      p
+        .split("/")
+        .slice(0, -1)
+        .map((_, i, a) => a.slice(0, i + 1).join("/")),
+    ),
+  );
   const shown = [...document.querySelectorAll(".tree-head")].map((h) => h.dataset.folder);
   return { same: shown.length === onDisk.size && shown.every((f) => onDisk.has(f)), shown: shown.length };
 });
 check("the tree shows exactly the folders on disk", treeFolders.same, `${treeFolders.shown} folders`);
-check("long names never push the tree sideways", await page.evaluate(() => { const t = document.querySelector(".sidebar-inner"); return t.scrollWidth <= t.clientWidth; }));
-check("every row in the tree is one line", await page.evaluate(() => [...document.querySelectorAll(".nav-item")].filter((n) => n.offsetParent).every((n) => n.offsetHeight === 28)));
+check(
+  "long names never push the tree sideways",
+  await page.evaluate(() => {
+    const t = document.querySelector(".sidebar-inner");
+    return t.scrollWidth <= t.clientWidth;
+  }),
+);
+check(
+  "every row in the tree is one line",
+  await page.evaluate(() =>
+    [...document.querySelectorAll(".nav-item")].filter((n) => n.offsetParent).every((n) => n.offsetHeight === 28),
+  ),
+);
 const art = await page.evaluate(async () => {
   await document.fonts.load('13px "JetBrains Mono Variable"', "\u2500\u2502\u250c");
   const c = document.createElement("canvas").getContext("2d");
@@ -103,11 +134,31 @@ const art = await page.evaluate(async () => {
   return [..."\u2500\u2502\u250c\u2510\u2514\u2518\u253c\u25c0"].map(width).concat(width("a"));
 });
 check("box-drawing characters are as wide as letters", new Set(art.map((w) => w.toFixed(2))).size === 1, art[0].toFixed(2));
-check("list markers sit in the text flow", await page.evaluate(() => [...document.querySelectorAll(".doc ul > li, .doc ol > li")].filter((li) => !li.closest(".backlinks")).every((li) => { const host = li.querySelector(":scope > p:first-child") ?? li; const m = getComputedStyle(host, "::before"); return m.position === "static" && m.display === "inline-block"; })));
-check("the reader has no scrollbar", await page.evaluate(() => { const s = document.querySelector(".scroller"); return s.offsetWidth === s.clientWidth && getComputedStyle(s).scrollbarWidth === "none"; }));
+check(
+  "list markers sit in the text flow",
+  await page.evaluate(() =>
+    [...document.querySelectorAll(".doc ul > li, .doc ol > li")]
+      .filter((li) => !li.closest(".backlinks"))
+      .every((li) => {
+        const host = li.querySelector(":scope > p:first-child") ?? li;
+        const m = getComputedStyle(host, "::before");
+        return m.position === "static" && m.display === "inline-block";
+      }),
+  ),
+);
+check(
+  "the reader has no scrollbar",
+  await page.evaluate(() => {
+    const s = document.querySelector(".scroller");
+    return s.offsetWidth === s.clientWidth && getComputedStyle(s).scrollbarWidth === "none";
+  }),
+);
 await page.keyboard.press("Meta+\\");
 await pause(450);
-check("⌘\\ collapses the sidebar", await page.evaluate(() => document.querySelector(".shell").classList.contains("sidebar-closed")));
+check(
+  "⌘\\ collapses the sidebar",
+  await page.evaluate(() => document.querySelector(".shell").classList.contains("sidebar-closed")),
+);
 await page.keyboard.press("Meta+\\");
 await pause(450);
 
@@ -124,7 +175,9 @@ const h1 = await page.evaluate(() => document.querySelector(".callout[data-fold]
 check("collapsed callout expands", h0 < 2 && h1 > 20, `${h0.toFixed(0)}px → ${h1.toFixed(0)}px`);
 
 // Diagram enlarge
-await page.evaluate(() => window.folio.open(window.folio.index.notes.find((p) => p.endsWith("Crumb structure and the overproofing problem.md"))));
+await page.evaluate(() =>
+  window.folio.open(window.folio.index.notes.find((p) => p.endsWith("Crumb structure and the overproofing problem.md"))),
+);
 await page.waitForSelector(".diagram-svg svg");
 await page.evaluate(() => document.querySelector(".diagram").scrollIntoView({ block: "center" }));
 await page.hover(".diagram");
@@ -138,13 +191,23 @@ await pause(300);
 check("Escape closes the enlarged diagram", (await page.locator(".lightbox").count()) === 0);
 
 // Appearance switch redraws the diagram in the new palette
-const fill0 = await page.evaluate(() => getComputedStyle(document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon")).fill);
+const fill0 = await page.evaluate(
+  () => getComputedStyle(document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon")).fill,
+);
 await page.keyboard.press("Meta+Shift+L");
-await page.waitForFunction((f) => {
-  const n = document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon");
-  return n && getComputedStyle(n).fill !== f;
-}, fill0, { timeout: 8000 }).catch(() => {});
-const fill1 = await page.evaluate(() => getComputedStyle(document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon")).fill);
+await page
+  .waitForFunction(
+    (f) => {
+      const n = document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon");
+      return n && getComputedStyle(n).fill !== f;
+    },
+    fill0,
+    { timeout: 8000 },
+  )
+  .catch(() => {});
+const fill1 = await page.evaluate(
+  () => getComputedStyle(document.querySelector(".diagram-svg .node rect, .diagram-svg .node polygon")).fill,
+);
 check("diagram follows appearance", fill0 !== fill1, `${fill0} → ${fill1}`);
 await page.keyboard.press("Meta+Shift+L");
 await pause(500);
@@ -217,18 +280,30 @@ check("Escape closes the graph", (await page.locator(".graph-view").count()) ===
 // Every state has a visible way in and out
 await page.keyboard.press("Meta+g");
 await pause(900);
-check("the graph button shows that the graph is open", await page.locator('[data-act="graph"].is-on').count() === 1);
+check("the graph button shows that the graph is open", (await page.locator('[data-act="graph"].is-on').count()) === 1);
 const strip = page.locator(".graph-groups");
 await strip.hover();
 await page.mouse.wheel(0, 240);
 await pause(150);
-check("the community strip scrolls sideways", await strip.evaluate((e) => e.scrollWidth > e.clientWidth && e.scrollLeft > 0), await strip.evaluate((e) => `${Math.round(e.scrollLeft)} of ${e.scrollWidth - e.clientWidth}`));
-check("the graph opens as a tab", (await page.locator(".tab.is-graph-tab.is-active").count()) === 1, await page.textContent(".tab.is-active .tab-title"));
+check(
+  "the community strip scrolls sideways",
+  await strip.evaluate((e) => e.scrollWidth > e.clientWidth && e.scrollLeft > 0),
+  await strip.evaluate((e) => `${Math.round(e.scrollLeft)} of ${e.scrollWidth - e.clientWidth}`),
+);
+check(
+  "the graph opens as a tab",
+  (await page.locator(".tab.is-graph-tab.is-active").count()) === 1,
+  await page.textContent(".tab.is-active .tab-title"),
+);
 const beforeGraphClick = await title();
 const sibling = page.locator(".tree-folder.is-open .nav-item:not(.is-current)").first();
 await sibling.click();
 await pause(500);
-check("opening a note from the tree replaces the graph in its tab", (await page.locator(".graph-view").count()) === 0 && (await title()) !== beforeGraphClick, await title());
+check(
+  "opening a note from the tree replaces the graph in its tab",
+  (await page.locator(".graph-view").count()) === 0 && (await title()) !== beforeGraphClick,
+  await title(),
+);
 await page.keyboard.press("Meta+[");
 await pause(600);
 check("Back returns to the graph", (await page.locator(".graph-view").count()) === 1);
@@ -242,21 +317,33 @@ await page.keyboard.type("zzzznothing");
 await pause(150);
 await page.click('[data-act="search-clear"]');
 await pause(100);
-check("the X clears the field and stays in Search", (await page.inputValue(".search-field input")) === "" && await page.locator(".search-field input").isVisible());
+check(
+  "the X clears the field and stays in Search",
+  (await page.inputValue(".search-field input")) === "" && (await page.locator(".search-field input").isVisible()),
+);
 await page.keyboard.type("declination");
 await pause(200);
 await page.click('[data-side="files"]');
 await pause(120);
-check("Files tab returns to the tree", await page.locator(".tree").isVisible() && !(await page.locator(".search-field input").isVisible()));
+check(
+  "Files tab returns to the tree",
+  (await page.locator(".tree").isVisible()) && !(await page.locator(".search-field input").isVisible()),
+);
 await page.click('[data-side="search"]');
 await pause(120);
-check("Search keeps the query when you come back", (await page.inputValue(".search-field input")) === "declination" && (await page.locator(".search-hit").count()) > 0);
+check(
+  "Search keeps the query when you come back",
+  (await page.inputValue(".search-field input")) === "declination" && (await page.locator(".search-hit").count()) > 0,
+);
 await page.keyboard.press("Escape");
 await pause(120);
 check("Escape in Search returns to the tree", await page.locator(".tree").isVisible());
 
 // Each tab keeps its own trail of followed links
-await page.evaluate(async () => { const f = window.folio; await f.open(f.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md"))); });
+await page.evaluate(async () => {
+  const f = window.folio;
+  await f.open(f.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
+});
 await pause(400);
 check("a tab with one note shows no trail", !(await page.locator(".trail").isVisible()));
 const followed = [];
@@ -278,11 +365,22 @@ await followLink();
 check("following a link grows the trail", (await page.locator(".trail-node").count()) === 2);
 await page.locator(".trail-name").first().click();
 await pause(450);
-check("clicking the map moves this tab there", (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2);
+check(
+  "clicking the map moves this tab there",
+  (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2,
+);
 await followLink();
-const rows = await page.evaluate(() => new Set([...document.querySelectorAll(".trail-node")].map((n) => n.style.insetBlockStart)).size);
-check("a second link from the same note branches", (await page.locator(".trail-node").count()) === 3 && rows === 2, `${rows} rows`);
-await page.keyboard.down("Meta"); await page.locator(".tree-folder.is-open .nav-item").first().click(); await page.keyboard.up("Meta");
+const rows = await page.evaluate(
+  () => new Set([...document.querySelectorAll(".trail-node")].map((n) => n.style.insetBlockStart)).size,
+);
+check(
+  "a second link from the same note branches",
+  (await page.locator(".trail-node").count()) === 3 && rows === 2,
+  `${rows} rows`,
+);
+await page.keyboard.down("Meta");
+await page.locator(".tree-folder.is-open .nav-item").first().click();
+await page.keyboard.up("Meta");
 await pause(500);
 await page.click(".tab:nth-child(2)");
 await pause(450);
@@ -292,19 +390,35 @@ await pause(450);
 check("the first tab keeps its map", (await page.locator(".trail-node").count()) === 3);
 await page.click(".tab:nth-child(2) .tab-close", { force: true });
 await pause(300);
-check("every note on the map shows its remove button", await page.locator(".trail-x").first().evaluate((e) => getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width >= 18));
+check(
+  "every note on the map shows its remove button",
+  await page
+    .locator(".trail-x")
+    .first()
+    .evaluate((e) => getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width >= 18),
+);
 const foldButton = page.locator(".trail-fold").first();
 await foldButton.click();
 await pause(150);
-check("the branch control folds away branches the tab is not on", (await foldButton.textContent()) !== "" && (await page.locator(".trail-fold").first().getAttribute("aria-expanded")) === "false");
+check(
+  "the branch control folds away branches the tab is not on",
+  (await foldButton.textContent()) !== "" &&
+    (await page.locator(".trail-fold").first().getAttribute("aria-expanded")) === "false",
+);
 await page.locator(".trail-fold").first().click();
 await pause(150);
 await page.locator(".trail-node.is-current .trail-x").click();
 await pause(450);
-check("removing the current note steps back to its parent", (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2);
+check(
+  "removing the current note steps back to its parent",
+  (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2,
+);
 await page.locator(".trail-x").first().click();
 await pause(200);
-check("removing the start keeps only the current note", !(await page.locator(".trail").isVisible()) && (await title()).startsWith("Compass declination"));
+check(
+  "removing the start keeps only the current note",
+  !(await page.locator(".trail").isVisible()) && (await title()).startsWith("Compass declination"),
+);
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
 await pause(450);
@@ -316,19 +430,32 @@ check("Back brings the previous trail back", (await page.locator(".trail-node").
 // A trail can loop back on itself
 const loop = await page.evaluate(() => {
   const f = window.folio;
-  for (const a of f.index.notes) for (const b of f.links.out.get(a) ?? []) if (a !== b && f.links.out.get(b)?.has(a)) return [a, b];
+  for (const a of f.index.notes)
+    for (const b of f.links.out.get(a) ?? []) if (a !== b && f.links.out.get(b)?.has(a)) return [a, b];
   return null;
 });
-await page.evaluate(async ([a]) => { await window.folio.open(a); }, loop);
+await page.evaluate(async ([a]) => {
+  await window.folio.open(a);
+}, loop);
 await pause(400);
-const clickTo = async (target) => { await page.locator(`.doc a.wikilink[data-path="${target}"]`).first().click(); await pause(450); };
+const clickTo = async (target) => {
+  await page.locator(`.doc a.wikilink[data-path="${target}"]`).first().click();
+  await pause(450);
+};
 await clickTo(loop[1]);
 await clickTo(loop[0]);
-check("a link back to an earlier note does not repeat it", (await page.locator(".trail-node").count()) === 2 && (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").first().textContent()));
+check(
+  "a link back to an earlier note does not repeat it",
+  (await page.locator(".trail-node").count()) === 2 &&
+    (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").first().textContent()),
+);
 check("the link back is drawn on the map", (await page.locator(".trail-lines path.is-cross").count()) === 1);
 await page.keyboard.press("Meta+[");
 await pause(450);
-check("Back retraces the stop you came from", (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").nth(1).textContent()));
+check(
+  "Back retraces the stop you came from",
+  (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").nth(1).textContent()),
+);
 
 await page.click('[data-rail="info"]');
 await pause(150);
@@ -338,7 +465,10 @@ await page.click('[data-rail="outline"]');
 const tabsBefore = await page.locator(".tab").count();
 await page.click('[data-act="new-tab"]');
 await pause(400);
-check("the + button opens a tab and the palette", (await page.locator(".tab").count()) === tabsBefore + 1 && await page.locator(".palette input").isVisible());
+check(
+  "the + button opens a tab and the palette",
+  (await page.locator(".tab").count()) === tabsBefore + 1 && (await page.locator(".palette input").isVisible()),
+);
 await page.keyboard.press("Escape");
 await pause(200);
 await page.keyboard.press("Meta+w");

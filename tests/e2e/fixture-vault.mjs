@@ -8,12 +8,32 @@ const PNG_1X1 = Buffer.from(
 );
 
 const TOPICS = [
-  ["Apiary", "Beekeeping"], ["Atlas", "Cartography"], ["Crafts/Clay", "Ceramic glazing"], ["Night sky", "Telescope collimation"],
-  ["Crafts/Rope", "Knot tying"], ["Crafts/Wood", "Wood joinery"], ["Outdoors", "Foraging"], ["Press room", "Letterpress printing"],
-  ["Workshop", "Bicycle repair"], ["Pantry", "Cheese aging"], ["Outdoors/River", "Fly fishing"], ["Crafts/Glass", "Stained glass"],
-  ["Outdoors/Sky", "Weather reading"], ["Garden", "Seed saving"],
+  ["Apiary", "Beekeeping"],
+  ["Atlas", "Cartography"],
+  ["Crafts/Clay", "Ceramic glazing"],
+  ["Night sky", "Telescope collimation"],
+  ["Crafts/Rope", "Knot tying"],
+  ["Crafts/Wood", "Wood joinery"],
+  ["Outdoors", "Foraging"],
+  ["Press room", "Letterpress printing"],
+  ["Workshop", "Bicycle repair"],
+  ["Pantry", "Cheese aging"],
+  ["Outdoors/River", "Fly fishing"],
+  ["Crafts/Glass", "Stained glass"],
+  ["Outdoors/Sky", "Weather reading"],
+  ["Garden", "Seed saving"],
 ];
-const ASPECTS = ["basics", "tools", "common mistakes", "seasonal schedule", "safety notes", "glossary", "field log", "further reading", "troubleshooting"];
+const ASPECTS = [
+  "basics",
+  "tools",
+  "common mistakes",
+  "seasonal schedule",
+  "safety notes",
+  "glossary",
+  "field log",
+  "further reading",
+  "troubleshooting",
+];
 
 const MERMAID = "```mermaid\nflowchart LR\n  A[Mix] --> B[Rest]\n  B --> C{Ready?}\n  C -->|yes| D[Shape]\n  C -->|no| B\n```";
 const FILLER = [
@@ -95,7 +115,11 @@ function topicNote(topicIndex, aspectIndex) {
   const prev = (aspectIndex + ASPECTS.length - 1) % ASPECTS.length;
   const next = (aspectIndex + 1) % ASPECTS.length;
   const seed = topicIndex * 9 + aspectIndex;
-  const parts = [`See [[${name(prev)}]] and [[${name(next)}]].`, `## Notes\n\n${paragraph(seed)}`, `- First pass\n- Second pass with [[${name(0)}]]\n- Third pass`];
+  const parts = [
+    `See [[${name(prev)}]] and [[${name(next)}]].`,
+    `## Notes\n\n${paragraph(seed)}`,
+    `- First pass\n- Second pass with [[${name(0)}]]\n- Third pass`,
+  ];
   if (aspectIndex === 0) parts.push(`Related craft is [[${TOPICS[(topicIndex + 1) % TOPICS.length][1]} basics]].`);
   if (seed % 5 === 0) parts.push(MERMAID);
   if (seed % 7 === 0) parts.push("```js\nconst batch = { day: 1, grams: 500 };\nconsole.log(batch);\n```");
@@ -106,7 +130,11 @@ function topicNote(topicIndex, aspectIndex) {
 
 export async function writeFixtureVault(root) {
   const files = new Map(Object.entries(hero));
-  TOPICS.forEach(([folder, topic], t) => ASPECTS.forEach((aspect, a) => files.set(`${folder}/${topic} ${aspect}.md`, topicNote(t, a))));
+  TOPICS.forEach(([folder, topic], t) => {
+    ASPECTS.forEach((aspect, a) => {
+      files.set(`${folder}/${topic} ${aspect}.md`, topicNote(t, a));
+    });
+  });
   for (const [rel, text] of files) {
     const abs = path.join(root, rel);
     await mkdir(path.dirname(abs), { recursive: true });

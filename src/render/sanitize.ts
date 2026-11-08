@@ -3,8 +3,20 @@ import DOMPurify from "dompurify";
 const LOCAL_ASSET = /^\/@vault\/file\?|^vault:\/\/localhost\//;
 
 const RENDERER_DATA = new Set([
-  "data-candidates", "data-anchor", "data-path", "data-embed", "data-fold", "data-callout", "data-type",
-  "data-lang", "data-lines", "data-diagram", "data-src", "data-key", "data-external", "data-attachment",
+  "data-candidates",
+  "data-anchor",
+  "data-path",
+  "data-embed",
+  "data-fold",
+  "data-callout",
+  "data-type",
+  "data-lang",
+  "data-lines",
+  "data-diagram",
+  "data-src",
+  "data-key",
+  "data-external",
+  "data-attachment",
 ]);
 
 let configured = false;

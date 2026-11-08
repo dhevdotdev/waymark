@@ -1,28 +1,27 @@
-import { VaultIndex, headingKey } from "../vault/index";
-import type { VaultSource } from "../vault/source";
-import { parseFrontmatter } from "../render/frontmatter";
-import { ancestors, buildTree, type TreeFolder } from "../vault/tree";
-import { detectCommunities, type CommunityResult } from "../vault/communities";
-import { Trail, type GraphScope, type View } from "../vault/trail";
-import { TrailMap } from "./trail-map";
-import { LinkGraph } from "../vault/links";
-import { Highlighter } from "../render/highlight";
-import { renderNote, type RenderedNote } from "../render/note";
-import { renderDiagrams } from "../render/diagrams";
-import { SearchIndex, type Hit } from "../search";
-import { FAMILIES, applyTheme, findFamily, type Scheme } from "../themes";
-import { PrefStore } from "../prefs";
-import { isDesktop, native, git, desktopVaultSource, type GitStatus } from "../platform";
-import { icons } from "./icons";
-import { Palette, type PaletteItem } from "./palette";
-import { FindBar, findRanges, paint, scrollToRange } from "./find";
-import { GitPanel, type SyncState } from "./git-panel";
-import { GraphCanvas, groupColor, type GraphData } from "./graph";
-import { LocalGraph } from "./local-graph";
-import { Sound } from "./sound";
-import { showWelcome } from "./welcome";
-import { relative } from "./git-panel";
 import type { Commit } from "../platform";
+import { desktopVaultSource, type GitStatus, git, isDesktop, native } from "../platform";
+import { PrefStore } from "../prefs";
+import { renderDiagrams } from "../render/diagrams";
+import { Highlighter } from "../render/highlight";
+import { type RenderedNote, renderNote } from "../render/note";
+import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
+import { type CommunityResult, detectCommunities } from "../vault/communities";
+import { parseFrontmatter } from "../vault/frontmatter";
+import { headingKey, VaultIndex } from "../vault/index";
+import { LinkGraph } from "../vault/links";
+import { type Hit, SearchIndex } from "../vault/search";
+import type { VaultSource } from "../vault/source";
+import { type GraphScope, Trail, type View } from "../vault/trail";
+import { ancestors, buildTree, type TreeFolder } from "../vault/tree";
+import { FindBar, findRanges, paint, scrollToRange } from "./find";
+import { GitPanel, relative, type SyncState } from "./git-panel";
+import { GraphCanvas, type GraphData, groupColor } from "./graph";
+import { icons } from "./icons";
+import { LocalGraph } from "./local-graph";
+import { Palette, type PaletteItem } from "./palette";
+import { Sound } from "./sound";
+import { TrailMap } from "./trail-map";
+import { showWelcome } from "./welcome";
 
 interface Tab {
   id: number;
@@ -76,10 +75,24 @@ export class App {
   private noteEls = new Map<string, HTMLElement>();
   private spyActive: HTMLElement | null = null;
   private els!: {
-    shell: HTMLElement; tabs: HTMLElement; sidebar: HTMLElement; searchPane: HTMLElement; scroller: HTMLElement;
-    outline: HTMLElement; links: HTMLElement; info: HTMLElement; railBody: HTMLElement; railGraph: HTMLElement;
-    back: HTMLButtonElement; forward: HTMLButtonElement; sync: HTMLButtonElement; reader: HTMLElement;
-    paneHead: HTMLElement; crumbs: HTMLElement; paneMeta: HTMLElement; branch: HTMLElement;
+    shell: HTMLElement;
+    tabs: HTMLElement;
+    sidebar: HTMLElement;
+    searchPane: HTMLElement;
+    scroller: HTMLElement;
+    outline: HTMLElement;
+    links: HTMLElement;
+    info: HTMLElement;
+    railBody: HTMLElement;
+    railGraph: HTMLElement;
+    back: HTMLButtonElement;
+    forward: HTMLButtonElement;
+    sync: HTMLButtonElement;
+    reader: HTMLElement;
+    paneHead: HTMLElement;
+    crumbs: HTMLElement;
+    paneMeta: HTMLElement;
+    branch: HTMLElement;
   };
   readonly metrics: Record<string, number> = {};
 
@@ -110,9 +123,14 @@ export class App {
   private welcome(error?: string): void {
     this.localGraph = null;
     this.els = undefined as never;
-    showWelcome(this.host, this.prefs.value.recentVaults, (path) => {
-      void this.openVault(path).catch((err: Error) => this.welcome(err.message));
-    }, error);
+    showWelcome(
+      this.host,
+      this.prefs.value.recentVaults,
+      (path) => {
+        void this.openVault(path).catch((err: Error) => this.welcome(err.message));
+      },
+      error,
+    );
   }
 
   async openVault(path: string): Promise<void> {
@@ -159,7 +177,13 @@ export class App {
         const trail = Trail.restore(value, exists);
         if (trail) return [{ id: this.nextId++, trail }];
         /* Earlier versions saved a single note per tab. */
-        if (typeof value === "object" && value !== null && "path" in value && typeof value.path === "string" && this.index.notes.includes(value.path)) {
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          "path" in value &&
+          typeof value.path === "string" &&
+          this.index.notes.includes(value.path)
+        ) {
           return [noteTab(value.path, "scroll" in value && typeof value.scroll === "number" ? value.scroll : 0)];
         }
         return [];
@@ -236,7 +260,9 @@ export class App {
     const missing = this.index.notes.filter((p) => !this.texts.has(p));
     if (missing.length) {
       const extra = await this.source.readMany(missing);
-      missing.forEach((p, i) => extra[i] !== null && this.texts.set(p, extra[i]!));
+      missing.forEach((p, i) => {
+        if (extra[i] !== null) this.texts.set(p, extra[i]!);
+      });
     }
     if (structural) for (const p of this.index.notes) this.ingest(p);
     else for (const p of changed) this.ingest(p);
@@ -356,10 +382,24 @@ export class App {
       </div>`;
     const q = <T extends HTMLElement>(s: string) => this.host.querySelector(s) as T;
     this.els = {
-      shell: q(".shell"), tabs: q(".tabs"), sidebar: q(".sidebar-inner"), searchPane: q(".sidebar-search"), scroller: q(".scroller"),
-      outline: q(".rail-outline"), links: q(".rail-links"), info: q(".rail-info"), railBody: q(".rail-body"), railGraph: q(".rail-graph"),
-      back: q('[data-act="back"]'), forward: q('[data-act="forward"]'), sync: q(".sync-btn"), reader: q(".reader"),
-      paneHead: q(".pane-head"), crumbs: q(".crumbs"), paneMeta: q(".pane-meta"), branch: q(".status-branch"),
+      shell: q(".shell"),
+      tabs: q(".tabs"),
+      sidebar: q(".sidebar-inner"),
+      searchPane: q(".sidebar-search"),
+      scroller: q(".scroller"),
+      outline: q(".rail-outline"),
+      links: q(".rail-links"),
+      info: q(".rail-info"),
+      railBody: q(".rail-body"),
+      railGraph: q(".rail-graph"),
+      back: q('[data-act="back"]'),
+      forward: q('[data-act="forward"]'),
+      sync: q(".sync-btn"),
+      reader: q(".reader"),
+      paneHead: q(".pane-head"),
+      crumbs: q(".crumbs"),
+      paneMeta: q(".pane-meta"),
+      branch: q(".status-branch"),
     };
     this.trailMap = new TrailMap({
       select: (id, newTab) => this.selectOnTrail(id, newTab),
@@ -378,7 +418,10 @@ export class App {
     this.sidebarMode = "files";
     this.bindSearchField();
     this.syncSideTabs();
-    this.palette = new Palette((query) => this.paletteItems(query), () => this.paletteRecent());
+    this.palette = new Palette(
+      (query) => this.paletteItems(query),
+      () => this.paletteRecent(),
+    );
     this.find = new FindBar(this.els.reader, () => this.els.scroller.querySelector(".doc"), this.els.scroller);
     this.gitPanel = new GitPanel({
       play: (c) => this.sound.play(c),
@@ -386,13 +429,18 @@ export class App {
       openNote: (path) => void this.open(path),
       lastSync: () => this.prefs.value.vaults[this.vaultRoot]?.lastSync ?? null,
       onVisible: (open) => this.els.sync.classList.toggle("is-on", open),
-      setLastSync: (at) => this.prefs.update((pr) => {
-        pr.vaults[this.vaultRoot] ??= { tabs: [], active: 0, lastSync: null };
-        pr.vaults[this.vaultRoot].lastSync = at;
-      }),
+      setLastSync: (at) =>
+        this.prefs.update((pr) => {
+          pr.vaults[this.vaultRoot] ??= { tabs: [], active: 0, lastSync: null };
+          pr.vaults[this.vaultRoot].lastSync = at;
+        }),
       onStatus: (st, state) => this.renderSync(st, state),
       renderNoteAt: async (md, path, into) => {
-        const r = await renderNote(md, path, { index: this.index, highlighter: this.highlighter, assetUrl: this.source.assetUrl });
+        const r = await renderNote(md, path, {
+          index: this.index,
+          highlighter: this.highlighter,
+          assetUrl: this.source.assetUrl,
+        });
         into.append(r.fragment);
         await renderDiagrams(into);
       },
@@ -424,7 +472,10 @@ export class App {
 
   // ---------- Navigation ----------
 
-  async open(path: string, opts: { anchor?: string; newTab?: boolean; focus?: boolean; find?: string; keyboard?: boolean; via?: "link" | "jump" } = {}): Promise<void> {
+  async open(
+    path: string,
+    opts: { anchor?: string; newTab?: boolean; focus?: boolean; find?: string; keyboard?: boolean; via?: "link" | "jump" } = {},
+  ): Promise<void> {
     const view: View = { kind: "note", path };
     if (opts.newTab) {
       const tab: Tab = { id: this.nextId++, trail: new Trail(view) };
@@ -437,7 +488,12 @@ export class App {
       }
       this.saveScroll();
       this.active += 1;
-      await this.show({ anchor: opts.anchor, entering: opts.keyboard ? undefined : tab.id, find: opts.find, keyboard: opts.keyboard });
+      await this.show({
+        anchor: opts.anchor,
+        entering: opts.keyboard ? undefined : tab.id,
+        find: opts.find,
+        keyboard: opts.keyboard,
+      });
       return;
     }
     if (path === this.path) {
@@ -493,10 +549,16 @@ export class App {
     const trail = this.tab.trail;
     this.trailMap.root.hidden = trail.size < 2;
     if (trail.size < 2) return;
-    this.trailMap.render(this.tab.id, trail.layout().map((p) => {
-      const view = trail.view(p.id)!;
-      return { ...p, label: this.viewLabel(view), isGraph: view.kind === "graph" };
-    }), trail.current.id, trail.pathToCurrent(), trail.crossLinks());
+    this.trailMap.render(
+      this.tab.id,
+      trail.layout().map((p) => {
+        const view = trail.view(p.id)!;
+        return { ...p, label: this.viewLabel(view), isGraph: view.kind === "graph" };
+      }),
+      trail.current.id,
+      trail.pathToCurrent(),
+      trail.crossLinks(),
+    );
   }
 
   /** The parts of the window that follow the active tab, whichever view it shows. */
@@ -512,7 +574,18 @@ export class App {
     this.els.forward.disabled = !this.tab.trail.canForward;
   }
 
-  private async show(opts: { anchor?: string; entering?: number; find?: string; keepScroll?: boolean; quiet?: boolean; restoring?: boolean; keyboard?: boolean; onPainted?: () => void } = {}): Promise<void> {
+  private async show(
+    opts: {
+      anchor?: string;
+      entering?: number;
+      find?: string;
+      keepScroll?: boolean;
+      quiet?: boolean;
+      restoring?: boolean;
+      keyboard?: boolean;
+      onPainted?: () => void;
+    } = {},
+  ): Promise<void> {
     const seq = ++this.renderSeq;
     this.metrics.navStart = performance.now();
     const entry = this.tab.trail.current;
@@ -533,7 +606,11 @@ export class App {
         return;
       }
     }
-    const rendered = await renderNote(text, path, { index: this.index, highlighter: this.highlighter, assetUrl: this.source.assetUrl });
+    const rendered = await renderNote(text, path, {
+      index: this.index,
+      highlighter: this.highlighter,
+      assetUrl: this.source.assetUrl,
+    });
     if (seq !== this.renderSeq) return;
     const changedNote = path !== this.current;
     this.current = path;
@@ -654,7 +731,7 @@ export class App {
     for (const line of text.split("\n")) {
       for (const m of line.matchAll(/\[\[([^\]|#]+)/g)) {
         const t = m[1].trim().toLowerCase();
-        if (t !== title && !t.endsWith("/" + title)) continue;
+        if (t !== title && !t.endsWith(`/${title}`)) continue;
         const clean = line
           .replace(/!?\[\[([^\]|]*?)(?:\|([^\]]*))?\]\]/g, (_, target: string, alias?: string) => alias || target.split("#")[0])
           .replace(/^\s*(?:[-*+]|\d+\.|>|#+)\s*/, "")
@@ -662,7 +739,7 @@ export class App {
           .replace(/[*_`]/g, "")
           .trim();
         if (clean.toLowerCase() === title || !clean) return null;
-        return clean.length > 160 ? clean.slice(0, 157) + "…" : clean;
+        return clean.length > 160 ? `${clean.slice(0, 157)}…` : clean;
       }
     }
     return null;
@@ -674,7 +751,7 @@ export class App {
     const frag = document.createDocumentFragment();
     this.tabs.forEach((tab, i) => {
       const el = document.createElement("div");
-      el.className = "tab" + (i === this.active ? " is-active" : "") + (tab.id === entering && !reducedMotion() ? " is-entering" : "");
+      el.className = `tab${i === this.active ? " is-active" : ""}${tab.id === entering && !reducedMotion() ? " is-entering" : ""}`;
       el.setAttribute("role", "tab");
       el.setAttribute("aria-selected", String(i === this.active));
       el.dataset.tab = String(i);
@@ -700,7 +777,10 @@ export class App {
     requestAnimationFrame(() => {
       /* Tabs keep their natural width while they fit; once crowded they share the strip equally. */
       const strip = this.els.tabs;
-      const natural = [...strip.querySelectorAll<HTMLElement>(".tab-title")].reduce((sum, t) => sum + Math.min(t.scrollWidth + 40, 320) + 2, 32);
+      const natural = [...strip.querySelectorAll<HTMLElement>(".tab-title")].reduce(
+        (sum, t) => sum + Math.min(t.scrollWidth + 40, 320) + 2,
+        32,
+      );
       strip.classList.toggle("is-crowded", natural > strip.clientWidth);
       for (const t of this.els.tabs.querySelectorAll<HTMLElement>(".tab")) {
         const title = t.querySelector<HTMLElement>(".tab-title")!;
@@ -757,7 +837,7 @@ export class App {
   private treeFolder(folder: TreeFolder, depth: number): HTMLElement {
     const wrap = document.createElement("div");
     const open = this.openFolders.has(folder.path);
-    wrap.className = "tree-folder" + (open ? " is-open" : "");
+    wrap.className = `tree-folder${open ? " is-open" : ""}`;
     const head = document.createElement("button");
     head.className = "tree-head";
     head.dataset.folder = folder.path;
@@ -893,7 +973,8 @@ export class App {
       b.classList.toggle("is-on", on);
       b.setAttribute("aria-selected", String(on));
     }
-    for (const pane of this.host.querySelectorAll<HTMLElement>("[data-side-pane]")) pane.hidden = pane.dataset.sidePane !== this.sidebarMode;
+    for (const pane of this.host.querySelectorAll<HTMLElement>("[data-side-pane]"))
+      pane.hidden = pane.dataset.sidePane !== this.sidebarMode;
   }
 
   private searchInput(): HTMLInputElement {
@@ -1083,7 +1164,7 @@ export class App {
     list.className = "outline";
     for (const h of items) {
       const a = document.createElement("a");
-      a.href = "#" + h.id;
+      a.href = `#${h.id}`;
       a.className = `l${h.level}`;
       a.dataset.target = h.id;
       a.textContent = h.text.replace(/`/g, "");
@@ -1192,7 +1273,10 @@ export class App {
     heading.className = "rail-title";
     heading.textContent = "History";
     if (!isDesktop || (status && !status.isRepo)) {
-      box.replaceChildren(heading, this.railEmpty(isDesktop ? "This vault is not a Git repository." : "File history runs in the desktop app."));
+      box.replaceChildren(
+        heading,
+        this.railEmpty(isDesktop ? "This vault is not a Git repository." : "File history runs in the desktop app."),
+      );
       return;
     }
     let commits: Commit[];
@@ -1205,7 +1289,9 @@ export class App {
       return;
     }
     if (seq !== this.historySeq || path !== this.current) return;
-    heading.textContent = commits.length ? `History · ${commits.length}${commits.length === HISTORY_LIMIT ? "+" : ""}` : "History";
+    heading.textContent = commits.length
+      ? `History · ${commits.length}${commits.length === HISTORY_LIMIT ? "+" : ""}`
+      : "History";
     const nodes: HTMLElement[] = [];
     if (commits.length) {
       const facts = document.createElement("dl");
@@ -1218,7 +1304,11 @@ export class App {
         facts.append(dt, dd);
       };
       fact("Updated", relative(commits[0].date));
-      if (commits.length < HISTORY_LIMIT) fact("Created", new Date(commits.at(-1)!.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }));
+      if (commits.length < HISTORY_LIMIT)
+        fact(
+          "Created",
+          new Date(commits.at(-1)!.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
+        );
       nodes.push(facts);
     }
     nodes.push(heading);
@@ -1235,8 +1325,14 @@ export class App {
       b.onclick = onClick;
       nodes.push(b);
     };
-    if (changed) row("Uncommitted changes", "Edited since the last commit", () => void this.gitPanel.showWorktreeDiff(changed, changed.unstaged === " " || !changed.unstaged));
-    for (const c of commits) row(c.subject || "(no message)", `${relative(c.date)} · ${c.short}`, () => void this.gitPanel.showCommit(c, path));
+    if (changed)
+      row(
+        "Uncommitted changes",
+        "Edited since the last commit",
+        () => void this.gitPanel.showWorktreeDiff(changed, changed.unstaged === " " || !changed.unstaged),
+      );
+    for (const c of commits)
+      row(c.subject || "(no message)", `${relative(c.date)} · ${c.short}`, () => void this.gitPanel.showCommit(c, path));
     if (!commits.length && !changed) nodes.push(this.railEmpty("Not committed yet."));
     box.replaceChildren(...nodes);
   }
@@ -1287,13 +1383,17 @@ export class App {
     const edges: [string, string][] = [];
     for (const a of ids) for (const b of this.links.out.get(a) ?? []) if (ids.has(b) && a !== b) edges.push([a, b]);
     const { groupOf } = this.linkCommunities();
-    this.localGraph.set(edges, [...ids].map((id) => ({
-      id,
-      label: this.index.title(id),
-      outgoing: out.has(id),
-      incoming: inc.has(id),
-      group: groupOf.get(id) ?? -1,
-    })), groupOf.get(this.current) ?? -1);
+    this.localGraph.set(
+      edges,
+      [...ids].map((id) => ({
+        id,
+        label: this.index.title(id),
+        outgoing: out.has(id),
+        incoming: inc.has(id),
+        group: groupOf.get(id) ?? -1,
+      })),
+      groupOf.get(this.current) ?? -1,
+    );
   }
 
   private spy(): void {
@@ -1410,11 +1510,15 @@ export class App {
     root.querySelector("input")!.addEventListener("input", (e) => canvas.setFilter((e.target as HTMLInputElement).value));
     const strip = root.querySelector<HTMLElement>(".graph-groups")!;
     strip.addEventListener("scroll", () => this.markStripEnds(strip), { passive: true });
-    strip.addEventListener("wheel", (e) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      e.preventDefault();
-      strip.scrollLeft += e.deltaY;
-    }, { passive: false });
+    strip.addEventListener(
+      "wheel",
+      (e) => {
+        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+        e.preventDefault();
+        strip.scrollLeft += e.deltaY;
+      },
+      { passive: false },
+    );
     const preview = (group: number | null) => this.graphView?.canvas.spotlight(group ?? this.spotGroup);
     root.addEventListener("pointerover", (e) => {
       const chip = (e.target as HTMLElement).closest<HTMLElement>("[data-ggroup]");
@@ -1443,7 +1547,8 @@ export class App {
     const data = this.graphData(scope === "local" ? this.links.neighbourhood(note, g.depth) : null);
     g.canvas.setData(data, note);
     for (const b of g.root.querySelectorAll<HTMLElement>("[data-gmode]")) b.classList.toggle("is-on", b.dataset.gmode === scope);
-    for (const b of g.root.querySelectorAll<HTMLElement>("[data-depth]")) b.classList.toggle("is-on", Number(b.dataset.depth) === g.depth);
+    for (const b of g.root.querySelectorAll<HTMLElement>("[data-depth]"))
+      b.classList.toggle("is-on", Number(b.dataset.depth) === g.depth);
     g.root.querySelector<HTMLElement>(".graph-depth")!.hidden = scope !== "local";
     g.root.querySelector(".graph-stats")!.textContent = `${data.nodes.length} notes · ${data.links.length} links`;
     this.spotGroup = null;
@@ -1535,7 +1640,17 @@ export class App {
     } else if (state.kind === "error") {
       const k = state.error.kind;
       tone = k === "offline" ? "off" : "warn";
-      text = ({ offline: "Offline", auth: "Sign-in needed", diverged: "Diverged", localChangesBlock: "Blocked", rejected: "Push rejected", timeout: "Timed out" } as Record<string, string>)[k] ?? "Sync problem";
+      text =
+        (
+          {
+            offline: "Offline",
+            auth: "Sign-in needed",
+            diverged: "Diverged",
+            localChangesBlock: "Blocked",
+            rejected: "Push rejected",
+            timeout: "Timed out",
+          } as Record<string, string>
+        )[k] ?? "Sync problem";
       tip = state.error.message.split("\n")[0];
     } else if (st.operation) {
       tone = "warn";
@@ -1604,7 +1719,14 @@ export class App {
   }
 
   private commands(): PaletteItem[] {
-    const c = (id: string, label: string, run: () => void, hint?: string, keywords?: string): PaletteItem => ({ id, label, hint, keywords, group: "Commands", run });
+    const c = (id: string, label: string, run: () => void, hint?: string, keywords?: string): PaletteItem => ({
+      id,
+      label,
+      hint,
+      keywords,
+      group: "Commands",
+      run,
+    });
     const st = this.gitPanel?.status;
     const list: PaletteItem[] = [
       c("files", "Show files", () => this.closeSearch(), "⌘⇧E", "folders tree sidebar"),
@@ -1615,8 +1737,19 @@ export class App {
       c("sidebar", "Toggle sidebar", () => this.toggleSidebar(), "⌘\\"),
       c("rail", "Toggle inspector", () => this.toggleRail(), "⌥⌘\\", "outline linked notes properties"),
       c("theme", "Change theme…", () => this.openSettings(), "⌘,", "appearance colour catppuccin rose pine gruvbox everforest"),
-      c("appearance", this.scheme() === "dark" ? "Use light appearance" : "Use dark appearance", () => this.setAppearance(this.scheme() === "dark" ? "light" : "dark"), "⌘⇧L"),
-      c("sound", this.prefs.value.sound ? "Mute sounds" : "Turn sounds on", () => this.setSound(!this.prefs.value.sound), undefined, "audio mute"),
+      c(
+        "appearance",
+        this.scheme() === "dark" ? "Use light appearance" : "Use dark appearance",
+        () => this.setAppearance(this.scheme() === "dark" ? "light" : "dark"),
+        "⌘⇧L",
+      ),
+      c(
+        "sound",
+        this.prefs.value.sound ? "Mute sounds" : "Turn sounds on",
+        () => this.setSound(!this.prefs.value.sound),
+        undefined,
+        "audio mute",
+      ),
       c("text-bigger", "Make text larger", () => this.scaleText(1), "⌘+"),
       c("text-smaller", "Make text smaller", () => this.scaleText(-1), "⌘−"),
       c("text-reset", "Reset text size", () => this.scaleText(0), "⌘0"),
@@ -1625,8 +1758,20 @@ export class App {
       list.push(
         c("sync", "Sync now", () => void this.gitPanel.sync(), "⌘⇧S", "git pull fetch update"),
         c("sync-panel", "Show changes and sync", () => this.gitPanel.open(), "⌘⇧Y", "git status commit push"),
-        c("history", "Show history of this note", () => this.gitPanel.open(undefined, { historyPath: this.current }), "⌘⇧H", "git log revisions"),
-        c("vault-history", "Show history of the vault", () => this.gitPanel.open(undefined, { historyPath: null }), undefined, "git log"),
+        c(
+          "history",
+          "Show history of this note",
+          () => this.gitPanel.open(undefined, { historyPath: this.current }),
+          "⌘⇧H",
+          "git log revisions",
+        ),
+        c(
+          "vault-history",
+          "Show history of the vault",
+          () => this.gitPanel.open(undefined, { historyPath: null }),
+          undefined,
+          "git log",
+        ),
         c("reveal", "Reveal note in Finder", () => void native.reveal(this.current)),
         c("terminal", "Open vault in Terminal", () => void native.openTerminal()),
         c("open-vault", "Open another vault…", async () => {
@@ -1639,7 +1784,8 @@ export class App {
           this.welcome();
         }),
       );
-      if (st?.ahead && !st.behind) list.push(c("push", `Push ${st.ahead} commit${st.ahead === 1 ? "" : "s"}`, () => this.gitPanel.open()));
+      if (st?.ahead && !st.behind)
+        list.push(c("push", `Push ${st.ahead} commit${st.ahead === 1 ? "" : "s"}`, () => this.gitPanel.open()));
     }
     return list;
   }
@@ -1673,9 +1819,13 @@ export class App {
         <div class="seg seg-full">${(["system", "light", "dark"] as const).map((a) => `<button class="seg-btn${p.appearance === a ? " is-on" : ""}" data-appearance="${a}">${a === "system" ? "Match system" : a[0].toUpperCase() + a.slice(1)}</button>`).join("")}</div></div>
       <div class="pop-section pop-toggles">
         <label class="toggle"><span>Sounds for sync, copy and new tabs</span><input type="checkbox" data-pref="sound" ${p.sound ? "checked" : ""}/><i aria-hidden="true"></i></label>
-        ${isDesktop ? `<label class="toggle"><span>Check the remote on launch</span><input type="checkbox" data-pref="syncOnLaunch" ${p.syncOnLaunch ? "checked" : ""}/><i aria-hidden="true"></i></label>
+        ${
+          isDesktop
+            ? `<label class="toggle"><span>Check the remote on launch</span><input type="checkbox" data-pref="syncOnLaunch" ${p.syncOnLaunch ? "checked" : ""}/><i aria-hidden="true"></i></label>
         <label class="toggle"><span>Check every 15 minutes</span><input type="checkbox" data-pref="background" ${p.backgroundMinutes ? "checked" : ""}/><i aria-hidden="true"></i></label>
-        <p class="pop-note">Checks only fetch. Incoming changes apply when you press Sync, and only as a fast-forward.</p>` : ""}
+        <p class="pop-note">Checks only fetch. Incoming changes apply when you press Sync, and only as a fast-forward.</p>`
+            : ""
+        }
       </div>`;
     document.body.append(pop);
     const r = anchor.getBoundingClientRect();
@@ -1685,7 +1835,11 @@ export class App {
     pop.addEventListener("click", (e) => {
       const t = e.target as HTMLElement;
       const fam = t.closest<HTMLElement>("[data-family]")?.dataset.family;
-      const appearance = t.closest<HTMLElement>("[data-appearance]")?.dataset.appearance as "system" | "light" | "dark" | undefined;
+      const appearance = t.closest<HTMLElement>("[data-appearance]")?.dataset.appearance as
+        | "system"
+        | "light"
+        | "dark"
+        | undefined;
       if (fam) {
         this.prefs.update((pr) => (pr.family = fam));
         this.applyTheme();
@@ -1774,7 +1928,8 @@ export class App {
       else if (act === "rail") this.toggleRail();
       else if (act === "graph") this.tab.trail.current.view.kind === "graph" ? this.leaveGraph() : this.openGraph("vault");
       else if (act === "graph-local") this.openGraph("local");
-      else if (act === "sync-panel") isDesktop ? this.gitPanel.toggle(this.els.sync) : this.toast("Git sync runs in the desktop app");
+      else if (act === "sync-panel")
+        isDesktop ? this.gitPanel.toggle(this.els.sync) : this.toast("Git sync runs in the desktop app");
       else if (act === "close") this.closeTab(Number(el.closest<HTMLElement>(".tab")!.dataset.tab));
       return;
     }
@@ -1845,7 +2000,9 @@ export class App {
     const outline = el.closest<HTMLAnchorElement>(".outline a");
     if (outline) {
       e.preventDefault();
-      document.getElementById(outline.dataset.target!)?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+      document
+        .getElementById(outline.dataset.target!)
+        ?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
       return;
     }
     const link = el.closest<HTMLElement>("a.wikilink, a.wikilink-plain, .nav-item[data-path]");
@@ -1926,12 +2083,12 @@ export class App {
     const inField = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     if (e.key === "Escape") {
       if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover")) return;
-      if (this.find.isOpen) return this.find.close();
-      if (this.tab.trail.current.view.kind === "graph" && !inField) return this.leaveGraph();
-      if (this.gitPanel.isOpen) return this.gitPanel.close();
-      if (this.els.shell.matches(".sidebar-peek, .rail-peek")) return void this.els.shell.classList.remove("sidebar-peek", "rail-peek");
-      if (this.sidebarMode === "search" && !inField) return this.closeSearch();
-      paint("search", []);
+      if (this.find.isOpen) this.find.close();
+      else if (this.tab.trail.current.view.kind === "graph" && !inField) this.leaveGraph();
+      else if (this.gitPanel.isOpen) this.gitPanel.close();
+      else if (this.els.shell.matches(".sidebar-peek, .rail-peek")) this.els.shell.classList.remove("sidebar-peek", "rail-peek");
+      else if (this.sidebarMode === "search" && !inField) this.closeSearch();
+      else paint("search", []);
       return;
     }
     if (e.ctrlKey && e.key === "Tab") {
@@ -1944,35 +2101,79 @@ export class App {
       e.preventDefault();
       e.stopPropagation();
     };
-    if ((k === "k" || k === "o" || k === "p") && !e.shiftKey) { handled(); this.palette.open(); }
-    else if (k === "t" && !e.shiftKey) { handled(); this.newTab(); }
-    else if (k === "e" && e.shiftKey) { handled(); this.closeSearch(); }
-    else if (k === "f" && e.shiftKey) { handled(); this.openSearch(window.getSelection()?.toString().trim() || undefined); }
-    else if (k === "f") { handled(); this.find.open(); }
-    else if (k === "g" && e.shiftKey) { handled(); this.openGraph("local"); }
-    else if (k === "g") { handled(); this.tab.trail.current.view.kind === "graph" ? this.leaveGraph() : this.openGraph("vault"); }
-    else if (k === "l" && e.shiftKey) { handled(); this.setAppearance(this.scheme() === "dark" ? "light" : "dark"); }
-    else if (k === "s" && e.shiftKey && isDesktop) { handled(); void this.gitPanel.sync(); }
-    else if (k === "y" && e.shiftKey && isDesktop) { handled(); this.gitPanel.open(); }
-    else if (k === "h" && e.shiftKey && isDesktop) { handled(); this.gitPanel.open(undefined, { historyPath: this.current }); }
-    else if (k === ",") { handled(); this.openSettings(); }
-    else if (inField) return;
-    else if (e.key === "[" && !e.shiftKey) { handled(); void this.go(-1); }
-    else if (e.key === "]" && !e.shiftKey) { handled(); void this.go(1); }
-    else if (e.key === "{" || (e.key === "[" && e.shiftKey)) { handled(); this.switchTab((this.active - 1 + this.tabs.length) % this.tabs.length); }
-    else if (e.key === "}" || (e.key === "]" && e.shiftKey)) { handled(); this.switchTab((this.active + 1) % this.tabs.length); }
-    else if (e.code === "Backslash" && e.altKey) { handled(); this.toggleRail(); }
-    else if (e.code === "Backslash") {
+    if ((k === "k" || k === "o" || k === "p") && !e.shiftKey) {
+      handled();
+      this.palette.open();
+    } else if (k === "t" && !e.shiftKey) {
+      handled();
+      this.newTab();
+    } else if (k === "e" && e.shiftKey) {
+      handled();
+      this.closeSearch();
+    } else if (k === "f" && e.shiftKey) {
+      handled();
+      this.openSearch(window.getSelection()?.toString().trim() || undefined);
+    } else if (k === "f") {
+      handled();
+      this.find.open();
+    } else if (k === "g" && e.shiftKey) {
+      handled();
+      this.openGraph("local");
+    } else if (k === "g") {
+      handled();
+      this.tab.trail.current.view.kind === "graph" ? this.leaveGraph() : this.openGraph("vault");
+    } else if (k === "l" && e.shiftKey) {
+      handled();
+      this.setAppearance(this.scheme() === "dark" ? "light" : "dark");
+    } else if (k === "s" && e.shiftKey && isDesktop) {
+      handled();
+      void this.gitPanel.sync();
+    } else if (k === "y" && e.shiftKey && isDesktop) {
+      handled();
+      this.gitPanel.open();
+    } else if (k === "h" && e.shiftKey && isDesktop) {
+      handled();
+      this.gitPanel.open(undefined, { historyPath: this.current });
+    } else if (k === ",") {
+      handled();
+      this.openSettings();
+    } else if (inField) return;
+    else if (e.key === "[" && !e.shiftKey) {
+      handled();
+      void this.go(-1);
+    } else if (e.key === "]" && !e.shiftKey) {
+      handled();
+      void this.go(1);
+    } else if (e.key === "{" || (e.key === "[" && e.shiftKey)) {
+      handled();
+      this.switchTab((this.active - 1 + this.tabs.length) % this.tabs.length);
+    } else if (e.key === "}" || (e.key === "]" && e.shiftKey)) {
+      handled();
+      this.switchTab((this.active + 1) % this.tabs.length);
+    } else if (e.code === "Backslash" && e.altKey) {
+      handled();
+      this.toggleRail();
+    } else if (e.code === "Backslash") {
       handled();
       this.els.shell.classList.add("no-anim");
       this.toggleSidebar();
       requestAnimationFrame(() => requestAnimationFrame(() => this.els.shell.classList.remove("no-anim")));
+    } else if (k === "w") {
+      handled();
+      this.closeTab(this.active);
+    } else if (k === "=" || k === "+") {
+      handled();
+      this.scaleText(1);
+    } else if (k === "-") {
+      handled();
+      this.scaleText(-1);
+    } else if (k === "0") {
+      handled();
+      this.scaleText(0);
+    } else if (/^[1-9]$/.test(k)) {
+      handled();
+      this.switchTab(k === "9" ? this.tabs.length - 1 : Math.min(Number(k), this.tabs.length) - 1);
     }
-    else if (k === "w") { handled(); this.closeTab(this.active); }
-    else if (k === "=" || k === "+") { handled(); this.scaleText(1); }
-    else if (k === "-") { handled(); this.scaleText(-1); }
-    else if (k === "0") { handled(); this.scaleText(0); }
-    else if (/^[1-9]$/.test(k)) { handled(); this.switchTab(k === "9" ? this.tabs.length - 1 : Math.min(Number(k), this.tabs.length) - 1); }
   }
 
   private async copyCode(button: HTMLButtonElement): Promise<void> {
@@ -2057,7 +2258,7 @@ export class App {
       hide();
       const show = () => {
         tip = document.createElement("div");
-        tip.className = "tooltip" + (performance.now() < warmUntil ? " is-instant" : "");
+        tip.className = `tooltip${performance.now() < warmUntil ? " is-instant" : ""}`;
         tip.textContent = target.dataset.tip!;
         if (target.dataset.key) {
           const kbd = document.createElement("kbd");
@@ -2110,7 +2311,11 @@ export class App {
     if (!text || path === this.current) return;
     const { body } = parseFrontmatter(text);
     const excerpt = body.split(/\n(?=## )/)[0].slice(0, 2000);
-    const r = await renderNote(excerpt, path, { index: this.index, highlighter: this.highlighter, assetUrl: this.source.assetUrl });
+    const r = await renderNote(excerpt, path, {
+      index: this.index,
+      highlighter: this.highlighter,
+      assetUrl: this.source.assetUrl,
+    });
     if (!link.matches(":hover")) return;
     this.hidePreview();
     const pop = document.createElement("div");

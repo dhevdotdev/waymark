@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { VaultIndex } from "../../src/vault/index";
-import { renderNote } from "../../src/render/note";
 import type { Highlighter } from "../../src/render/highlight";
+import { renderNote } from "../../src/render/note";
+import { VaultIndex } from "../../src/vault/index";
 
 const index = new VaultIndex(["Notes/A.md", "Notes/B.md", "Inbox/B.md", "Attachments/pic.png"]);
 const highlighter = { prepare: async () => {}, highlight: () => null } as unknown as Highlighter;
 const render = async (md: string) => {
-  const { fragment, headings } = await renderNote(md, "Notes/A.md", { index, highlighter, assetUrl: (p) => `/@vault/file?path=${encodeURIComponent(p)}` });
+  const { fragment, headings } = await renderNote(md, "Notes/A.md", {
+    index,
+    highlighter,
+    assetUrl: (p) => `/@vault/file?path=${encodeURIComponent(p)}`,
+  });
   const div = document.createElement("div");
   div.append(fragment);
   return { div, headings };

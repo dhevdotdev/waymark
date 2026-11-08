@@ -1,4 +1,13 @@
-import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
+import {
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+  type SimulationLinkDatum,
+  type SimulationNodeDatum,
+} from "d3-force";
 import { resolveColor } from "./colors";
 import { groupColor } from "./graph";
 
@@ -84,7 +93,10 @@ export class LocalGraph {
 
     const inc = neighbours.filter((n) => n.incoming).length;
     this.summary = neighbours.length ? `${neighbours.length} connected · ${inc} backlink${inc === 1 ? "" : "s"}` : "";
-    this.canvas.setAttribute("aria-label", `Linked notes, ${this.summary}. Use the arrow keys to move between them and Enter to open one.`);
+    this.canvas.setAttribute(
+      "aria-label",
+      `Linked notes, ${this.summary}. Use the arrow keys to move between them and Enter to open one.`,
+    );
     this.hover = null;
     this.readColors();
     this.simulate();
@@ -129,12 +141,26 @@ export class LocalGraph {
     }
     const reachOf = (id: string) => 26 + 58 / (1 + (ties.get(id) ?? 0) * 0.7);
     const sim = forceSimulation<Node, Link>(this.nodes)
-      .force("link", forceLink<Node, Link>(this.links).id((d) => d.id)
-        .distance((l) => (l.between ? 24 : reachOf(typeof l.target === "string" ? l.target : l.target.id)))
-        .strength((l) => (l.between ? 0.2 : 0.42)))
+      .force(
+        "link",
+        forceLink<Node, Link>(this.links)
+          .id((d) => d.id)
+          .distance((l) => (l.between ? 24 : reachOf(typeof l.target === "string" ? l.target : l.target.id)))
+          .strength((l) => (l.between ? 0.2 : 0.42)),
+      )
       .force("charge", forceManyBody<Node>().strength(-46).distanceMax(150))
-      .force("x", forceX<Node>((d) => anchors.get(d.group ?? -2)?.x ?? 0).strength((d) => (d.center || d.group === this.centreGroup ? 0 : 0.2)))
-      .force("y", forceY<Node>((d) => anchors.get(d.group ?? -2)?.y ?? 0).strength((d) => (d.center || d.group === this.centreGroup ? 0 : 0.2)))
+      .force(
+        "x",
+        forceX<Node>((d) => anchors.get(d.group ?? -2)?.x ?? 0).strength((d) =>
+          d.center || d.group === this.centreGroup ? 0 : 0.2,
+        ),
+      )
+      .force(
+        "y",
+        forceY<Node>((d) => anchors.get(d.group ?? -2)?.y ?? 0).strength((d) =>
+          d.center || d.group === this.centreGroup ? 0 : 0.2,
+        ),
+      )
       .force("collide", forceCollide<Node>(10))
       .stop();
     /* Keyboard order follows the angle around the centre once the layout settles. */
@@ -167,10 +193,15 @@ export class LocalGraph {
   private fit(): void {
     const { w, h } = this.size;
     if (!w || !this.nodes.length) return;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
     for (const d of this.nodes) {
-      minX = Math.min(minX, d.x!); maxX = Math.max(maxX, d.x!);
-      minY = Math.min(minY, d.y!); maxY = Math.max(maxY, d.y!);
+      minX = Math.min(minX, d.x!);
+      maxX = Math.max(maxX, d.x!);
+      minY = Math.min(minY, d.y!);
+      maxY = Math.max(maxY, d.y!);
     }
     const pad = 16;
     this.view.k = Math.min((w - pad * 2) / Math.max(1, maxX - minX), (h - pad * 2) / Math.max(1, maxY - minY), 2.2);
@@ -187,7 +218,8 @@ export class LocalGraph {
       ink: resolveColor("var(--ink)"),
     };
     this.hues.clear();
-    for (const d of this.nodes) if (!d.center && !this.hues.has(d.group!)) this.hues.set(d.group!, resolveColor(groupColor(d.group!)));
+    for (const d of this.nodes)
+      if (!d.center && !this.hues.has(d.group!)) this.hues.set(d.group!, resolveColor(groupColor(d.group!)));
   }
 
   private resize(): void {
@@ -218,15 +250,20 @@ export class LocalGraph {
     const hot = this.hover && !this.hover.center ? this.hover : null;
 
     for (const l of this.links) {
-      const s = l.source as Node, t = l.target as Node;
+      const s = l.source as Node,
+        t = l.target as Node;
       if (typeof s === "string" || typeof t === "string") continue;
       const lit = !!hot && (s === hot || t === hot);
       const outer = s.center ? t : s;
       ctx.globalAlpha = lit ? 0.9 : hot ? 0.07 : l.between ? 0.28 : 0.42;
-      ctx.strokeStyle = lit ? c.ink : l.between ? c.rule : this.hues.get(outer.group!) ?? c.rule;
+      ctx.strokeStyle = lit ? c.ink : l.between ? c.rule : (this.hues.get(outer.group!) ?? c.rule);
       ctx.lineWidth = lit ? 1.3 : 1;
-      const ax = this.sx(s), ay = this.sy(s), bx = this.sx(t), by = this.sy(t);
-      const dx = bx - ax, dy = by - ay;
+      const ax = this.sx(s),
+        ay = this.sy(s),
+        bx = this.sx(t),
+        by = this.sy(t);
+      const dx = bx - ax,
+        dy = by - ay;
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.quadraticCurveTo(ax + dx / 2 - dy * 0.12, ay + dy / 2 + dx * 0.12, bx, by);
@@ -239,7 +276,7 @@ export class LocalGraph {
       ctx.globalAlpha = hot && !on ? 0.4 : 1;
       ctx.beginPath();
       ctx.arc(this.sx(d), this.sy(d), on ? 5 : 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = on ? c.ink : this.hues.get(d.group!) ?? c.dot;
+      ctx.fillStyle = on ? c.ink : (this.hues.get(d.group!) ?? c.dot);
       ctx.fill();
     }
 
@@ -252,7 +289,8 @@ export class LocalGraph {
 
   private pick(e: MouseEvent): Node | null {
     const r = this.canvas.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const x = e.clientX - r.left,
+      y = e.clientY - r.top;
     let best: Node | null = null;
     let bestD = 12;
     for (const d of this.nodes) {

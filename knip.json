@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": ["tests/unit/*.test.ts", "tests/e2e/*.mjs", "tests/native/*.mjs", "scripts/*.mjs"],
+  "project": ["src/**/*.ts", "tests/**/*.{ts,mjs}", "scripts/**/*.mjs"],
+  "ignoreDependencies": [
+    "@fontsource-variable/inter",
+    "@fontsource-variable/jetbrains-mono",
+    "@fontsource-variable/source-serif-4"
+  ],
+  "ignore": []
+}

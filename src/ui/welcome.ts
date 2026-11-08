@@ -1,4 +1,4 @@
-import { git, GitError, native } from "../platform";
+import { type GitError, git, native } from "../platform";
 
 /**
  * First run, or no vault open: open an existing folder or clone a remote into

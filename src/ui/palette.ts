@@ -24,7 +24,10 @@ export class Palette {
   private selected = 0;
   private returnFocus: Element | null = null;
 
-  constructor(private source: (query: string) => PaletteItem[], private recent: () => PaletteItem[]) {}
+  constructor(
+    private source: (query: string) => PaletteItem[],
+    private recent: () => PaletteItem[],
+  ) {}
 
   get isOpen(): boolean {
     return this.root !== null;
@@ -92,7 +95,12 @@ export class Palette {
     const needle = commandsOnly ? q.slice(1).trim() : q.trim();
     const scored = this.items
       .filter((i) => (commandsOnly ? i.group === "Commands" : true))
-      .map((item) => ({ item, m: needle ? fuzzy(needle, item.label) ?? (item.keywords ? fuzzy(needle, item.keywords) : null) : { score: 0, marks: [] } }))
+      .map((item) => ({
+        item,
+        m: needle
+          ? (fuzzy(needle, item.label) ?? (item.keywords ? fuzzy(needle, item.keywords) : null))
+          : { score: 0, marks: [] },
+      }))
       .filter((x) => x.m !== null) as { item: PaletteItem; m: { score: number; marks: number[] } }[];
     if (needle) scored.sort((a, b) => b.m.score - a.m.score);
     const top = scored.slice(0, 60);
@@ -134,7 +142,9 @@ export class Palette {
     if (!top.length) {
       const empty = document.createElement("div");
       empty.className = "palette-empty";
-      empty.textContent = commandsOnly ? "No command matches" : `No note named like “${needle}”. Press ⌘⇧F to search inside notes.`;
+      empty.textContent = commandsOnly
+        ? "No command matches"
+        : `No note named like “${needle}”. Press ⌘⇧F to search inside notes.`;
       this.list.append(empty);
     }
     this.select(0, true);

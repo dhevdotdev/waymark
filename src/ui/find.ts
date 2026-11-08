@@ -5,10 +5,11 @@ export function findRanges(root: Element, needle: string, limit = 2000): Range[]
   const ranges: Range[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) =>
-      (n.parentElement?.closest(".diagram-source, .code-bar, .callout-icon, script, style, .katex-mathml") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      n.parentElement?.closest(".diagram-source, .code-bar, .callout-icon, script, style, .katex-mathml")
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
   });
-  let node: Node | null;
-  while ((node = walker.nextNode()) && ranges.length < limit) {
+  for (let node = walker.nextNode(); node && ranges.length < limit; node = walker.nextNode()) {
     const text = (node.textContent ?? "").toLowerCase();
     let at = text.indexOf(q);
     while (at >= 0 && ranges.length < limit) {
@@ -56,7 +57,11 @@ export class FindBar {
   private ranges: Range[] = [];
   private index = 0;
 
-  constructor(private host: HTMLElement, private doc: () => Element | null, private scroller: HTMLElement) {}
+  constructor(
+    private host: HTMLElement,
+    private doc: () => Element | null,
+    private scroller: HTMLElement,
+  ) {}
 
   get isOpen(): boolean {
     return this.root !== null;
@@ -133,7 +138,11 @@ export class FindBar {
     paint("find", this.ranges);
     const current = this.ranges[this.index];
     paint("find-current", current ? [current] : []);
-    this.count.textContent = this.input.value ? (this.ranges.length ? `${this.index + 1} of ${this.ranges.length}` : "No matches") : "";
+    this.count.textContent = this.input.value
+      ? this.ranges.length
+        ? `${this.index + 1} of ${this.ranges.length}`
+        : "No matches"
+      : "";
     this.root?.classList.toggle("is-empty", !!this.input.value && !this.ranges.length);
     if (current) scrollToRange(current, this.scroller);
   }

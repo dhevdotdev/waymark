@@ -1,5 +1,5 @@
-import { icons } from "./icons";
 import type { CrossLink, Placement } from "../vault/trail";
+import { icons } from "./icons";
 
 export interface TrailEntry extends Placement {
   label: string;
@@ -20,7 +20,9 @@ export class TrailMap {
   private seen = new Set<number>();
   private tabId = -1;
 
-  constructor(private on: { select: (id: number, newTab: boolean) => void; remove: (id: number) => void; toggle: (id: number) => void }) {
+  constructor(
+    private on: { select: (id: number, newTab: boolean) => void; remove: (id: number) => void; toggle: (id: number) => void },
+  ) {
     this.root.className = "trail";
     this.root.setAttribute("aria-label", "Trail of notes followed in this tab");
     this.scroller.className = "trail-scroll";
@@ -28,12 +30,16 @@ export class TrailMap {
     this.scroller.append(this.inner);
     this.root.append(this.scroller);
     this.scroller.addEventListener("scroll", () => this.markEnds(), { passive: true });
-    this.scroller.addEventListener("wheel", (e) => {
-      const s = this.scroller;
-      if (s.scrollHeight > s.clientHeight || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      e.preventDefault();
-      s.scrollLeft += e.deltaY;
-    }, { passive: false });
+    this.scroller.addEventListener(
+      "wheel",
+      (e) => {
+        const s = this.scroller;
+        if (s.scrollHeight > s.clientHeight || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+        e.preventDefault();
+        s.scrollLeft += e.deltaY;
+      },
+      { passive: false },
+    );
     this.root.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const remove = target.closest<HTMLElement>("[data-trail-remove]");
@@ -92,8 +98,11 @@ export class TrailMap {
     const box = new Map<number, { x: number; y: number; width: number }>();
     const byId = new Map(entries.map((e) => [e.id, e]));
     const isReturn = (l: CrossLink) => byId.get(l.from)?.parent === l.to;
-    const top = cross.some((l) => !isReturn(l) && byId.get(l.from)?.row === byId.get(l.to)?.row && byId.get(l.from)?.row === 0) ? ARC_ROOM : 0;
-    let width = 0, height = 0;
+    const top = cross.some((l) => !isReturn(l) && byId.get(l.from)?.row === byId.get(l.to)?.row && byId.get(l.from)?.row === 0)
+      ? ARC_ROOM
+      : 0;
+    let width = 0,
+      height = 0;
     for (const entry of entries) {
       const el = elements.get(entry.id)!;
       const parent = entry.parent === null ? undefined : box.get(entry.parent);
@@ -123,9 +132,10 @@ export class TrailMap {
       const endY = to.y + ROW / 2;
       const trunk = startX + 9;
       const r = 6;
-      const d = endY === startY
-        ? `M${startX} ${startY}H${endX}`
-        : `M${startX} ${startY}H${trunk}V${endY - r}Q${trunk} ${endY} ${trunk + r} ${endY}H${endX}`;
+      const d =
+        endY === startY
+          ? `M${startX} ${startY}H${endX}`
+          : `M${startX} ${startY}H${trunk}V${endY - r}Q${trunk} ${endY} ${trunk + r} ${endY}H${endX}`;
       const line = document.createElementNS(SVG_NS, "path");
       line.setAttribute("d", d);
       line.setAttribute("pathLength", "1");
@@ -144,7 +154,10 @@ export class TrailMap {
       fold.className = "trail-fold";
       fold.dataset.trailFold = String(entry.id);
       fold.setAttribute("aria-expanded", String(!entry.collapsed));
-      fold.setAttribute("aria-label", entry.collapsed ? `Show the branches from ${entry.label}` : `Fold the branches from ${entry.label}`);
+      fold.setAttribute(
+        "aria-label",
+        entry.collapsed ? `Show the branches from ${entry.label}` : `Fold the branches from ${entry.label}`,
+      );
       fold.textContent = entry.collapsed ? "+" : "−";
       fold.style.insetInlineStart = `${at.x + at.width + 12 - 7}px`;
       fold.style.insetBlockStart = `${at.y + (entry.collapsed ? ROW / 2 : ROW) - 7}px`;
@@ -159,16 +172,19 @@ export class TrailMap {
       svg.append(path);
     };
     for (const link of cross) {
-      const from = box.get(link.from), to = box.get(link.to);
+      const from = box.get(link.from),
+        to = box.get(link.to);
       if (!from || !to) continue;
       const touching = link.from === current || link.to === current;
       if (isReturn(link)) {
         /* A link straight back to the note before it: the existing line simply points both ways. */
-        const x = to.x + to.width + 8, y = to.y + ROW / 2;
+        const x = to.x + to.width + 8,
+          y = to.y + ROW / 2;
         stroke(`M${x + 4} ${y - 3.5}L${x} ${y}L${x + 4} ${y + 3.5}`, ["is-cross"], touching);
         continue;
       }
-      const fx = from.x + from.width / 2, tx = to.x + to.width / 2;
+      const fx = from.x + from.width / 2,
+        tx = to.x + to.width / 2;
       const inset = 3;
       if (from.y === to.y) {
         const y = from.y + inset;
@@ -190,7 +206,8 @@ export class TrailMap {
     if (active) {
       const s = this.scroller;
       if (active.x < s.scrollLeft) s.scrollLeft = Math.max(0, active.x - 12);
-      else if (active.x + active.width > s.scrollLeft + s.clientWidth) s.scrollLeft = active.x + active.width - s.clientWidth + 12;
+      else if (active.x + active.width > s.scrollLeft + s.clientWidth)
+        s.scrollLeft = active.x + active.width - s.clientWidth + 12;
       if (active.y < s.scrollTop) s.scrollTop = active.y;
       else if (active.y + ROW > s.scrollTop + s.clientHeight) s.scrollTop = active.y + ROW - s.clientHeight;
     }

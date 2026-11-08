@@ -64,7 +64,8 @@ export function detectCommunities(paths: string[], edges: [string, string][]): C
   let adj: Adjacency = sorted.map(() => new Map());
   const degree = new Map<string, number>();
   for (const [a, b] of edges) {
-    const i = index.get(a), j = index.get(b);
+    const i = index.get(a),
+      j = index.get(b);
     if (i === undefined || j === undefined || i === j) continue;
     adj[i].set(j, (adj[i].get(j) ?? 0) + 1);
     adj[j].set(i, (adj[j].get(i) ?? 0) + 1);

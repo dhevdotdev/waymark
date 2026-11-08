@@ -9,14 +9,14 @@
   --font-mono: "JetBrains Mono Variable", "SF Mono", ui-monospace, Menlo, monospace;
 
   /* Type ladder: four reading sizes plus two UI sizes. */
-  --text-body: 1.0625rem;      /* 17px reading body */
-  --text-small: 0.9375rem;     /* 15px callouts, tables, captions */
-  --text-code: 0.8125rem;      /* 13px code */
+  --text-body: 1.0625rem; /* 17px reading body */
+  --text-small: 0.9375rem; /* 15px callouts, tables, captions */
+  --text-code: 0.8125rem; /* 13px code */
   --text-h3: 1.0625rem;
   --text-h2: 1.375rem;
   --text-title: 2.125rem;
-  --ui-text: 0.8125rem;        /* 13px app controls */
-  --ui-small: 0.6875rem;       /* 11px meta */
+  --ui-text: 0.8125rem; /* 13px app controls */
+  --ui-small: 0.6875rem; /* 11px meta */
 
   --leading-body: 1.65;
   --leading-tight: 1.2;
@@ -28,7 +28,14 @@
   --gutter: 2.5rem;
 
   /* Space scale (4px base). */
-  --s1: 0.25rem; --s2: 0.5rem; --s3: 0.75rem; --s4: 1rem; --s5: 1.5rem; --s6: 2rem; --s7: 3rem; --s8: 4.5rem;
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --s8: 4.5rem;
 
   /* Radii by role: inline chips, controls, blocks in the page, floating surfaces, sheets. */
   --r-chip: 4px;
@@ -66,20 +73,43 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --rise: 0px; --pop: 1; --drawer-shift: 0px; --t-slide: 0ms; }
+  :root {
+    --rise: 0px;
+    --pop: 1;
+    --drawer-shift: 0px;
+    --t-slide: 0ms;
+  }
 }
 
 /* First paint uses Latte until the chosen theme is applied from themes.ts. */
 :root {
   color-scheme: light;
-  --p-rosewater: #dc8a78; --p-flamingo: #dd7878; --p-pink: #ea76cb; --p-mauve: #8839ef;
-  --p-red: #d20f39; --p-maroon: #e64553; --p-peach: #fe640b; --p-yellow: #df8e1d;
-  --p-green: #40a02b; --p-teal: #179299; --p-sky: #04a5e5; --p-sapphire: #209fb5;
-  --p-blue: #1e66f5; --p-lavender: #7287fd;
-  --p-text: #4c4f69; --p-subtext1: #5c5f77; --p-subtext0: #6c6f85;
-  --p-overlay2: #7c7f93; --p-overlay1: #8c8fa1; --p-overlay0: #9ca0b0;
-  --p-surface2: #acb0be; --p-surface1: #bcc0cc; --p-surface0: #ccd0da;
-  --p-base: #eff1f5; --p-mantle: #e6e9ef; --p-crust: #dce0e8;
+  --p-rosewater: #dc8a78;
+  --p-flamingo: #dd7878;
+  --p-pink: #ea76cb;
+  --p-mauve: #8839ef;
+  --p-red: #d20f39;
+  --p-maroon: #e64553;
+  --p-peach: #fe640b;
+  --p-yellow: #df8e1d;
+  --p-green: #40a02b;
+  --p-teal: #179299;
+  --p-sky: #04a5e5;
+  --p-sapphire: #209fb5;
+  --p-blue: #1e66f5;
+  --p-lavender: #7287fd;
+  --p-text: #4c4f69;
+  --p-subtext1: #5c5f77;
+  --p-subtext0: #6c6f85;
+  --p-overlay2: #7c7f93;
+  --p-overlay1: #8c8fa1;
+  --p-overlay0: #9ca0b0;
+  --p-surface2: #acb0be;
+  --p-surface1: #bcc0cc;
+  --p-surface0: #ccd0da;
+  --p-base: #eff1f5;
+  --p-mantle: #e6e9ef;
+  --p-crust: #dce0e8;
   --paper: color-mix(in oklab, var(--p-base) 30%, white);
   --ink: color-mix(in oklab, var(--p-text) 88%, black);
   --accent: var(--p-mauve);

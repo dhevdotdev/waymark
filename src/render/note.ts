@@ -1,9 +1,9 @@
-import { createMarkdown, type RenderEnv } from "./markdown";
-import { parseFrontmatter } from "./frontmatter";
-import { stripComments } from "./comments";
-import { sanitize } from "./sanitize";
-import type { Highlighter } from "./highlight";
+import { parseFrontmatter } from "../vault/frontmatter";
 import type { VaultIndex } from "../vault/index";
+import { stripComments } from "./comments";
+import type { Highlighter } from "./highlight";
+import { createMarkdown, type RenderEnv } from "./markdown";
+import { sanitize } from "./sanitize";
 
 const md = createMarkdown();
 

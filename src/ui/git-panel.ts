@@ -1,4 +1,4 @@
-import { git, GitError, native, type Commit, type FileChange, type GitStatus } from "../platform";
+import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import { renderDiff } from "./diff";
 import type { Cue } from "./sound";
 
@@ -14,21 +14,46 @@ export interface GitHost {
   title(path: string): string;
 }
 
-export type SyncState =
-  | { kind: "idle" }
-  | { kind: "busy"; label: string }
-  | { kind: "error"; error: GitError };
+export type SyncState = { kind: "idle" } | { kind: "busy"; label: string } | { kind: "error"; error: GitError };
 
 const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean }> = {
-  offline: { title: "Offline", body: "The remote could not be reached. Your notes are all here and readable; sync again when you are back online." },
-  auth: { title: "The remote refused access", body: "Waymark uses the same credentials as git in Terminal: your SSH agent for SSH remotes and the macOS Keychain for HTTPS." },
-  diverged: { title: "Histories have diverged", body: "This copy and the remote each have commits the other lacks. Waymark never merges or rebases for you. Resolve it in a terminal or your Git client, then sync again.", terminal: true },
-  localChangesBlock: { title: "Local edits are in the way", body: "Incoming commits change files you have edited here. Waymark will not overwrite them. Commit your edits first, or resolve it in a terminal.", terminal: true },
-  rejected: { title: "Push was rejected", body: "The remote has commits you do not have yet. Sync first; Waymark never force-pushes." },
-  inProgress: { title: "An operation is unfinished", body: "A merge or rebase was started outside Waymark and is not finished. Complete or abort it in a terminal.", terminal: true },
-  noUpstream: { title: "No upstream branch", body: "This branch does not track a remote branch. Set one in a terminal with git push -u.", terminal: true },
+  offline: {
+    title: "Offline",
+    body: "The remote could not be reached. Your notes are all here and readable; sync again when you are back online.",
+  },
+  auth: {
+    title: "The remote refused access",
+    body: "Waymark uses the same credentials as git in Terminal: your SSH agent for SSH remotes and the macOS Keychain for HTTPS.",
+  },
+  diverged: {
+    title: "Histories have diverged",
+    body: "This copy and the remote each have commits the other lacks. Waymark never merges or rebases for you. Resolve it in a terminal or your Git client, then sync again.",
+    terminal: true,
+  },
+  localChangesBlock: {
+    title: "Local edits are in the way",
+    body: "Incoming commits change files you have edited here. Waymark will not overwrite them. Commit your edits first, or resolve it in a terminal.",
+    terminal: true,
+  },
+  rejected: {
+    title: "Push was rejected",
+    body: "The remote has commits you do not have yet. Sync first; Waymark never force-pushes.",
+  },
+  inProgress: {
+    title: "An operation is unfinished",
+    body: "A merge or rebase was started outside Waymark and is not finished. Complete or abort it in a terminal.",
+    terminal: true,
+  },
+  noUpstream: {
+    title: "No upstream branch",
+    body: "This branch does not track a remote branch. Set one in a terminal with git push -u.",
+    terminal: true,
+  },
   timeout: { title: "Git took too long", body: "The operation was stopped after waiting. Check your connection and try again." },
-  notARepo: { title: "Not a Git repository", body: "This vault is a plain folder. Waymark reads it normally, but sync and history need Git." },
+  notARepo: {
+    title: "Not a Git repository",
+    body: "This vault is a plain folder. Waymark reads it normally, but sync and history need Git.",
+  },
   other: { title: "Git reported a problem", body: "" },
 };
 
@@ -84,7 +109,11 @@ export class GitPanel {
     if (this.root) this.render();
   }
 
-  private async run(label: string, op: () => Promise<GitStatus>, after?: (before: GitStatus | null, now: GitStatus) => void): Promise<boolean> {
+  private async run(
+    label: string,
+    op: () => Promise<GitStatus>,
+    after?: (before: GitStatus | null, now: GitStatus) => void,
+  ): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
     const before = this.status;
@@ -101,7 +130,10 @@ export class GitPanel {
       const e = err instanceof GitError ? err : new GitError("other", String(err));
       this.state = { kind: "error", error: e };
       if (e.kind !== "offline") this.host.play("problem");
-      await git.status().then((s) => (this.status = s)).catch(() => {});
+      await git
+        .status()
+        .then((s) => (this.status = s))
+        .catch(() => {});
       return false;
     } finally {
       this.busy = false;
@@ -112,10 +144,14 @@ export class GitPanel {
 
   /** Fetch only. Used for launch and background checks; never changes files. */
   async fetch(quiet = false): Promise<boolean> {
-    return this.run("Checking remote", () => git.fetch(), (before, now) => {
-      this.host.setLastSync(Date.now());
-      if (!quiet && now.behind > (before?.behind ?? 0)) this.host.play("incoming");
-    });
+    return this.run(
+      "Checking remote",
+      () => git.fetch(),
+      (before, now) => {
+        this.host.setLastSync(Date.now());
+        if (!quiet && now.behind > (before?.behind ?? 0)) this.host.play("incoming");
+      },
+    );
   }
 
   /** The deliberate sync: fetch, then fast-forward if that is safe. */
@@ -132,7 +168,10 @@ export class GitPanel {
       return;
     }
     if (st.behind > 0 && st.ahead > 0) {
-      this.state = { kind: "error", error: new GitError("diverged", `This copy has ${st.ahead} and the remote has ${st.behind} commits the other lacks.`) };
+      this.state = {
+        kind: "error",
+        error: new GitError("diverged", `This copy has ${st.ahead} and the remote has ${st.behind} commits the other lacks.`),
+      };
       this.host.play("problem");
       this.host.onStatus(this.status, this.state);
       if (this.root) this.render();
@@ -202,14 +241,23 @@ export class GitPanel {
 
     const summary = el("div", "sync-summary");
     const remote = el("div", "sync-remote");
-    remote.append(el("span", "sync-remote-name", remoteName(st.remoteUrl)), el("span", "sync-branch", st.branch ?? "detached HEAD"));
+    remote.append(
+      el("span", "sync-remote-name", remoteName(st.remoteUrl)),
+      el("span", "sync-branch", st.branch ?? "detached HEAD"),
+    );
     if (st.upstream) remote.append(el("span", "sync-upstream", `tracks ${st.upstream}`));
     summary.append(remote);
 
     const quiet = !st.ahead && !st.behind && !st.files.length && this.state.kind !== "error";
     if (quiet) {
       const last = this.host.lastSync();
-      summary.append(el("div", last === null ? "sync-uptodate is-unchecked" : "sync-uptodate", last === null ? "No local changes. Not compared with the remote yet." : `Up to date · checked ${relative(last)}`));
+      summary.append(
+        el(
+          "div",
+          last === null ? "sync-uptodate is-unchecked" : "sync-uptodate",
+          last === null ? "No local changes. Not compared with the remote yet." : `Up to date · checked ${relative(last)}`,
+        ),
+      );
     } else {
       const facts = el("dl", "sync-facts");
       const fact = (k: string, v: string, tone = "") => {
@@ -234,7 +282,13 @@ export class GitPanel {
       return b;
     };
     btn("Sync", true, true, () => void this.sync(), "Fetch, then apply incoming commits when that is a fast-forward");
-    btn(`Push${st.ahead ? ` ${st.ahead}` : ""}`, false, st.ahead > 0 && st.behind === 0, () => void this.push(), st.behind ? "Sync first" : undefined);
+    btn(
+      `Push${st.ahead ? ` ${st.ahead}` : ""}`,
+      false,
+      st.ahead > 0 && st.behind === 0,
+      () => void this.push(),
+      st.behind ? "Sync first" : undefined,
+    );
     summary.append(actions);
     if (this.state.kind === "busy") {
       const busy = el("div", "sync-busy");
@@ -248,8 +302,11 @@ export class GitPanel {
 
     const tabs = el("div", "seg");
     tabs.setAttribute("role", "tablist");
-    for (const [id, label] of [["changes", `Changes${st.files.length ? ` ${st.files.length}` : ""}`], ["history", "History"]] as const) {
-      const t = el("button", "seg-btn" + (this.tab === id ? " is-on" : ""), label);
+    for (const [id, label] of [
+      ["changes", `Changes${st.files.length ? ` ${st.files.length}` : ""}`],
+      ["history", "History"],
+    ] as const) {
+      const t = el("button", `seg-btn${this.tab === id ? " is-on" : ""}`, label);
       t.setAttribute("role", "tab");
       t.setAttribute("aria-selected", String(this.tab === id));
       t.onclick = () => {
@@ -327,7 +384,10 @@ export class GitPanel {
   private renderChanges(body: HTMLElement, st: GitStatus): void {
     if (!st.files.length) {
       const empty = el("div", "empty-state");
-      empty.append(el("strong", "", "Nothing to commit"), el("p", "", "Edits made in Obsidian or any other editor appear here for review."));
+      empty.append(
+        el("strong", "", "Nothing to commit"),
+        el("p", "", "Edits made in Obsidian or any other editor appear here for review."),
+      );
       body.append(empty);
       return;
     }
@@ -339,22 +399,45 @@ export class GitPanel {
       const h = el("div", "change-head");
       h.append(el("span", "", `${label} · ${files.length}`));
       const all = el("button", "link-btn", isStaged ? "Unstage all" : "Stage all");
-      all.onclick = () => void this.run(isStaged ? "Unstaging" : "Staging", () => (isStaged ? git.unstage(files.map((f) => f.path)) : git.stage(files.map((f) => f.path))));
+      all.onclick = () =>
+        void this.run(isStaged ? "Unstaging" : "Staging", () =>
+          isStaged ? git.unstage(files.map((f) => f.path)) : git.stage(files.map((f) => f.path)),
+        );
       h.append(all);
       g.append(h);
       for (const f of files) {
         const code = isStaged ? f.staged : f.unstaged;
         const row = el("div", "change-row");
-        const badge = el("span", `change-badge is-${code === "?" ? "new" : code === "D" ? "del" : code === "A" ? "new" : "mod"}`, code === "?" ? "U" : code);
-        badge.title = { "?": "Untracked", M: "Modified", A: "Added", D: "Deleted", R: "Renamed", C: "Copied", T: "Type changed", U: "Conflicted" }[code] ?? code;
+        const badge = el(
+          "span",
+          `change-badge is-${code === "?" ? "new" : code === "D" ? "del" : code === "A" ? "new" : "mod"}`,
+          code === "?" ? "U" : code,
+        );
+        badge.title =
+          {
+            "?": "Untracked",
+            M: "Modified",
+            A: "Added",
+            D: "Deleted",
+            R: "Renamed",
+            C: "Copied",
+            T: "Type changed",
+            U: "Conflicted",
+          }[code] ?? code;
         const name = el("button", "change-name");
         const base = f.path.split("/").pop()!;
-        name.append(el("span", "", base.replace(/\.md$/, "")), el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")));
+        name.append(
+          el("span", "", base.replace(/\.md$/, "")),
+          el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")),
+        );
         name.onclick = () => void this.showWorktreeDiff(f, isStaged);
         const act = el("button", "icon-btn change-act");
         act.setAttribute("aria-label", isStaged ? `Unstage ${base}` : `Stage ${base}`);
-        act.innerHTML = isStaged ? `<svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg>` : `<svg viewBox="0 0 16 16"><path d="M8 4v8M4 8h8"/></svg>`;
-        act.onclick = () => void this.run(isStaged ? "Unstaging" : "Staging", () => (isStaged ? git.unstage([f.path]) : git.stage([f.path])));
+        act.innerHTML = isStaged
+          ? `<svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg>`
+          : `<svg viewBox="0 0 16 16"><path d="M8 4v8M4 8h8"/></svg>`;
+        act.onclick = () =>
+          void this.run(isStaged ? "Unstaging" : "Staging", () => (isStaged ? git.unstage([f.path]) : git.stage([f.path])));
         row.append(badge, name, act);
         if (f.conflicted) row.classList.add("is-conflicted");
         g.append(row);
@@ -369,7 +452,11 @@ export class GitPanel {
     msg.placeholder = staged.length ? "Describe what changed" : "Stage changes to commit them";
     msg.rows = 3;
     msg.disabled = !staged.length;
-    const commit = el("button", "btn btn-primary", staged.length ? `Commit ${staged.length} file${staged.length === 1 ? "" : "s"}` : "Commit");
+    const commit = el(
+      "button",
+      "btn btn-primary",
+      staged.length ? `Commit ${staged.length} file${staged.length === 1 ? "" : "s"}` : "Commit",
+    );
     commit.type = "submit";
     commit.disabled = !staged.length;
     box.append(msg, commit);
@@ -399,7 +486,11 @@ export class GitPanel {
 
   private async push(): Promise<void> {
     const n = this.status?.ahead ?? 0;
-    const ok = await this.run("Pushing", () => git.push(), () => this.host.setLastSync(Date.now()));
+    const ok = await this.run(
+      "Pushing",
+      () => git.push(),
+      () => this.host.setLastSync(Date.now()),
+    );
     if (ok) {
       this.host.play("pushed");
       this.host.toast(`Pushed ${n} commit${n === 1 ? "" : "s"}`);
@@ -460,11 +551,11 @@ export class GitPanel {
 
   /** Shows one commit: limited to a note's changes when `notePath` is given, with a way to read or compare that version. */
   async showCommit(c: Commit, notePath: string | null = this.historyPath): Promise<void> {
-    const path = notePath ? c.path ?? notePath : null;
+    const path = notePath ? (c.path ?? notePath) : null;
     try {
       const text = await git.show(c.sha, path);
       const content = el("div");
-      if (path && path.endsWith(".md")) {
+      if (path?.endsWith(".md")) {
         const bar = el("div", "sheet-actions");
         const read = el("button", "btn btn-small", "Read this version");
         read.onclick = async () => {
@@ -478,7 +569,11 @@ export class GitPanel {
           const head = this.status?.head;
           if (!head) return;
           const d = await git.diffRevs(c.sha, head, path);
-          openSheet(this.host.title(path), `${c.short} → current`, renderDiff(d, { emptyMessage: "Identical to the current version." }));
+          openSheet(
+            this.host.title(path),
+            `${c.short} → current`,
+            renderDiff(d, { emptyMessage: "Identical to the current version." }),
+          );
         };
         bar.append(read, cmp);
         content.append(bar);

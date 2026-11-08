@@ -1,7 +1,4 @@
-export type Resolution =
-  | { kind: "found"; path: string }
-  | { kind: "ambiguous"; candidates: string[] }
-  | { kind: "missing" };
+export type Resolution = { kind: "found"; path: string } | { kind: "ambiguous"; candidates: string[] } | { kind: "missing" };
 
 const NOTE_EXT = ".md";
 
@@ -57,7 +54,7 @@ export class VaultIndex {
     if (key.includes("/")) {
       const exact = this.byPath.get(key);
       if (exact) return { kind: "found", path: exact };
-      const suffix = [...this.byPath.entries()].filter(([p]) => p.endsWith("/" + key)).map(([, f]) => f);
+      const suffix = [...this.byPath.entries()].filter(([p]) => p.endsWith(`/${key}`)).map(([, f]) => f);
       return pick(suffix);
     }
 
@@ -87,5 +84,5 @@ export function headingKey(text: string): string {
 }
 
 export function headingId(text: string): string {
-  return "h-" + headingKey(text).replace(/ /g, "-");
+  return `h-${headingKey(text).replace(/ /g, "-")}`;
 }

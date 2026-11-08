@@ -1,6 +1,6 @@
-import { defineConfig, type Plugin } from "vite";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { defineConfig, type Plugin } from "vite";
 
 const MIME: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",

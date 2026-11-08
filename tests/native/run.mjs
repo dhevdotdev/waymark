@@ -12,7 +12,11 @@ const APP = path.join(ROOT, "src-tauri/target/release/bundle/macos/Waymark.app/C
 const TIMEOUT_MS = 180_000;
 
 const git = (cwd, ...args) =>
-  execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd, stdio: "pipe" });
+  execFileSync(
+    "git",
+    ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args],
+    { cwd, stdio: "pipe" },
+  );
 
 async function commitAll(dir, message) {
   git(dir, "add", "-A");
@@ -86,7 +90,9 @@ for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys
     const report = JSON.parse(await readFile(out, "utf8"));
     const bad = report.results.filter((r) => !r.ok);
     failed += bad.length;
-    console.log(`${bad.length ? "FAIL" : "PASS"}  ${mode}: ${report.results.length - bad.length}/${report.results.length}${report.render ? ` p50=${report.render.p50}ms p95=${report.render.p95}ms` : ""}`);
+    console.log(
+      `${bad.length ? "FAIL" : "PASS"}  ${mode}: ${report.results.length - bad.length}/${report.results.length}${report.render ? ` p50=${report.render.p50}ms p95=${report.render.p95}ms` : ""}`,
+    );
     for (const r of bad) console.log(`  FAIL ${r.name} ${JSON.stringify(r.detail ?? "")}`);
   } catch (err) {
     failed += 1;

@@ -1,5 +1,5 @@
 import MiniSearch from "minisearch";
-import { plainText } from "./vault/links";
+import { plainText } from "./links";
 
 export interface Hit {
   path: string;
