@@ -1,9 +1,7 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -50,8 +48,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   native:
-    # macOS minutes cost ten times Linux minutes on a private repository, so this runs only when native code changes.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'native')
+    # macOS minutes cost ten times Linux minutes on a private repository, so this job runs on request.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
