@@ -318,18 +318,18 @@ struct SelfTest {
     mode: String,
 }
 
-/// QA hook: when FOLIO_SELFTEST_OUT is set, the frontend runs its in-app checks
-/// against FOLIO_SELFTEST_VAULT and reports back through `selftest_report`.
+/// QA hook: when WAYMARK_SELFTEST_OUT is set, the frontend runs its in-app checks
+/// against WAYMARK_SELFTEST_VAULT and reports back through `selftest_report`.
 #[tauri::command]
 fn selftest_config(app: AppHandle) -> Option<SelfTest> {
-    std::env::var("FOLIO_SELFTEST_OUT").ok()?;
+    std::env::var("WAYMARK_SELFTEST_OUT").ok()?;
     /* macOS throttles timers in hidden windows; a self-test runs in front so its timings are real. */
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_focus();
     }
     Some(SelfTest {
-        vault: std::env::var("FOLIO_SELFTEST_VAULT").ok()?,
-        mode: std::env::var("FOLIO_SELFTEST_MODE").unwrap_or_else(|_| "read".into()),
+        vault: std::env::var("WAYMARK_SELFTEST_VAULT").ok()?,
+        mode: std::env::var("WAYMARK_SELFTEST_MODE").unwrap_or_else(|_| "read".into()),
     })
 }
 
@@ -340,13 +340,13 @@ fn selftest_log(line: String) {
 
 #[tauri::command]
 fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), String> {
-    let out = std::env::var("FOLIO_SELFTEST_OUT").map_err(|e| e.to_string())?;
+    let out = std::env::var("WAYMARK_SELFTEST_OUT").map_err(|e| e.to_string())?;
     std::fs::write(
         out,
         serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    if std::env::var("FOLIO_SELFTEST_STAY").is_err() {
+    if std::env::var("WAYMARK_SELFTEST_STAY").is_err() {
         app.exit(0);
     }
     Ok(())

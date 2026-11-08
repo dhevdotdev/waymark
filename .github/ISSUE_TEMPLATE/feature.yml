@@ -1,0 +1,10 @@
+name: Feature
+description: Something new or different
+labels: [needs-triage, enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: What you want to do
+      description: Describe the reading or navigation problem, not a solution.
+    validations:
+      required: true

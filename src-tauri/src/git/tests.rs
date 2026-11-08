@@ -197,7 +197,7 @@ fn reports_offline_remotes() {
             "remote",
             "set-url",
             "origin",
-            "https://folio-test.invalid/repo.git",
+            "https://waymark-test.invalid/repo.git",
         ],
     );
     let err = fetch(&a).unwrap_err();

@@ -4,9 +4,9 @@
 # The app's own appearance is set; the system appearance is never changed.
 set -euo pipefail
 VAULT=$1; MODE=$2; OUT=$3; SCHEME=${4:-light}
-APP="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/target/release/bundle/macos/Waymark.app/Contents/MacOS/folio"
+APP="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/target/release/bundle/macos/Waymark.app/Contents/MacOS/waymark"
 REPORT=$(mktemp)
-FOLIO_SELFTEST_STAY=1 FOLIO_SELFTEST_OUT=$REPORT FOLIO_SELFTEST_VAULT=$VAULT FOLIO_SELFTEST_MODE="$MODE:$SCHEME" "$APP" >/dev/null 2>&1 &
+WAYMARK_SELFTEST_STAY=1 WAYMARK_SELFTEST_OUT=$REPORT WAYMARK_SELFTEST_VAULT=$VAULT WAYMARK_SELFTEST_MODE="$MODE:$SCHEME" "$APP" >/dev/null 2>&1 &
 PID=$!
 for _ in $(seq 1 200); do
   [ -s "$REPORT" ] && break

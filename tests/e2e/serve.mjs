@@ -8,7 +8,7 @@ import { writeFixtureVault } from "./fixture-vault.mjs";
 export async function serveFixture() {
   const vault = await mkdtemp(path.join(tmpdir(), "waymark-fixture-"));
   await writeFixtureVault(vault);
-  process.env.FOLIO_VAULT = vault;
+  process.env.WAYMARK_VAULT = vault;
   const server = await createServer({ logLevel: "error" });
   await server.listen();
   return {

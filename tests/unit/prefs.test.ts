@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { PrefStore } from "../../src/prefs";
 
-const KEY = "folio.prefs";
+const KEY = "waymark.prefs";
 const load = async (saved: unknown) => {
   localStorage.setItem(KEY, JSON.stringify(saved));
   const store = new PrefStore();
@@ -33,5 +33,30 @@ describe("PrefStore.load", () => {
     const store = new PrefStore();
     await store.load();
     expect(store.value.family).toBe("catppuccin");
+  });
+});
+
+describe("PrefStore persistence", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("writes changes that a later load reads back", async () => {
+    const store = new PrefStore();
+    store.update((p) => {
+      p.family = "rose-pine";
+    });
+    await store.flush();
+    const next = new PrefStore();
+    await next.load();
+    expect(next.value.family).toBe("rose-pine");
+  });
+
+  it("writes nothing while ephemeral", async () => {
+    const store = new PrefStore();
+    store.ephemeral = true;
+    store.update((p) => {
+      p.family = "rose-pine";
+    });
+    await store.flush();
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 });

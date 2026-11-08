@@ -38,7 +38,7 @@ const DEFAULTS: Prefs = {
   sidebarWidth: 268,
 };
 
-const LOCAL_KEY = "folio.prefs";
+const LOCAL_KEY = "waymark.prefs";
 
 const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
   appearance: ["system", "light", "dark"],

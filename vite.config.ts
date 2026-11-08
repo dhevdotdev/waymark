@@ -31,12 +31,12 @@ async function walk(root: string, rel = ""): Promise<string[]> {
  */
 function devVault(root: string | undefined): Plugin {
   return {
-    name: "folio-dev-vault",
+    name: "waymark-dev-vault",
     configureServer(server) {
       server.middlewares.use("/@vault", async (req, res) => {
         if (!root) {
           res.statusCode = 503;
-          res.end("FOLIO_VAULT is not set");
+          res.end("WAYMARK_VAULT is not set");
           return;
         }
         const url = new URL(req.url ?? "/", "http://local");
@@ -72,7 +72,7 @@ function devVault(root: string | undefined): Plugin {
 }
 
 export default defineConfig({
-  plugins: [devVault(process.env.FOLIO_VAULT)],
+  plugins: [devVault(process.env.WAYMARK_VAULT)],
   clearScreen: false,
   server: { port: 5178, strictPort: true },
 });

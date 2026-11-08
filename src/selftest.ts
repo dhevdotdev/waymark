@@ -3,7 +3,7 @@ import type { App } from "./ui/app";
 
 /**
  * Checks that run inside the packaged app (WKWebView + Rust), started with
- * FOLIO_SELFTEST_OUT. "read" exercises a real vault without writing to it;
+ * WAYMARK_SELFTEST_OUT. "read" exercises a real vault without writing to it;
  * "git" drives sync against a disposable fixture repository.
  */
 export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {

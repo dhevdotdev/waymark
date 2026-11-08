@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { writeFixtureVault } from "../e2e/fixture-vault.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const APP = path.join(ROOT, "src-tauri/target/release/bundle/macos/Waymark.app/Contents/MacOS/folio");
+const APP = path.join(ROOT, "src-tauri/target/release/bundle/macos/Waymark.app/Contents/MacOS/waymark");
 const TIMEOUT_MS = 180_000;
 
 const git = (cwd, ...args) =>
@@ -66,7 +66,7 @@ const SETUP = {
 function launch(vault, mode, out) {
   return new Promise((resolve, reject) => {
     const child = spawn(APP, [], {
-      env: { ...process.env, FOLIO_SELFTEST_OUT: out, FOLIO_SELFTEST_VAULT: vault, FOLIO_SELFTEST_MODE: mode },
+      env: { ...process.env, WAYMARK_SELFTEST_OUT: out, WAYMARK_SELFTEST_VAULT: vault, WAYMARK_SELFTEST_MODE: mode },
       stdio: "ignore",
     });
     const timer = setTimeout(() => {

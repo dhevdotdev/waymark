@@ -45,8 +45,8 @@ On first launch, choose **Open a vault…** (an existing folder) or **Clone from
 ## Develop
 
 ```sh
-pnpm install
-FOLIO_VAULT=/path/to/vault pnpm dev        # browser preview at http://localhost:5178 (no Git)
+pnpm bootstrap
+WAYMARK_VAULT=/path/to/vault pnpm dev        # browser preview at http://localhost:5178 (no Git)
 pnpm tauri dev                             # desktop app with hot reload
 pnpm tauri build --bundles app             # release .app
 ```
@@ -54,29 +54,14 @@ pnpm tauri build --bundles app             # release .app
 ## Checks
 
 ```sh
-pnpm test                                  # TypeScript: links, comments, frontmatter, renderer, sanitizer
-(cd src-tauri && cargo test)               # Rust: path guard, Git safety on throwaway repositories, redaction
-node scripts/sweep.mjs                     # every note in WebKit: render time, diagrams, links, images, network
-node scripts/interact.mjs <dir> [reduced]  # 31 behaviours driven like a person would; records video
-node scripts/ui-shots.mjs <dir> [light|dark]
-scripts/capture-native.sh <vault> "show:<note>:<graph|palette|sync|search|>" out.png [light|dark]
+pnpm check                  # lint, types, architecture, dead code, duplication, unit tests with coverage, Rust
+pnpm test:e2e               # the reader driven like a person, in WebKit, in normal and Reduce Motion
+pnpm test:sweep             # every fixture note: render time, diagrams, links, images, network
+pnpm test:native            # builds the app and runs its self-test against disposable vaults
 ```
 
-The packaged app also has a self-test. Run the binary inside `Waymark.app` with `FOLIO_SELFTEST_OUT=report.json FOLIO_SELFTEST_VAULT=<vault>` and `FOLIO_SELFTEST_MODE` set to one of these modes:
+All of these use a generated fixture vault, so no real notes are needed.
 
-- `read`: renders every note and checks `vault://` images, diagrams, search, Git status, history and diffs over IPC, and that no network request is made.
-- `git`, `diverged`, `blocked`: run against a disposable fixture repository.
+## Contributing
 
-The self-test does nothing unless those variables are set, and it writes no preferences.
-
-## Layout
-
-- `src-tauri/src/vault.rs`: vault path guard, file listing, `vault://` assets
-- `src-tauri/src/git.rs`: Git via the system binary, with error classification and redaction
-- `src-tauri/src/lib.rs`: commands, file watcher, preferences, menu
-- `src/render/`: Markdown pipeline (wikilinks, callouts, embeds, math, Shiki, Mermaid, sanitising)
-- `src/vault/`: link resolution, folder tree, link graph, link communities
-- `src/search.ts`: full-text index
-- `src/ui/`: app shell, palette, find, sync panel, diffs, graph, sound, welcome
-- `src/styles/`: tokens, document surface, chrome, components
-- `DESIGN.md`: rationale, tokens and the critique log
+`AGENTS.md` lists the commands and rules. `ARCHITECTURE.md` maps the code. `DESIGN.md` holds the design rationale.

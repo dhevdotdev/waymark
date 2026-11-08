@@ -1,12 +1,12 @@
 [package]
-name = "folio"
+name = "waymark"
 version = "0.1.0"
-description = "A reader for Obsidian vaults kept in Git"
+description = "A reader for Markdown vaults kept in Git"
 edition = "2024"
 rust-version = "1.90"
 
 [lib]
-name = "folio_lib"
+name = "waymark_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]
