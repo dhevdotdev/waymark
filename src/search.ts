@@ -1,0 +1,118 @@
+import MiniSearch from "minisearch";
+import { plainText } from "./vault/links";
+
+export interface Hit {
+  path: string;
+  title: string;
+  score: number;
+  terms: string[];
+  snippet: { before: string; match: string; after: string; heading: string | null } | null;
+}
+
+interface Doc {
+  id: string;
+  title: string;
+  aliases: string;
+  headings: string;
+  body: string;
+}
+
+/**
+ * Full-text search over every note. Titles and headings weigh most; matching
+ * is prefix- and typo-tolerant only for words long enough to make that useful.
+ */
+export class SearchIndex {
+  private mini = new MiniSearch<Doc>({
+    fields: ["title", "aliases", "headings", "body"],
+    storeFields: ["title"],
+    searchOptions: {
+      boost: { title: 4, aliases: 3, headings: 2 },
+      prefix: (term) => term.length > 2,
+      fuzzy: (term) => (term.length > 5 ? 0.15 : false),
+      combineWith: "AND",
+    },
+  });
+  private texts = new Map<string, string>();
+
+  set(path: string, title: string, markdown: string | null, aliases: string[] = []): void {
+    if (this.mini.has(path)) this.mini.discard(path);
+    this.texts.delete(path);
+    if (markdown === null) return;
+    const body = plainText(markdown);
+    const headings = [...markdown.matchAll(/^#{1,6}\s+(.*)$/gm)].map((m) => m[1]).join("\n");
+    this.texts.set(path, markdown);
+    this.mini.add({ id: path, title, aliases: aliases.join(" "), headings, body });
+  }
+
+  search(query: string, limit = 40): Hit[] {
+    const q = query.trim();
+    if (!q) return [];
+    const phrase = /^".+"$/.test(q) ? q.slice(1, -1).toLowerCase() : null;
+    const results = this.mini.search(phrase ?? q).slice(0, limit * 2);
+    const hits: Hit[] = [];
+    /* A note containing the words as typed, in order, outranks one that has them scattered. */
+    const words = q.toLowerCase().replace(/"/g, "");
+    const asTyped = !phrase && /\s/.test(words) ? words : null;
+    for (const r of results) {
+      const text = this.texts.get(r.id) ?? "";
+      const lower = text.toLowerCase();
+      if (phrase && !lower.includes(phrase)) continue;
+      const exact = phrase ?? (asTyped && lower.includes(asTyped) ? asTyped : null);
+      hits.push({
+        path: r.id,
+        title: r.title as string,
+        score: r.score * (exact ? 3 : 1),
+        terms: exact ? [exact] : r.terms,
+        snippet: snippet(text, exact ? [exact] : r.terms),
+      });
+    }
+    hits.sort((a, b) => b.score - a.score);
+    return hits.slice(0, limit);
+  }
+}
+
+function snippet(markdown: string, terms: string[]): Hit["snippet"] {
+  const body = markdown.replace(/^---\n[\s\S]*?\n---\n?/, "");
+  const lower = body.toLowerCase();
+  let best = -1;
+  let term = "";
+  for (const t of [...terms].sort((a, b) => b.length - a.length)) {
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(t)}`, "iu");
+    const m = re.exec(body);
+    const at = m ? m.index + m[1].length : lower.indexOf(t.toLowerCase());
+    if (at >= 0 && !isHeadingLine(body, at)) {
+      best = at;
+      term = t;
+      break;
+    }
+    if (at >= 0 && best < 0) {
+      best = at;
+      term = t;
+    }
+  }
+  if (best < 0) return null;
+  const lineStart = body.lastIndexOf("\n", best) + 1;
+  const lineEnd = body.indexOf("\n", best);
+  const line = body.slice(lineStart, lineEnd < 0 ? undefined : lineEnd);
+  const col = best - lineStart;
+  const wordEnd = col + (/^[\p{L}\p{N}_-]*/u.exec(line.slice(col + term.length))?.[0].length ?? 0) + term.length;
+  const clean = (s: string) => plainText(s).replace(/\s+/g, " ");
+  const before = clean(line.slice(Math.max(0, col - 70), col));
+  const after = clean(line.slice(wordEnd, wordEnd + 120));
+  const headingMatch = [...body.slice(0, best).matchAll(/^#{1,6}\s+(.*)$/gm)].pop();
+  return {
+    before: (col > 70 ? "…" : "") + before.trimStart(),
+    match: line.slice(col, wordEnd),
+    after,
+    heading: headingMatch ? headingMatch[1].replace(/`/g, "") : null,
+  };
+}
+
+function isHeadingLine(body: string, at: number): boolean {
+  const start = body.lastIndexOf("\n", at) + 1;
+  return /^#{1,6}\s/.test(body.slice(start, start + 7));
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

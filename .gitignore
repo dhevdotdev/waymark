@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+.DS_Store
+*.log
+.env
+.env.*
+
+# Screenshots and recordings can show private notes. Only the app's own artwork is tracked.
+*.png
+*.webm
+*.mp4
+!src-tauri/icons/**/*.png
+!design/icon.png

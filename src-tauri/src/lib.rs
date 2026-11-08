@@ -1,0 +1,329 @@
+mod git;
+mod vault;
+
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::Duration;
+
+use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult, Debouncer};
+use serde::Serialize;
+use tauri::http::{Response, StatusCode};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+use git::{GitError, Status};
+use vault::{Vault, VaultInfo};
+
+#[derive(Default)]
+struct Watcher(Mutex<Option<Debouncer<notify_debouncer_mini::notify::RecommendedWatcher>>>);
+
+#[derive(Serialize, Clone)]
+struct VaultChange {
+    paths: Vec<String>,
+}
+
+type CmdResult<T> = Result<T, GitError>;
+
+fn plain_err(message: impl Into<String>) -> GitError {
+    git::classify(&message.into())
+}
+
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + 'static) -> CmdResult<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| plain_err(e.to_string()))?
+}
+
+#[tauri::command]
+fn open_vault(app: AppHandle, vault: State<Vault>, watcher: State<Watcher>, path: String) -> Result<VaultInfo, String> {
+    let root = PathBuf::from(&path).canonicalize().map_err(|_| format!("Folder not found: {path}"))?;
+    if !root.is_dir() {
+        return Err("Choose a folder".into());
+    }
+    vault.set(root.clone());
+    watch(&app, &watcher, &root)?;
+    Ok(vault::info(&root))
+}
+
+/// Watches the vault for edits made by other apps. `.git` and `.obsidian`
+/// churn is ignored; Git state is refreshed separately.
+fn watch(app: &AppHandle, watcher: &Watcher, root: &PathBuf) -> Result<(), String> {
+    let handle = app.clone();
+    let base = root.clone();
+    let mut debouncer = new_debouncer(Duration::from_millis(250), move |res: DebounceEventResult| {
+        let Ok(events) = res else { return };
+        let mut paths: Vec<String> = events
+            .iter()
+            .filter_map(|e| e.path.strip_prefix(&base).ok().map(|p| p.to_string_lossy().replace('\\', "/")))
+            .filter(|p| !p.split('/').any(|part| part.starts_with('.')) || p.starts_with(".git/") && is_git_signal(p))
+            .collect();
+        paths.sort();
+        paths.dedup();
+        if !paths.is_empty() {
+            let _ = handle.emit("vault-changed", VaultChange { paths });
+        }
+    })
+    .map_err(|e| e.to_string())?;
+    debouncer.watcher().watch(root, RecursiveMode::Recursive).map_err(|e| e.to_string())?;
+    *watcher.0.lock().unwrap() = Some(debouncer);
+    Ok(())
+}
+
+fn is_git_signal(path: &str) -> bool {
+    matches!(path, ".git/HEAD" | ".git/index" | ".git/FETCH_HEAD" | ".git/ORIG_HEAD") || path.starts_with(".git/refs/")
+}
+
+#[tauri::command]
+fn list_files(vault: State<Vault>) -> Result<Vec<String>, String> {
+    vault::list(&vault.root()?)
+}
+
+#[tauri::command]
+fn read_text(vault: State<Vault>, path: String) -> Result<String, String> {
+    let abs = vault.resolve(&path)?;
+    std::fs::read_to_string(abs).map_err(|e| format!("Could not read {path}: {e}"))
+}
+
+#[tauri::command]
+fn read_many(vault: State<Vault>, paths: Vec<String>) -> Result<Vec<Option<String>>, String> {
+    let root = vault.root()?;
+    Ok(paths
+        .iter()
+        .map(|p| vault::resolve_in(&root, p).ok().and_then(|abs| std::fs::read_to_string(abs).ok()))
+        .collect())
+}
+
+#[tauri::command]
+fn reveal(vault: State<Vault>, path: Option<String>) -> Result<(), String> {
+    let target = match path {
+        Some(p) => vault.resolve(&p)?,
+        None => vault.root()?,
+    };
+    std::process::Command::new("open").arg("-R").arg(target).status().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// The external route for problems Waymark will not resolve itself.
+#[tauri::command]
+fn open_terminal(vault: State<Vault>) -> Result<(), String> {
+    let root = vault.root()?;
+    std::process::Command::new("open").args(["-a", "Terminal"]).arg(root).status().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_status(vault: State<'_, Vault>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::status(&root)).await
+}
+
+#[tauri::command]
+async fn git_fetch(vault: State<'_, Vault>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::fetch(&root)).await
+}
+
+#[tauri::command]
+async fn git_fast_forward(vault: State<'_, Vault>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::fast_forward(&root)).await
+}
+
+#[tauri::command]
+async fn git_push(vault: State<'_, Vault>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::push(&root)).await
+}
+
+#[tauri::command]
+async fn git_stage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::stage(&root, &paths)).await
+}
+
+#[tauri::command]
+async fn git_unstage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::unstage(&root, &paths)).await
+}
+
+#[tauri::command]
+async fn git_commit(vault: State<'_, Vault>, message: String) -> CmdResult<Status> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::commit(&root, &message)).await
+}
+
+#[tauri::command]
+async fn git_diff(vault: State<'_, Vault>, path: String, staged: bool, untracked: bool) -> CmdResult<String> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::diff_worktree(&root, &path, staged, untracked)).await
+}
+
+#[tauri::command]
+async fn git_log(vault: State<'_, Vault>, path: Option<String>, limit: u32, skip: u32) -> CmdResult<Vec<git::Commit>> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::log(&root, path.as_deref(), limit, skip)).await
+}
+
+#[tauri::command]
+async fn git_show(vault: State<'_, Vault>, sha: String, path: Option<String>) -> CmdResult<String> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::show_commit(&root, &sha, path.as_deref())).await
+}
+
+#[tauri::command]
+async fn git_file_at(vault: State<'_, Vault>, sha: String, path: String) -> CmdResult<String> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::file_at(&root, &sha, &path)).await
+}
+
+#[tauri::command]
+async fn git_diff_revs(vault: State<'_, Vault>, from: String, to: String, path: String) -> CmdResult<String> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::diff_revs(&root, &from, &to, &path)).await
+}
+
+#[tauri::command]
+async fn git_store_credential(vault: State<'_, Vault>, url: String, username: String, secret: String) -> CmdResult<()> {
+    let root = vault.root().map_err(plain_err)?;
+    blocking(move || git::store_credential(&root, &url, &username, &secret)).await
+}
+
+#[tauri::command]
+async fn git_clone(app: AppHandle, url: String, dest: String) -> CmdResult<()> {
+    let dest = PathBuf::from(dest);
+    blocking(move || {
+        git::clone(&url, &dest, |line| {
+            let _ = app.emit("clone-progress", line);
+        })
+    })
+    .await
+}
+
+fn prefs_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("preferences.json"))
+}
+
+/// Preferences and per-vault state live in Application Support, never in the vault.
+#[derive(Serialize)]
+struct SelfTest {
+    vault: String,
+    mode: String,
+}
+
+/// QA hook: when FOLIO_SELFTEST_OUT is set, the frontend runs its in-app checks
+/// against FOLIO_SELFTEST_VAULT and reports back through `selftest_report`.
+#[tauri::command]
+fn selftest_config(app: AppHandle) -> Option<SelfTest> {
+    std::env::var("FOLIO_SELFTEST_OUT").ok()?;
+    /* macOS throttles timers in hidden windows; a self-test runs in front so its timings are real. */
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_focus();
+    }
+    Some(SelfTest {
+        vault: std::env::var("FOLIO_SELFTEST_VAULT").ok()?,
+        mode: std::env::var("FOLIO_SELFTEST_MODE").unwrap_or_else(|_| "read".into()),
+    })
+}
+
+#[tauri::command]
+fn selftest_log(line: String) {
+    eprintln!("[selftest] {line}");
+}
+
+#[tauri::command]
+fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), String> {
+    let out = std::env::var("FOLIO_SELFTEST_OUT").map_err(|e| e.to_string())?;
+    std::fs::write(out, serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    if std::env::var("FOLIO_SELFTEST_STAY").is_err() {
+        app.exit(0);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn read_prefs(app: AppHandle) -> Result<serde_json::Value, String> {
+    let path = prefs_path(&app)?;
+    match std::fs::read_to_string(path) {
+        Ok(text) => Ok(serde_json::from_str(&text).unwrap_or(serde_json::json!({}))),
+        Err(_) => Ok(serde_json::json!({})),
+    }
+}
+
+#[tauri::command]
+fn write_prefs(app: AppHandle, prefs: serde_json::Value) -> Result<(), String> {
+    let path = prefs_path(&app)?;
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, serde_json::to_vec_pretty(&prefs).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(tmp, path).map_err(|e| e.to_string())
+}
+
+/// The standard Mac menus, without Close Window: ⌘W closes a tab in Waymark.
+fn build_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
+    let app_menu = SubmenuBuilder::new(app, "Waymark")
+        .item(&PredefinedMenuItem::about(app, Some("About Waymark"), None)?)
+        .separator()
+        .item(&PredefinedMenuItem::services(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::hide(app, None)?)
+        .item(&PredefinedMenuItem::hide_others(app, None)?)
+        .item(&PredefinedMenuItem::show_all(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::quit(app, None)?)
+        .build()?;
+    let edit = SubmenuBuilder::new(app, "Edit")
+        .item(&PredefinedMenuItem::undo(app, None)?)
+        .item(&PredefinedMenuItem::redo(app, None)?)
+        .separator()
+        .item(&PredefinedMenuItem::cut(app, None)?)
+        .item(&PredefinedMenuItem::copy(app, None)?)
+        .item(&PredefinedMenuItem::paste(app, None)?)
+        .item(&PredefinedMenuItem::select_all(app, None)?)
+        .build()?;
+    let view = SubmenuBuilder::new(app, "View")
+        .item(&PredefinedMenuItem::fullscreen(app, None)?)
+        .build()?;
+    let window = SubmenuBuilder::new(app, "Window")
+        .item(&PredefinedMenuItem::minimize(app, None)?)
+        .item(&PredefinedMenuItem::maximize(app, Some("Zoom"))?)
+        .build()?;
+    MenuBuilder::new(app).items(&[&app_menu, &edit, &view, &window]).build()
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            app.set_menu(build_menu(app.handle())?)?;
+            Ok(())
+        })
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(Vault::default())
+        .manage(Watcher::default())
+        .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            std::thread::spawn(move || {
+                let vault = app.state::<Vault>();
+                let raw = request.uri().path().trim_start_matches('/');
+                let rel = percent_encoding::percent_decode_str(raw).decode_utf8_lossy().into_owned();
+                let response = match vault.resolve(&rel).and_then(|abs| std::fs::read(&abs).map(|b| (abs, b)).map_err(|e| e.to_string())) {
+                    Ok((abs, bytes)) => Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", vault::mime_for(&abs))
+                        .header("Cache-Control", "no-cache")
+                        .body(bytes),
+                    Err(_) => Response::builder().status(StatusCode::NOT_FOUND).body(Vec::new()),
+                };
+                responder.respond(response.unwrap());
+            });
+        })
+        .invoke_handler(tauri::generate_handler![
+            open_vault, list_files, read_text, read_many, reveal, open_terminal,
+            git_status, git_fetch, git_fast_forward, git_push, git_stage, git_unstage, git_commit,
+            git_diff, git_log, git_show, git_file_at, git_diff_revs, git_store_credential, git_clone,
+            read_prefs, write_prefs, selftest_config, selftest_report, selftest_log
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Waymark");
+}
