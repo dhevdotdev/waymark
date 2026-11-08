@@ -1,32 +1,9 @@
-import type { Simulation, SimulationLinkDatum, SimulationNodeDatum } from "d3-force";
+import type { Simulation } from "d3-force";
 import { resolveColor } from "./colors";
 import { settleGraph } from "./graph-layout";
-import { groupColor, lightSprite } from "./graph-paint";
+import { arcControls, bezier, groupColor, lightSprite } from "./graph-paint";
+import type { GraphData, GraphGroup, GraphLink, GraphNode } from "./graph-types";
 import { reducedMotion } from "./media";
-
-export interface GraphNode extends SimulationNodeDatum {
-  id: string;
-  label: string;
-  degree: number;
-  group: number;
-  /** Where the note starts its entrance. */
-  sx?: number;
-  sy?: number;
-}
-
-export interface GraphGroup {
-  id: number;
-  label: string;
-  size: number;
-}
-
-export type GraphLink = SimulationLinkDatum<GraphNode> & { source: GraphNode | string; target: GraphNode | string };
-
-export interface GraphData {
-  nodes: GraphNode[];
-  links: { source: string; target: string }[];
-  groups: GraphGroup[];
-}
 
 interface Palette {
   loose: string;
@@ -332,21 +309,9 @@ export class GraphCanvas {
       ty = this.py(t);
     const a = centres.get(s.group),
       b = centres.get(t.group);
-    if (s.group !== t.group && a && b) {
+    if (s.group !== t.group && a && b)
       return [sx, sy, sx + (a.x - sx) * 0.62, sy + (a.y - sy) * 0.62, tx + (b.x - tx) * 0.62, ty + (b.y - ty) * 0.62, tx, ty];
-    }
-    const dx = tx - sx,
-      dy = ty - sy;
-    return [
-      sx,
-      sy,
-      sx + dx / 3 - dy * 0.1,
-      sy + dy / 3 + dx * 0.1,
-      sx + (dx * 2) / 3 - dy * 0.1,
-      sy + (dy * 2) / 3 + dx * 0.1,
-      tx,
-      ty,
-    ];
+    return arcControls(sx, sy, tx, ty);
   }
 
   private draw(): void {
@@ -367,51 +332,76 @@ export class GraphCanvas {
     const light = p.dark ? "lighter" : "source-over";
     const fade = this.intro;
 
-    const stroke = (list: GraphLink[]) => {
-      ctx.beginPath();
-      for (const l of list) {
-        const [ax, ay, bx, by, cx, cy, dx, dy] = this.curve(l, centres);
-        ctx.moveTo(ax, ay);
-        ctx.bezierCurveTo(bx, by, cx, cy, dx, dy);
-      }
-      ctx.stroke();
-    };
+    this.drawEdges(k, dimmed, fade, centres);
+    if (focus) this.drawFocusEdges(focus, k, centres, light);
+    this.drawGlows(lit, focus, light, fade);
+    this.drawDots(lit, focus, fade, k);
+
+    if (fade >= 1) this.drawLabels(lit, near, centres);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    cancelAnimationFrame(this.pulseFrame);
+    if (focus && !reducedMotion()) this.pulseFrame = requestAnimationFrame(() => this.draw());
+  }
+
+  private strokeLinks(list: GraphLink[], centres: Map<number, Centre>): void {
+    const { ctx } = this;
+    ctx.beginPath();
+    for (const l of list) {
+      const [ax, ay, bx, by, cx, cy, dx, dy] = this.curve(l, centres);
+      ctx.moveTo(ax, ay);
+      ctx.bezierCurveTo(bx, by, cx, cy, dx, dy);
+    }
+    ctx.stroke();
+  }
+
+  private drawEdges(k: number, dimmed: boolean, fade: number, centres: Map<number, Centre>): void {
+    const { ctx, palette: p } = this;
     ctx.lineCap = "round";
     ctx.lineWidth = 0.8 / Math.max(k, 0.6);
     ctx.strokeStyle = p.edge;
     ctx.globalAlpha = (p.dark ? 0.1 : 0.16) * (dimmed ? 0.3 : 1) * fade;
-    stroke(this.between);
+    this.strokeLinks(this.between, centres);
     for (const [g, list] of this.inside) {
       ctx.strokeStyle = this.hue(g);
       ctx.globalAlpha = (p.dark ? 0.32 : 0.34) * (dimmed && this.spot !== g ? 0.18 : 1) * fade;
-      stroke(list);
+      this.strokeLinks(list, centres);
     }
+  }
 
-    if (focus) {
-      const hot = this.links.filter((l) => l.source === focus || l.target === focus);
-      ctx.lineWidth = 1.3 / Math.max(k, 0.6);
-      ctx.globalAlpha = 0.85;
-      for (const l of hot) {
-        const other = l.source === focus ? (l.target as GraphNode) : (l.source as GraphNode);
-        ctx.strokeStyle = other.group >= 0 ? this.hue(other.group) : p.accent;
-        stroke([l]);
-      }
-      if (!reducedMotion()) {
-        const now = performance.now();
-        ctx.globalCompositeOperation = light;
-        ctx.globalAlpha = 0.8;
-        hot.slice(0, 48).forEach((l, i) => {
-          const [ax, ay, bx, by, cx, cy, dx, dy] = this.curve(l, centres);
-          const t = (now / 1500 + i * 0.137) % 1;
-          const u = 1 - t;
-          const x = u * u * u * ax + 3 * u * u * t * bx + 3 * u * t * t * cx + t * t * t * dx;
-          const y = u * u * u * ay + 3 * u * u * t * by + 3 * u * t * t * cy + t * t * t * dy;
-          const R = 4.5 / Math.max(k, 0.7);
-          ctx.drawImage(this.sprite(p.bright), x - R, y - R, R * 2, R * 2);
-        });
-      }
+  private drawFocusEdges(focus: GraphNode, k: number, centres: Map<number, Centre>, light: GlobalCompositeOperation): void {
+    const { ctx, palette: p } = this;
+    const hot = this.links.filter((l) => l.source === focus || l.target === focus);
+    ctx.lineWidth = 1.3 / Math.max(k, 0.6);
+    ctx.globalAlpha = 0.85;
+    for (const l of hot) {
+      const other = l.source === focus ? (l.target as GraphNode) : (l.source as GraphNode);
+      ctx.strokeStyle = other.group >= 0 ? this.hue(other.group) : p.accent;
+      this.strokeLinks([l], centres);
     }
+    if (reducedMotion()) return;
+    const now = performance.now();
+    ctx.globalCompositeOperation = light;
+    ctx.globalAlpha = 0.8;
+    hot.slice(0, 48).forEach((l, i) => {
+      const [ax, ay, bx, by, cx, cy, dx, dy] = this.curve(l, centres);
+      const t = (now / 1500 + i * 0.137) % 1;
+      const u = 1 - t;
+      const x = bezier(ax, bx, cx, dx, t, u);
+      const y = bezier(ay, by, cy, dy, t, u);
+      const R = 4.5 / Math.max(k, 0.7);
+      ctx.drawImage(this.sprite(p.bright), x - R, y - R, R * 2, R * 2);
+    });
+  }
 
+  private drawGlows(
+    lit: (n: GraphNode) => boolean,
+    focus: GraphNode | null,
+    light: GlobalCompositeOperation,
+    fade: number,
+  ): void {
+    const { ctx, palette: p } = this;
     const degrees = this.nodes.map((n) => n.degree).sort((a, b) => b - a);
     const hub = Math.max(3, degrees[Math.floor(degrees.length * 0.06)] ?? Infinity);
     ctx.globalCompositeOperation = light;
@@ -423,6 +413,10 @@ export class GraphCanvas {
       ctx.globalAlpha = (special ? (p.dark ? 0.75 : 0.5) : p.dark ? 0.4 : 0.26) * fade;
       ctx.drawImage(this.sprite(special ? p.accent : this.hue(n.group)), this.px(n) - R, this.py(n) - R, R * 2, R * 2);
     }
+  }
+
+  private drawDots(lit: (n: GraphNode) => boolean, focus: GraphNode | null, fade: number, k: number): void {
+    const { ctx, palette: p } = this;
     ctx.globalCompositeOperation = "source-over";
     for (const n of this.nodes) {
       const special = n.id === this.current || n === focus;
@@ -432,13 +426,6 @@ export class GraphCanvas {
       ctx.fillStyle = special ? p.bright : this.hue(n.group);
       ctx.fill();
     }
-
-    if (fade >= 1) this.drawLabels(lit, near, centres);
-    ctx.restore();
-    ctx.globalAlpha = 1;
-
-    cancelAnimationFrame(this.pulseFrame);
-    if (focus && !reducedMotion()) this.pulseFrame = requestAnimationFrame(() => this.draw());
   }
 
   private drawLabels(lit: (n: GraphNode) => boolean, near: Set<string> | null, centres: Map<number, Centre>): void {

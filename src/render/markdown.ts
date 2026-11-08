@@ -176,35 +176,39 @@ function wikilinkRule(state: StateInline, silent: boolean): boolean {
   return true;
 }
 
+function renderAssetEmbed(target: string, alias: string, env: RenderEnv): string {
+  const res = env.index.resolve(target, false);
+  if (res.kind !== "found") {
+    return `<span class="embed-missing" title="${escapeAttr(target)} is not in the vault"><span class="embed-missing-icon" aria-hidden="true"></span>${escapeAttr(target)}</span>`;
+  }
+  const url = env.assetUrl(res.path);
+  if (IMAGE_EXT.test(target)) {
+    const size = /^(\d+)(?:x(\d+))?$/.exec(alias);
+    const dims = size ? ` width="${size[1]}"${size[2] ? ` height="${size[2]}"` : ""}` : "";
+    const alt = size ? target : alias || target;
+    return `<img class="embed-image" src="${escapeAttr(url)}" alt="${escapeAttr(alt)}" loading="lazy" decoding="async"${dims}>`;
+  }
+  if (/\.pdf$/i.test(target)) {
+    return `<figure class="embed-pdf"><iframe src="${escapeAttr(url)}#toolbar=0" title="${escapeAttr(target)}" sandbox></iframe><figcaption>${escapeAttr(target)}</figcaption></figure>`;
+  }
+  return `<a class="embed-file" href="${escapeAttr(url)}">${escapeAttr(target)}</a>`;
+}
+
+function renderAttachmentLink(md: MarkdownIt, target: string, label: string, env: RenderEnv): string {
+  const res = env.index.resolve(target, false);
+  if (res.kind !== "found")
+    return `<span class="wikilink is-missing" title="${escapeAttr(target)} is not in the vault">${md.utils.escapeHtml(label)}</span>`;
+  return `<a class="attachment-link" href="${escapeAttr(env.assetUrl(res.path))}" data-attachment="${escapeAttr(res.path)}">${md.utils.escapeHtml(label)}</a>`;
+}
+
 function renderWikilink(md: MarkdownIt, token: Token, env: RenderEnv): string {
   const { embed, target, anchor, alias } = token.meta as { embed: boolean; target: string; anchor: string; alias: string };
   const isAsset = isAttachmentTarget(env.index, target);
 
-  if (embed && isAsset) {
-    const res = env.index.resolve(target, false);
-    if (res.kind !== "found") {
-      return `<span class="embed-missing" title="${escapeAttr(target)} is not in the vault"><span class="embed-missing-icon" aria-hidden="true"></span>${escapeAttr(target)}</span>`;
-    }
-    const url = env.assetUrl(res.path);
-    if (IMAGE_EXT.test(target)) {
-      const size = /^(\d+)(?:x(\d+))?$/.exec(alias);
-      const dims = size ? ` width="${size[1]}"${size[2] ? ` height="${size[2]}"` : ""}` : "";
-      const alt = size ? target : alias || target;
-      return `<img class="embed-image" src="${escapeAttr(url)}" alt="${escapeAttr(alt)}" loading="lazy" decoding="async"${dims}>`;
-    }
-    if (/\.pdf$/i.test(target)) {
-      return `<figure class="embed-pdf"><iframe src="${escapeAttr(url)}#toolbar=0" title="${escapeAttr(target)}" sandbox></iframe><figcaption>${escapeAttr(target)}</figcaption></figure>`;
-    }
-    return `<a class="embed-file" href="${escapeAttr(url)}">${escapeAttr(target)}</a>`;
-  }
+  if (embed && isAsset) return renderAssetEmbed(target, alias, env);
 
   const label = alias || (target ? target + (anchor ? ` › ${anchor}` : "") : anchor);
-  if (isAsset) {
-    const res = env.index.resolve(target, false);
-    if (res.kind !== "found")
-      return `<span class="wikilink is-missing" title="${escapeAttr(target)} is not in the vault">${md.utils.escapeHtml(label)}</span>`;
-    return `<a class="attachment-link" href="${escapeAttr(env.assetUrl(res.path))}" data-attachment="${escapeAttr(res.path)}">${md.utils.escapeHtml(label)}</a>`;
-  }
+  if (isAsset) return renderAttachmentLink(md, target, label, env);
   const anchorAttr = anchor ? ` data-anchor="${escapeAttr(anchor)}"` : "";
   if (!target) {
     return `<a class="wikilink" href="#" data-path="${escapeAttr(env.currentPath)}"${anchorAttr}>${md.utils.escapeHtml(label)}</a>`;

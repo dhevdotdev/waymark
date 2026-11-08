@@ -6,6 +6,9 @@ src-tauri/gen/schemas/
 *.log
 .env
 .env.*
+!.env.example
+.idea/
+.vscode/
 
 # Screenshots and recordings can show private notes. Only the app's own artwork is tracked.
 *.png

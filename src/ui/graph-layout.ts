@@ -8,7 +8,7 @@ import {
   type Simulation,
   type SimulationNodeDatum,
 } from "d3-force";
-import type { GraphLink, GraphNode } from "./graph";
+import type { GraphLink, GraphNode } from "./graph-types";
 
 const NODE_TICKS = 220;
 const GROUP_TICKS = 240;

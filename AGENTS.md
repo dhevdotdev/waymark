@@ -29,6 +29,7 @@ These are product promises. Do not trade them for convenience.
 - The app imposes no organisation. No filename, folder, heading or frontmatter key has special meaning. `aliases` is the one exception, because it is how Obsidian links resolve.
 - Real notes never enter this repository, its tests or its history. Tests use the generated vault in `tests/e2e/fixture-vault.mjs`.
 - Honour Reduce Motion wherever something moves, canvas included.
+- No telemetry, analytics or crash reporting. Nothing leaves the machine except Git traffic the user asked for.
 
 ## Where things live
 
@@ -42,6 +43,9 @@ These are product promises. Do not trade them for convenience.
 - `tests/e2e/reader.mjs` pins user-visible behaviour. A structural change must leave it fully green in both normal and `reduced` modes.
 - A change to the Rust layer or IPC is proven only by `pnpm test:native`. A browser preview does not exercise Git or `vault://`.
 - Comments state a non-obvious reason. Do not narrate the change.
+- Test files are named `tests/unit/<subject>.test.ts`. Types and classes are PascalCase, functions and variables camelCase, constants SCREAMING_SNAKE_CASE. Biome enforces this.
+- Keep functions under Biome's cognitive complexity limit of 30 by extracting named steps.
+- Record known work as GitHub issues. A `TODO` or `FIXME` must cite one, as in `TODO(#12)`, and `pnpm arch` fails otherwise.
 - Add new commands to `src/ui/reader-commands.ts`. That one table feeds the palette, the keyboard and toolbar buttons.
 
 ## Agent skills

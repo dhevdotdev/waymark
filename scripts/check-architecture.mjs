@@ -39,6 +39,11 @@ for (const file of sources) {
   const text = readFileSync(file, "utf8");
   const rel = path.relative(ROOT, file);
   const lines = text.split("\n").length;
+  for (const [index, line] of text.split("\n").entries()) {
+    if (/\b(TODO|FIXME|HACK|XXX)\b/.test(line) && !/\b(TODO|FIXME|HACK|XXX)\(#\d+\)/.test(line)) {
+      problems.push(`${rel}:${index + 1}: cite an issue, as in TODO(#12)`);
+    }
+  }
   if (lines > MAX_LINES && !OVERSIZE_ALLOWED.has(rel)) problems.push(`${rel}: ${lines} lines, over the budget of ${MAX_LINES}`);
   if (!rel.startsWith("src/") || rel.endsWith(".d.ts")) continue;
 

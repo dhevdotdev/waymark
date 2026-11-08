@@ -1,7 +1,8 @@
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
-import { GraphCanvas, type GraphData } from "./graph";
+import { GraphCanvas } from "./graph";
 import { groupColor } from "./graph-paint";
+import type { GraphData } from "./graph-types";
 import { icons } from "./icons";
 
 export type GraphTabView = Extract<View, { kind: "graph" }>;

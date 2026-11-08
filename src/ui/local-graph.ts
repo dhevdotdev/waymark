@@ -248,6 +248,18 @@ export class LocalGraph {
     ctx.clearRect(0, 0, w, h);
     const hot = this.hover && !this.hover.center ? this.hover : null;
 
+    this.drawLinks(hot);
+    this.drawNodes(hot);
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = c.ink;
+    ctx.beginPath();
+    ctx.arc(this.view.x, this.view.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawLinks(hot: Node | null): void {
+    const { ctx, colors: c } = this;
     for (const l of this.links) {
       const s = l.source as Node,
         t = l.target as Node;
@@ -268,7 +280,10 @@ export class LocalGraph {
       ctx.quadraticCurveTo(ax + dx / 2 - dy * 0.12, ay + dy / 2 + dx * 0.12, bx, by);
       ctx.stroke();
     }
+  }
 
+  private drawNodes(hot: Node | null): void {
+    const { ctx, colors: c } = this;
     for (const d of this.nodes) {
       if (d.center) continue;
       const on = d === hot;
@@ -278,12 +293,6 @@ export class LocalGraph {
       ctx.fillStyle = on ? c.ink : (this.hues.get(d.group!) ?? c.dot);
       ctx.fill();
     }
-
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = c.ink;
-    ctx.beginPath();
-    ctx.arc(this.view.x, this.view.y, 5, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   private pick(e: MouseEvent): Node | null {

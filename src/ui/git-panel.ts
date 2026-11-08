@@ -381,6 +381,44 @@ export class GitPanel {
     return form;
   }
 
+  private changeRow(f: FileChange, isStaged: boolean): HTMLElement {
+    const code = isStaged ? f.staged : f.unstaged;
+    const row = el("div", "change-row");
+    const badge = el(
+      "span",
+      `change-badge is-${code === "?" ? "new" : code === "D" ? "del" : code === "A" ? "new" : "mod"}`,
+      code === "?" ? "U" : code,
+    );
+    badge.title =
+      {
+        "?": "Untracked",
+        M: "Modified",
+        A: "Added",
+        D: "Deleted",
+        R: "Renamed",
+        C: "Copied",
+        T: "Type changed",
+        U: "Conflicted",
+      }[code] ?? code;
+    const name = el("button", "change-name");
+    const base = f.path.split("/").pop()!;
+    name.append(
+      el("span", "", base.replace(/\.md$/, "")),
+      el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")),
+    );
+    name.onclick = () => void this.showWorktreeDiff(f, isStaged);
+    const act = el("button", "icon-btn change-act");
+    act.setAttribute("aria-label", isStaged ? `Unstage ${base}` : `Stage ${base}`);
+    act.innerHTML = isStaged
+      ? `<svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg>`
+      : `<svg viewBox="0 0 16 16"><path d="M8 4v8M4 8h8"/></svg>`;
+    act.onclick = () =>
+      void this.run(isStaged ? "Unstaging" : "Staging", () => (isStaged ? git.unstage([f.path]) : git.stage([f.path])));
+    row.append(badge, name, act);
+    if (f.conflicted) row.classList.add("is-conflicted");
+    return row;
+  }
+
   private renderChanges(body: HTMLElement, st: GitStatus): void {
     if (!st.files.length) {
       const empty = el("div", "empty-state");
@@ -405,43 +443,7 @@ export class GitPanel {
         );
       h.append(all);
       g.append(h);
-      for (const f of files) {
-        const code = isStaged ? f.staged : f.unstaged;
-        const row = el("div", "change-row");
-        const badge = el(
-          "span",
-          `change-badge is-${code === "?" ? "new" : code === "D" ? "del" : code === "A" ? "new" : "mod"}`,
-          code === "?" ? "U" : code,
-        );
-        badge.title =
-          {
-            "?": "Untracked",
-            M: "Modified",
-            A: "Added",
-            D: "Deleted",
-            R: "Renamed",
-            C: "Copied",
-            T: "Type changed",
-            U: "Conflicted",
-          }[code] ?? code;
-        const name = el("button", "change-name");
-        const base = f.path.split("/").pop()!;
-        name.append(
-          el("span", "", base.replace(/\.md$/, "")),
-          el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")),
-        );
-        name.onclick = () => void this.showWorktreeDiff(f, isStaged);
-        const act = el("button", "icon-btn change-act");
-        act.setAttribute("aria-label", isStaged ? `Unstage ${base}` : `Stage ${base}`);
-        act.innerHTML = isStaged
-          ? `<svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg>`
-          : `<svg viewBox="0 0 16 16"><path d="M8 4v8M4 8h8"/></svg>`;
-        act.onclick = () =>
-          void this.run(isStaged ? "Unstaging" : "Staging", () => (isStaged ? git.unstage([f.path]) : git.stage([f.path])));
-        row.append(badge, name, act);
-        if (f.conflicted) row.classList.add("is-conflicted");
-        g.append(row);
-      }
+      for (const f of files) g.append(this.changeRow(f, isStaged));
       body.append(g);
     };
     group("Staged", staged, true);

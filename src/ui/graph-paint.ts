@@ -3,6 +3,31 @@ const HUES = ["mauve", "teal", "peach", "blue", "pink", "green", "yellow", "sky"
 export const groupColor = (group: number): string =>
   group < 0 ? "var(--ink-4)" : `var(--p-${HUES[group % HUES.length]}, var(--accent))`;
 
+/** Control points for a link inside one community: a gentle sideways bow. */
+export function arcControls(
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+): [number, number, number, number, number, number, number, number] {
+  const dx = tx - sx,
+    dy = ty - sy;
+  return [
+    sx,
+    sy,
+    sx + dx / 3 - dy * 0.1,
+    sy + dy / 3 + dx * 0.1,
+    sx + (dx * 2) / 3 - dy * 0.1,
+    sy + (dy * 2) / 3 + dx * 0.1,
+    tx,
+    ty,
+  ];
+}
+
+/** One coordinate of a cubic Bezier at t, where u is 1 - t. */
+export const bezier = (p0: number, p1: number, p2: number, p3: number, t: number, u: number): number =>
+  u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+
 /** A soft round light in one colour: full at the centre and fading smoothly, with no visible edge. */
 export function lightSprite(color: string): HTMLCanvasElement {
   const size = 128;

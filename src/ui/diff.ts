@@ -14,51 +14,67 @@ interface FileDiff {
   removed: number;
 }
 
+const unquotePath = (p: string) => p.replace(/^"(.*)"$/, "$1").replace(/^[ab]\//, "");
+
+/** Applies a per-file header line; false when the line is not one. */
+function applyFileHeader(file: FileDiff, raw: string, inHunk: boolean): boolean {
+  if (raw.startsWith("new file")) file.status = "added";
+  else if (raw.startsWith("deleted file")) file.status = "deleted";
+  else if (raw.startsWith("rename from ")) {
+    file.status = "renamed";
+    file.oldPath = raw.slice(12);
+  } else if (raw.startsWith("Binary files")) file.status = "binary";
+  else if (raw.startsWith("--- ") && !inHunk) {
+    if (raw !== "--- /dev/null" && !file.oldPath) file.oldPath = unquotePath(raw.slice(4));
+  } else if (raw.startsWith("+++ ") && !inHunk) {
+    if (raw !== "+++ /dev/null") file.path = unquotePath(raw.slice(4));
+  } else return false;
+  return true;
+}
+
+function startFile(raw: string): FileDiff {
+  const m = /^diff --git (?:"?a\/(.+?)"?) (?:"?b\/(.+?)"?)$/.exec(raw);
+  return { path: m?.[2] ?? raw.slice(11), oldPath: null, status: "modified", hunks: [], added: 0, removed: 0 };
+}
+
+function startHunk(file: FileDiff, raw: string, cursor: { old: number; new: number }): FileDiff["hunks"][number] {
+  const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/.exec(raw);
+  cursor.old = Number(m?.[1] ?? 0);
+  cursor.new = Number(m?.[2] ?? 0);
+  const hunk = { header: m?.[3] ?? "", lines: [] };
+  file.hunks.push(hunk);
+  return hunk;
+}
+
+function addHunkLine(file: FileDiff, hunk: FileDiff["hunks"][number], raw: string, cursor: { old: number; new: number }): void {
+  if (raw.startsWith("+")) {
+    hunk.lines.push({ kind: "add", text: raw.slice(1), new: cursor.new++ });
+    file.added++;
+  } else if (raw.startsWith("-")) {
+    hunk.lines.push({ kind: "del", text: raw.slice(1), old: cursor.old++ });
+    file.removed++;
+  } else if (raw.startsWith(" ")) {
+    hunk.lines.push({ kind: "ctx", text: raw.slice(1), old: cursor.old++, new: cursor.new++ });
+  } else if (raw.startsWith("\\")) {
+    hunk.lines.push({ kind: "meta", text: raw.slice(2) });
+  }
+}
+
 function parseDiff(text: string): FileDiff[] {
   const files: FileDiff[] = [];
   let file: FileDiff | null = null;
   let hunk: FileDiff["hunks"][number] | null = null;
-  let oldNo = 0;
-  let newNo = 0;
-  const unq = (p: string) => p.replace(/^"(.*)"$/, "$1").replace(/^[ab]\//, "");
+  const cursor = { old: 0, new: 0 };
   for (const raw of text.split("\n")) {
     if (raw.startsWith("diff --git ")) {
-      const m = /^diff --git (?:"?a\/(.+?)"?) (?:"?b\/(.+?)"?)$/.exec(raw);
-      file = { path: m?.[2] ?? raw.slice(11), oldPath: null, status: "modified", hunks: [], added: 0, removed: 0 };
+      file = startFile(raw);
       files.push(file);
       hunk = null;
       continue;
     }
-    if (!file) continue;
-    if (raw.startsWith("new file")) file.status = "added";
-    else if (raw.startsWith("deleted file")) file.status = "deleted";
-    else if (raw.startsWith("rename from ")) {
-      file.status = "renamed";
-      file.oldPath = raw.slice(12);
-    } else if (raw.startsWith("Binary files")) file.status = "binary";
-    else if (raw.startsWith("--- ") && !hunk) {
-      if (raw !== "--- /dev/null" && !file.oldPath) file.oldPath = unq(raw.slice(4));
-    } else if (raw.startsWith("+++ ") && !hunk) {
-      if (raw !== "+++ /dev/null") file.path = unq(raw.slice(4));
-    } else if (raw.startsWith("@@")) {
-      const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/.exec(raw);
-      oldNo = Number(m?.[1] ?? 0);
-      newNo = Number(m?.[2] ?? 0);
-      hunk = { header: m?.[3] ?? "", lines: [] };
-      file.hunks.push(hunk);
-    } else if (hunk) {
-      if (raw.startsWith("+")) {
-        hunk.lines.push({ kind: "add", text: raw.slice(1), new: newNo++ });
-        file.added++;
-      } else if (raw.startsWith("-")) {
-        hunk.lines.push({ kind: "del", text: raw.slice(1), old: oldNo++ });
-        file.removed++;
-      } else if (raw.startsWith(" ")) {
-        hunk.lines.push({ kind: "ctx", text: raw.slice(1), old: oldNo++, new: newNo++ });
-      } else if (raw.startsWith("\\")) {
-        hunk.lines.push({ kind: "meta", text: raw.slice(2) });
-      }
-    }
+    if (!file || applyFileHeader(file, raw, hunk !== null)) continue;
+    if (raw.startsWith("@@")) hunk = startHunk(file, raw, cursor);
+    else if (hunk) addHunkLine(file, hunk, raw, cursor);
   }
   if (file && file.oldPath === file.path) file.oldPath = null;
   for (const f of files) if (f.oldPath === f.path) f.oldPath = null;
