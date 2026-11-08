@@ -9,10 +9,12 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.goto(app.url);
 await page.waitForSelector(".doc .doc-title");
 await page.waitForFunction(
-  () => window.folio?.index?.notes?.length > 0 && window.folio.texts.size >= window.folio.index.notes.length,
+  () =>
+    window.waymark?.reader?.vault.index.notes.length > 0 &&
+    window.waymark.vault.texts.size >= window.waymark.vault.index.notes.length,
 );
 const out = await page.evaluate(async () => {
-  const app = window.folio;
+  const app = window.waymark;
   const name = (el) => {
     if (el.classList.contains("code")) return "code";
     if (el.classList.contains("callout")) return "callout";
@@ -25,7 +27,7 @@ const out = await page.evaluate(async () => {
   const gaps = [];
   const empties = [];
   const diagrams = [];
-  for (const path of app.index.notes) {
+  for (const path of app.vault.index.notes) {
     await app.open(path);
     for (let i = 0; i < 400 && document.querySelector(".diagram.is-pending"); i++) await new Promise((r) => setTimeout(r, 25));
     const doc = document.querySelector(".doc");

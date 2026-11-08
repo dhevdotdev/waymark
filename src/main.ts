@@ -6,7 +6,7 @@ import { devVaultSource } from "./vault/source";
 const root = document.getElementById("app")!;
 const params = new URLSearchParams(location.search);
 const app = new App(root);
-(window as unknown as { folio: App }).folio = app;
+(window as unknown as { waymark: App }).waymark = app;
 
 async function boot(): Promise<void> {
   if (!isDesktop) return app.start(devVaultSource(), params.get("note") ?? undefined);

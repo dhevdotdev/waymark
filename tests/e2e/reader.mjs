@@ -80,7 +80,7 @@ check("⌘W closes the tab", (await page.locator(".tab").count()) === 1);
 
 // File tree navigation and collapse
 const flyway = await page.evaluate(() =>
-  window.folio.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")),
+  window.waymark.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")),
 );
 const flywayFolders = flyway
   .split("/")
@@ -102,7 +102,7 @@ await leaf.click();
 await pause(350);
 const treeFolders = await page.evaluate(() => {
   const onDisk = new Set(
-    window.folio.index.notes.flatMap((p) =>
+    window.waymark.vault.index.notes.flatMap((p) =>
       p
         .split("/")
         .slice(0, -1)
@@ -163,8 +163,10 @@ await page.keyboard.press("Meta+\\");
 await pause(450);
 
 // Collapsible callout (a real note with [!note]-)
-const folded = await page.evaluate(() => window.folio.index.notes.find((p) => window.folio.texts.get(p).includes("> [!note]-")));
-await page.evaluate((p) => window.folio.open(p), folded);
+const folded = await page.evaluate(() =>
+  window.waymark.vault.index.notes.find((p) => window.waymark.vault.texts.get(p).includes("> [!note]-")),
+);
+await page.evaluate((p) => window.waymark.open(p), folded);
 await page.waitForSelector('.callout[data-fold="closed"]');
 await page.evaluate(() => document.querySelector('.callout[data-fold="closed"]').scrollIntoView({ block: "center" }));
 await pause(300);
@@ -176,7 +178,9 @@ check("collapsed callout expands", h0 < 2 && h1 > 20, `${h0.toFixed(0)}px → ${
 
 // Diagram enlarge
 await page.evaluate(() =>
-  window.folio.open(window.folio.index.notes.find((p) => p.endsWith("Crumb structure and the overproofing problem.md"))),
+  window.waymark.open(
+    window.waymark.vault.index.notes.find((p) => p.endsWith("Crumb structure and the overproofing problem.md")),
+  ),
 );
 await page.waitForSelector(".diagram-svg svg");
 await page.evaluate(() => document.querySelector(".diagram").scrollIntoView({ block: "center" }));
@@ -341,8 +345,8 @@ check("Escape in Search returns to the tree", await page.locator(".tree").isVisi
 
 // Each tab keeps its own trail of followed links
 await page.evaluate(async () => {
-  const f = window.folio;
-  await f.open(f.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
+  const f = window.waymark;
+  await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
 await pause(400);
 check("a tab with one note shows no trail", !(await page.locator(".trail").isVisible()));
@@ -429,13 +433,13 @@ check("Back brings the previous trail back", (await page.locator(".trail-node").
 
 // A trail can loop back on itself
 const loop = await page.evaluate(() => {
-  const f = window.folio;
-  for (const a of f.index.notes)
-    for (const b of f.links.out.get(a) ?? []) if (a !== b && f.links.out.get(b)?.has(a)) return [a, b];
+  const f = window.waymark;
+  for (const a of f.vault.index.notes)
+    for (const b of f.vault.links.out.get(a) ?? []) if (a !== b && f.vault.links.out.get(b)?.has(a)) return [a, b];
   return null;
 });
 await page.evaluate(async ([a]) => {
-  await window.folio.open(a);
+  await window.waymark.open(a);
 }, loop);
 await pause(400);
 const clickTo = async (target) => {

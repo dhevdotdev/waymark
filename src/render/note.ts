@@ -16,11 +16,13 @@ export interface RenderedNote {
   grammarMs: number;
 }
 
-export async function renderNote(
-  source: string,
-  path: string,
-  deps: { index: VaultIndex; highlighter: Highlighter; assetUrl: (p: string) => string },
-): Promise<RenderedNote> {
+export interface RenderContext {
+  index: VaultIndex;
+  highlighter: Highlighter;
+  assetUrl: (path: string) => string;
+}
+
+export async function renderNote(source: string, path: string, deps: RenderContext): Promise<RenderedNote> {
   const t0 = performance.now();
   const { data, body } = parseFrontmatter(source);
   const text = stripComments(body);

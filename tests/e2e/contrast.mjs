@@ -6,7 +6,7 @@ const app = await serveFixture();
 const b = await webkit.launch();
 const page = await b.newPage();
 await page.goto(app.url);
-await page.waitForFunction(() => window.folio?.metrics.indexMs > 0);
+await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
 const rows = await page.evaluate(async () => {
   const { FAMILIES, applyTheme } = await import(/* @vite-ignore */ `${location.origin}/src/themes.ts`);
   const probe = document.createElement("span");

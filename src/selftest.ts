@@ -7,8 +7,9 @@ import type { App } from "./ui/app";
  * "git" drives sync against a disposable fixture repository.
  */
 export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {
-  // biome-ignore lint/suspicious/noExplicitAny: reaches private members until the app exposes a typed test port.
-  const a = app as unknown as Record<string, any>;
+  const reader = app.reader;
+  if (!reader) throw new Error("The self-test needs an open vault");
+  const { vault, gitPanel: panel } = reader;
   const results: { name: string; ok: boolean; detail?: unknown }[] = [];
   const check = (name: string, ok: boolean, detail?: unknown) => {
     results.push({ name, ok, detail });
@@ -27,26 +28,26 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
 
   await until(() => app.metrics.indexMs > 0, 20000);
   report.startup = { ...app.metrics };
-  check("vault indexed", app.index.notes.length > 0, app.index.notes.length);
+  check("vault indexed", vault.index.notes.length > 0, vault.index.notes.length);
 
   if (mode.startsWith("show:")) {
     const [, note, extra, scheme] = mode.split(":");
-    if (scheme === "light" || scheme === "dark") a.setAppearance(scheme);
-    const res = app.index.resolve(note);
+    if (scheme === "light" || scheme === "dark") app.setAppearance(scheme);
+    const res = vault.index.resolve(note);
     if (res.kind === "found") await app.open(res.path);
     await wait(800);
-    if (extra === "graph") a.openGraph("vault");
-    if (extra === "palette") a.palette.open("spring");
-    if (extra === "sync") a.gitPanel.open();
-    if (extra === "search") a.openSearch("the");
+    if (extra === "graph") reader.openGraph("vault");
+    if (extra === "palette") reader.palette.open("the");
+    if (extra === "sync") panel.open();
+    if (extra === "search") reader.sidebar.showSearch("the");
     await wait(2500);
     check("shown", true);
   }
 
   if (mode === "read") {
-    const sample = app.index.attachments.find((p) => /\.png$/i.test(p));
+    const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
     if (sample) {
-      const url = (a.source as { assetUrl: (p: string) => string }).assetUrl(sample);
+      const url = vault.source.assetUrl(sample);
       const img = new Image();
       img.src = url;
       await until(() => img.complete, 4000);
@@ -58,7 +59,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     let diagramErrors = 0;
     let images = 0;
     let brokenImages = 0;
-    for (const path of app.index.notes) {
+    for (const path of vault.index.notes) {
       try {
         await app.open(path);
         times.push(app.metrics.lastRenderMs);
@@ -81,12 +82,12 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     report.render = { notes: times.length, p50: pct(0.5), p95: pct(0.95), max: pct(1) };
     check("every note renders", failures.length === 0, failures.slice(0, 5));
     check("vault:// images load", images > 0 && brokenImages === 0, { images, brokenImages });
-    const expectsDiagrams = [...app.texts.values()].some((text) => text.includes("```mermaid"));
+    const expectsDiagrams = [...vault.texts.values()].some((text) => text.includes("```mermaid"));
     check("diagrams render", !expectsDiagrams || diagrams > 0, { diagrams, diagramErrors });
 
     const t0 = performance.now();
-    const term = [...app.texts.values()].join(" ").match(/[a-z]{8,}/i)?.[0] ?? "";
-    const hits = a.search.search(term, 20);
+    const term = [...vault.texts.values()].join(" ").match(/[a-z]{8,}/i)?.[0] ?? "";
+    const hits = vault.search.search(term, 20);
     report.searchMs = Math.round((performance.now() - t0) * 10) / 10;
     check("search finds text", hits.length > 0, hits.length);
 
@@ -98,7 +99,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
       behind: st.behind,
       changed: st.files.length,
     });
-    const target = app.index.notes[0];
+    const target = vault.index.notes[0];
     const history = await git.log(target, 10, 0);
     check("per-note history", history.length > 0, history.length);
     if (history[0]) {
@@ -112,7 +113,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     check("no requests leave the machine", external.length === 0, external.slice(0, 5));
 
     await app.open(target);
-    a.setRailPane("info");
+    reader.inspector.setPane("info");
     await until(() => !!document.querySelector(".rail-history .rail-commit"), 4000);
     const firstCommit = document.querySelector<HTMLElement>(".rail-history .rail-commit");
     check(
@@ -129,18 +130,17 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     check("a history entry offers the old version", !!document.querySelector(".sheet-actions .btn"));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     await wait(250);
-    a.setRailPane("outline");
-    a.openGraph("vault");
+    reader.inspector.setPane("outline");
+    reader.openGraph("vault");
     await wait(1500);
     check("graph opens", !!document.querySelector(".graph-view canvas"));
-    a.leaveGraph();
+    reader.leaveGraph();
   }
 
   const played: string[] = [];
-  a.sound.onPlay = (cue: string) => played.push(cue);
+  app.sound.onPlay = (cue: string) => played.push(cue);
 
   if (mode === "git") {
-    const panel = a.gitPanel;
     await panel.refresh();
     check("status before fetch shows nothing incoming", panel.status?.behind === 0, panel.status?.branch);
     await panel.fetch(true);
@@ -150,14 +150,13 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
       behind: panel.status?.behind,
       state: panel.state.kind,
     });
-    await until(() => app.texts.get("Welcome.md")?.includes("updated remotely") ?? false, 4000);
-    check("watcher re-reads the updated note", app.texts.get("Welcome.md")?.includes("updated remotely") ?? false);
+    await until(() => vault.texts.get("Welcome.md")?.includes("updated remotely") ?? false, 4000);
+    check("watcher re-reads the updated note", vault.texts.get("Welcome.md")?.includes("updated remotely") ?? false);
     check("open note re-rendered", document.querySelector(".doc")?.textContent?.includes("updated remotely") ?? false);
     check("incoming changes play the incoming cue", played.includes("incoming"), played);
   }
 
   if (mode === "diverged" || mode === "blocked") {
-    const panel = a.gitPanel;
     await panel.refresh();
     const head = panel.status?.head;
     await panel.sync();
@@ -178,15 +177,15 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
       document.querySelector(".git-drawer .notice-actions .btn")?.textContent,
     );
     if (mode === "blocked") {
-      a.setRailPane("info");
+      reader.inspector.setPane("info");
       await until(() => !!document.querySelector(".rail-history .rail-commit"), 4000);
       check(
         "the Info pane flags uncommitted edits",
         document.querySelector(".rail-history .rail-commit-subject")?.textContent === "Uncommitted changes",
       );
-      a.setRailPane("outline");
+      reader.inspector.setPane("outline");
     }
-    if (mode === "blocked") check("local edit preserved", (app.texts.get("Welcome.md") ?? "").includes("my local edit"));
+    if (mode === "blocked") check("local edit preserved", (vault.texts.get("Welcome.md") ?? "").includes("my local edit"));
     check("a refused sync plays the problem cue once", played.filter((c) => c === "problem").length === 1, played);
   }
 

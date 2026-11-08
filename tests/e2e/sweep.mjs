@@ -15,8 +15,8 @@ page.on("pageerror", (e) => pageErrors.push(String(e)));
 await page.goto(app.url);
 await page.waitForSelector(".doc .doc-title");
 const result = await page.evaluate(async () => {
-  const app = window.folio;
-  const notes = app.index.notes;
+  const app = window.waymark;
+  const notes = app.vault.index.notes;
   const rows = [];
   for (const path of notes) {
     await app.open(path);
