@@ -15,6 +15,19 @@ export interface PaletteItem {
  * commands. Results update on every keystroke with no debounce; the list is
  * small enough that filtering costs well under a frame.
  */
+interface PaletteMatch {
+  score: number;
+  marks: number[];
+}
+
+/** Marks index into the label, so a match on keywords highlights nothing. */
+function matchItem(needle: string, item: PaletteItem): PaletteMatch | null {
+  const onLabel = fuzzy(needle, item.label);
+  if (onLabel) return onLabel;
+  const onKeywords = item.keywords ? fuzzy(needle, item.keywords) : null;
+  return onKeywords && { score: onKeywords.score, marks: [] };
+}
+
 export class Palette {
   private root: HTMLElement | null = null;
   private input!: HTMLInputElement;
@@ -97,11 +110,9 @@ export class Palette {
       .filter((i) => (commandsOnly ? i.group === "Commands" : true))
       .map((item) => ({
         item,
-        m: needle
-          ? (fuzzy(needle, item.label) ?? (item.keywords ? fuzzy(needle, item.keywords) : null))
-          : { score: 0, marks: [] },
+        m: needle ? matchItem(needle, item) : { score: 0, marks: [] },
       }))
-      .filter((x) => x.m !== null) as { item: PaletteItem; m: { score: number; marks: number[] } }[];
+      .filter((x): x is { item: PaletteItem; m: PaletteMatch } => x.m !== null);
     if (needle) scored.sort((a, b) => b.m.score - a.m.score);
     const top = scored.slice(0, 60);
     this.shown = top.map((x) => x.item);

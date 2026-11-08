@@ -107,9 +107,25 @@ export class Trail {
     if (!("nodes" in value) || !Array.isArray(value.nodes) || !("root" in value) || !("current" in value)) return null;
     const trail = new Trail({ kind: "note", path: "" });
     trail.nodes.clear();
+    const saved = new Map<number, TrailNode>();
     for (const node of value.nodes) {
-      if (!isTrailNode(node) || !exists(node.view)) continue;
-      if (node.parent !== null && !trail.nodes.has(node.parent)) continue;
+      if (isTrailNode(node) && exists(node.view)) saved.set(node.id, node);
+    }
+    /* A note reattached by remove() can precede its parent, so reachability is decided after every node is known. */
+    const reachesRoot = (node: TrailNode): boolean => {
+      const seen = new Set<number>();
+      for (
+        let at: TrailNode | undefined = node;
+        at && !seen.has(at.id);
+        at = at.parent === null ? undefined : saved.get(at.parent)
+      ) {
+        seen.add(at.id);
+        if (at.parent === null) return at.id === value.root;
+      }
+      return false;
+    };
+    for (const node of saved.values()) {
+      if (!reachesRoot(node)) continue;
       trail.nodes.set(node.id, {
         id: node.id,
         view: node.view,

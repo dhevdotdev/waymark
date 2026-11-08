@@ -593,8 +593,10 @@ function remoteName(url: string | null): string {
 }
 
 /** A large read-only sheet for diffs and past revisions. Escape or a click outside closes it. */
+let closeActiveSheet: (() => void) | null = null;
+
 function openSheet(title: string, subtitle: string, content: HTMLElement): void {
-  document.querySelector(".sheet-overlay")?.remove();
+  closeActiveSheet?.();
   const overlay = el("div", "overlay sheet-overlay");
   const sheet = el("div", "sheet");
   sheet.setAttribute("role", "dialog");
@@ -611,10 +613,12 @@ function openSheet(title: string, subtitle: string, content: HTMLElement): void 
   sheet.append(head, body);
   overlay.append(sheet);
   const dismiss = () => {
+    closeActiveSheet = null;
     overlay.classList.add("is-leaving");
     setTimeout(() => overlay.remove(), 180);
     window.removeEventListener("keydown", onKey, true);
   };
+  closeActiveSheet = dismiss;
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       e.stopPropagation();

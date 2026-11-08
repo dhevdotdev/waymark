@@ -1,6 +1,6 @@
 import { isDesktop, native } from "./platform";
 
-export interface VaultState {
+interface VaultState {
   /** One saved trail per tab. Read through Trail.restore, which validates it. */
   tabs: unknown[];
   active: number;
@@ -40,6 +40,32 @@ const DEFAULTS: Prefs = {
 
 const LOCAL_KEY = "folio.prefs";
 
+const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
+  appearance: ["system", "light", "dark"],
+  railPane: ["outline", "links", "info"],
+};
+
+/** Read from disk or browser storage, so each key is checked and falls back to its own default. */
+function parsePrefs(raw: unknown): Prefs {
+  const prefs = structuredClone(DEFAULTS);
+  if (typeof raw !== "object" || raw === null) return prefs;
+  const saved = raw as Record<string, unknown>;
+  const target = prefs as unknown as Record<string, unknown>;
+  for (const key of Object.keys(DEFAULTS) as (keyof Prefs)[]) {
+    const value = saved[key];
+    const fallback = DEFAULTS[key];
+    const sameShape =
+      key === "lastVault"
+        ? value === null || typeof value === "string"
+        : Array.isArray(fallback)
+          ? Array.isArray(value)
+          : typeof value === typeof fallback && value !== null;
+    const choices = CHOICES[key] as readonly unknown[] | undefined;
+    if (sameShape && (!choices || choices.includes(value))) target[key] = value;
+  }
+  return prefs;
+}
+
 /** Preferences live in Application Support (desktop) or browser storage (dev), never in the vault. */
 export class PrefStore {
   value: Prefs = structuredClone(DEFAULTS);
@@ -49,13 +75,13 @@ export class PrefStore {
 
   async load(): Promise<void> {
     if (this.ephemeral) return;
-    let raw: Partial<Prefs> = {};
+    let raw: unknown = {};
     try {
-      raw = isDesktop ? ((await native.readPrefs()) as Partial<Prefs>) : JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}");
+      raw = isDesktop ? await native.readPrefs() : JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}");
     } catch {
       raw = {};
     }
-    this.value = { ...structuredClone(DEFAULTS), ...raw };
+    this.value = parsePrefs(raw);
   }
 
   update(change: (p: Prefs) => void): void {

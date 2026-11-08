@@ -1,4 +1,5 @@
-import type { VaultIndex } from "./index";
+import { parseFrontmatter } from "./frontmatter";
+import { isAttachmentTarget, type VaultIndex } from "./index";
 
 const CODE = /^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$|`[^`\n]*`/gm;
 const WIKILINK = /!?\[\[([^\]|#\n]*)(?:#[^\]|\n]*)?(?:\|[^\]\n]*)?\]\]/g;
@@ -17,7 +18,7 @@ export class LinkGraph {
     const targets = new Set<string>();
     for (const m of text.replace(CODE, "").matchAll(WIKILINK)) {
       const name = m[1].trim();
-      if (!name || /\.(?!md$)[a-z0-9]{2,5}$/i.test(name)) continue;
+      if (!name || isAttachmentTarget(this.index, name)) continue;
       const res = this.index.resolve(name, true);
       if (res.kind === "found" && res.path !== path) targets.add(res.path);
     }
@@ -58,9 +59,8 @@ export class LinkGraph {
 
 /** Visible text of a note, for search: no frontmatter, comments, link syntax or Markdown markers. */
 export function plainText(markdown: string): string {
-  return markdown
-    .replace(/^---\n[\s\S]*?\n---\n?/, "")
-    .replace(/%%[\s\S]*?%%/g, "")
+  return parseFrontmatter(markdown)
+    .body.replace(/%%[\s\S]*?%%/g, "")
     .replace(/!?\[\[([^\]|]*?)(?:\|([^\]]*))?\]\]/g, (_, t, a) => a || t.replace(/#/g, " "))
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^>\s*\[![^\]]*\][+-]?/gm, "")

@@ -1,4 +1,5 @@
 import MiniSearch from "minisearch";
+import { parseFrontmatter } from "./frontmatter";
 import { plainText } from "./links";
 
 export interface Hit {
@@ -48,15 +49,15 @@ export class SearchIndex {
     const q = query.trim();
     if (!q) return [];
     const phrase = /^".+"$/.test(q) ? q.slice(1, -1).toLowerCase() : null;
-    const results = this.mini.search(phrase ?? q).slice(0, limit * 2);
+    const matches = this.mini.search(phrase ?? q);
+    const results = phrase ? matches.filter((r) => this.texts.get(r.id)?.toLowerCase().includes(phrase)) : matches;
     const hits: Hit[] = [];
     /* A note containing the words as typed, in order, outranks one that has them scattered. */
     const words = q.toLowerCase().replace(/"/g, "");
     const asTyped = !phrase && /\s/.test(words) ? words : null;
-    for (const r of results) {
+    for (const r of results.slice(0, limit * 2)) {
       const text = this.texts.get(r.id) ?? "";
       const lower = text.toLowerCase();
-      if (phrase && !lower.includes(phrase)) continue;
       const exact = phrase ?? (asTyped && lower.includes(asTyped) ? asTyped : null);
       hits.push({
         path: r.id,
@@ -72,12 +73,12 @@ export class SearchIndex {
 }
 
 function snippet(markdown: string, terms: string[]): Hit["snippet"] {
-  const body = markdown.replace(/^---\n[\s\S]*?\n---\n?/, "");
+  const { body } = parseFrontmatter(markdown);
   const lower = body.toLowerCase();
   let best = -1;
   let term = "";
   for (const t of [...terms].sort((a, b) => b.length - a.length)) {
-    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(t)}`, "iu");
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(t)}`, "iu");
     const m = re.exec(body);
     const at = m ? m.index + m[1].length : lower.indexOf(t.toLowerCase());
     if (at >= 0 && !isHeadingLine(body, at)) {
@@ -113,6 +114,6 @@ function isHeadingLine(body: string, at: number): boolean {
   return /^#{1,6}\s/.test(body.slice(start, start + 7));
 }
 
-function escapeRe(s: string): string {
+export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

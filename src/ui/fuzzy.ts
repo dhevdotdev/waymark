@@ -1,5 +1,6 @@
+import { escapeRegExp } from "../vault/search";
+
 const BOUNDARY = /[\s\-_/(.,:]/;
-const escapeRegExp = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Title matching for the palette. Every query word must appear in the title,
@@ -87,14 +88,14 @@ export function highlightMarks(text: string, marks: number[]): DocumentFragment 
     } else frag.append(buf);
     buf = "";
   };
-  [...text].forEach((ch, i) => {
+  for (let i = 0; i < text.length; i++) {
     const isMark = set.has(i);
     if (isMark !== inMark) {
       flush();
       inMark = isMark;
     }
-    buf += ch;
-  });
+    buf += text[i];
+  }
   flush();
   return frag;
 }

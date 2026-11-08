@@ -2,7 +2,7 @@ import katex from "katex";
 import markdownit, { type MarkdownIt, type StateCore, type StateInline, type Token } from "markdown-it";
 import mark from "markdown-it-mark";
 import texmath from "markdown-it-texmath";
-import { headingId, headingKey, type VaultIndex } from "../vault/index";
+import { headingId, headingKey, isAttachmentTarget, type VaultIndex } from "../vault/index";
 
 export interface RenderEnv {
   [key: string]: unknown;
@@ -178,7 +178,7 @@ function wikilinkRule(state: StateInline, silent: boolean): boolean {
 
 function renderWikilink(md: MarkdownIt, token: Token, env: RenderEnv): string {
   const { embed, target, anchor, alias } = token.meta as { embed: boolean; target: string; anchor: string; alias: string };
-  const isAsset = /\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target);
+  const isAsset = isAttachmentTarget(env.index, target);
 
   if (embed && isAsset) {
     const res = env.index.resolve(target, false);

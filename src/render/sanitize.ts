@@ -2,6 +2,11 @@ import DOMPurify from "dompurify";
 
 const LOCAL_ASSET = /^\/@vault\/file\?|^vault:\/\/localhost\//;
 
+/** Anything an element fetches by itself must be local. Only a link the reader clicks may point elsewhere. */
+const LOCAL_LOAD = /^(?:\/@vault\/file\?|vault:\/\/localhost\/|#|data:image\/)/i;
+const LOADING_ATTRS = new Set(["src", "href", "xlink:href", "poster", "background"]);
+const isNavigation = (node: Element): boolean => node.tagName === "A" || node.tagName === "AREA" || node.tagName === "a";
+
 const RENDERER_DATA = new Set([
   "data-candidates",
   "data-anchor",
@@ -42,8 +47,12 @@ function configure(): void {
     }
   });
   /* Only the data attributes the renderer emits survive, so note HTML cannot trigger app actions (data-act). */
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
+  DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
+    const value = data.attrValue;
     if (data.attrName.startsWith("data-") && !RENDERER_DATA.has(data.attrName)) data.keepAttr = false;
+    if (data.attrName === "data-src" && !/^https?:/i.test(value)) data.keepAttr = false;
+    if (data.attrName === "style" && /url\(|@import|expression\(/i.test(value)) data.keepAttr = false;
+    if (LOADING_ATTRS.has(data.attrName) && !isNavigation(node) && !LOCAL_LOAD.test(value)) data.keepAttr = false;
   });
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     if (node instanceof HTMLAnchorElement && /^https?:/i.test(node.getAttribute("href") ?? "")) {
@@ -60,7 +69,22 @@ export function sanitize(html: string): DocumentFragment {
     RETURN_DOM_FRAGMENT: true,
     ADD_TAGS: ["iframe", "semantics", "annotation", "eq", "eqn"],
     ADD_ATTR: ["sandbox", "type", "aria-expanded", "encoding", "loading", "decoding"],
-    FORBID_TAGS: ["style", "form", "input", "textarea", "select", "object", "embed", "link", "meta", "base"],
+    FORBID_TAGS: [
+      "style",
+      "form",
+      "input",
+      "textarea",
+      "select",
+      "object",
+      "embed",
+      "link",
+      "meta",
+      "base",
+      "video",
+      "audio",
+      "source",
+      "track",
+    ],
     FORBID_ATTR: ["srcset", "action", "formaction", "ping"],
     /* Plain numbers and keywords, which the strict URL pattern below would otherwise reject. */
     ADD_URI_SAFE_ATTR: ["start", "colspan", "rowspan", "width", "height", "align", "dir", "lang"],

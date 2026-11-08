@@ -7,14 +7,14 @@ export interface Frontmatter {
 
 /**
  * Minimal YAML subset used by the vault: scalar `key: value` pairs and
- * string lists (`key: [a, b]` or indented `- item`). Anything else is kept as text.
+ * string lists (`key: [a, b]` or indented `- item`). Other lines are ignored.
  */
 export function parseFrontmatter(source: string): Frontmatter {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(source);
+  const match = /^---\r?\n(?:([\s\S]*?)\r?\n)?---\r?\n?/.exec(source);
   if (!match) return { data: {}, body: source, offset: 0 };
   const data: Record<string, string | string[]> = {};
   let listKey: string | null = null;
-  for (const line of match[1].split(/\r?\n/)) {
+  for (const line of (match[1] ?? "").split(/\r?\n/)) {
     const item = /^\s+-\s+(.*)$/.exec(line);
     if (item && listKey) {
       (data[listKey] as string[]).push(unquote(item[1]));

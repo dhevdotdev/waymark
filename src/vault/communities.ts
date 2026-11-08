@@ -1,4 +1,4 @@
-export interface Community {
+interface Community {
   id: number;
   /** The best-connected note in the community. */
   top: string;

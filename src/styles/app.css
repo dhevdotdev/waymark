@@ -590,6 +590,11 @@ kbd {
   visibility: hidden;
   transition: visibility 0s var(--t-menu);
 }
+@media (prefers-reduced-motion: reduce) {
+  .tree :is(.tree-body, .tree-inner, .tree-chevron) {
+    transition: none;
+  }
+}
 .tree.is-instant :is(.tree-body, .tree-inner, .tree-chevron) {
   transition: none;
 }

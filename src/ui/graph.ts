@@ -10,6 +10,7 @@ import {
   type SimulationNodeDatum,
 } from "d3-force";
 import { resolveColor } from "./colors";
+import { reducedMotion } from "./media";
 
 export interface GraphNode extends SimulationNodeDatum {
   id: string;
@@ -59,9 +60,6 @@ const HUES = ["mauve", "teal", "peach", "blue", "pink", "green", "yellow", "sky"
 /** The CSS colour for a link community, so every view of the graph agrees and follows the theme. */
 export const groupColor = (group: number): string =>
   group < 0 ? "var(--ink-4)" : `var(--p-${HUES[group % HUES.length]}, var(--accent))`;
-
-const reduceMotion = () =>
-  matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -296,7 +294,7 @@ export class GraphCanvas {
 
   private playIntro(): void {
     cancelAnimationFrame(this.frame);
-    if (reduceMotion() || !this.nodes.length) {
+    if (reducedMotion() || !this.nodes.length) {
       this.intro = 1;
       this.draw();
       return;
@@ -314,7 +312,7 @@ export class GraphCanvas {
   private animateView(to: { x: number; y: number; k: number }): void {
     cancelAnimationFrame(this.frame);
     this.intro = 1;
-    if (reduceMotion()) {
+    if (reducedMotion()) {
       this.view = to;
       this.draw();
       return;
@@ -527,7 +525,7 @@ export class GraphCanvas {
         ctx.strokeStyle = other.group >= 0 ? this.hue(other.group) : p.accent;
         stroke([l]);
       }
-      if (!reduceMotion()) {
+      if (!reducedMotion()) {
         const now = performance.now();
         ctx.globalCompositeOperation = light;
         ctx.globalAlpha = 0.8;
@@ -569,7 +567,7 @@ export class GraphCanvas {
     ctx.globalAlpha = 1;
 
     cancelAnimationFrame(this.pulseFrame);
-    if (focus && !reduceMotion()) this.pulseFrame = requestAnimationFrame(() => this.draw());
+    if (focus && !reducedMotion()) this.pulseFrame = requestAnimationFrame(() => this.draw());
   }
 
   private drawLabels(lit: (n: GraphNode) => boolean, near: Set<string> | null, centres: Map<number, Centre>): void {
@@ -683,7 +681,7 @@ export class GraphCanvas {
           const [x, y] = this.toWorld(e.clientX, e.clientY);
           this.drag.node.fx = x;
           this.drag.node.fy = y;
-          if (!reduceMotion()) this.kick(0.25);
+          if (!reducedMotion()) this.kick(0.25);
           else {
             this.drag.node.x = x;
             this.drag.node.y = y;

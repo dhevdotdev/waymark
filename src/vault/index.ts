@@ -76,6 +76,11 @@ function pick(candidates: string[]): Resolution {
 }
 
 /** Obsidian heading match: case-insensitive, punctuation-insensitive text comparison. */
+/** A link names an attachment only when it has a file extension and no note answers to it, so "Node.js" can be a note. */
+export function isAttachmentTarget(index: VaultIndex, target: string): boolean {
+  return /\.[a-z0-9]{2,5}$/i.test(target) && !/\.md$/i.test(target) && index.resolve(target, true).kind === "missing";
+}
+
 export function headingKey(text: string): string {
   return fold(text)
     .replace(/[`*_~=[\]]/g, "")

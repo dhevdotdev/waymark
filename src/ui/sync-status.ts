@@ -1,7 +1,7 @@
 import type { GitErrorKind, GitStatus } from "../platform";
 import type { SyncState } from "./git-panel";
 
-export type SyncTone = "ok" | "off" | "busy" | "warn" | "incoming" | "outgoing" | "changed";
+type SyncTone = "ok" | "off" | "busy" | "warn" | "incoming" | "outgoing" | "changed";
 
 export interface SyncSummary {
   tone: SyncTone;

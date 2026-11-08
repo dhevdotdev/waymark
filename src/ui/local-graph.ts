@@ -10,6 +10,7 @@ import {
 } from "d3-force";
 import { resolveColor } from "./colors";
 import { groupColor } from "./graph";
+import { reducedMotion } from "./media";
 
 export interface Neighbour {
   id: string;
@@ -25,8 +26,6 @@ interface Node extends SimulationNodeDatum, Partial<Neighbour> {
 }
 
 type Link = SimulationLinkDatum<Node> & { source: Node | string; target: Node | string; between: boolean };
-
-const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * The current note's neighbourhood as small lobes: linked notes gather by link
@@ -169,7 +168,7 @@ export class LocalGraph {
       this.fit();
       this.draw();
     };
-    if (reduceMotion()) {
+    if (reducedMotion()) {
       for (let i = 0; i < 220; i++) sim.tick();
       settle();
       return;

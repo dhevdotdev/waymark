@@ -9,7 +9,6 @@ interface Note {
   f: number;
   t: number;
   d: number;
-  g?: number;
 }
 
 const CUES: Record<Cue, { notes: Note[]; type: OscillatorType; gain: number }> = {
@@ -88,7 +87,7 @@ function schedule(ctx: BaseAudioContext, destination: AudioNode, cue: Cue, t0: n
     osc.type = spec.type;
     osc.frequency.value = n.f;
     env.gain.setValueAtTime(0, t0 + n.t);
-    env.gain.linearRampToValueAtTime(n.g ?? 1, t0 + n.t + 0.008);
+    env.gain.linearRampToValueAtTime(1, t0 + n.t + 0.008);
     env.gain.exponentialRampToValueAtTime(0.0001, t0 + n.t + n.d);
     osc.connect(env).connect(out);
     osc.start(t0 + n.t);
