@@ -21,7 +21,7 @@ import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
 import { restoreTabs } from "./restore-tabs";
-import { applySound, toggleSettings } from "./settings";
+import { applySound, previewKeys, toggleSettings } from "./settings";
 import { mountShell, type ShellElements } from "./shell";
 import { Sidebar } from "./sidebar";
 import type { Sound } from "./sound";
@@ -378,6 +378,7 @@ export class Reader {
       setFamily: this.deps.setFamily,
       setAppearance: this.deps.setAppearance,
       setSound: (on) => applySound(this.deps.prefs, this.deps.sound, on),
+      previewKeys: () => previewKeys(this.deps.prefs, this.deps.sound),
       rescheduleBackground: () => this.sync.scheduleBackground(),
     });
   }

@@ -10,6 +10,8 @@ const APPEARANCES: readonly Appearance[] = ["system", "light", "dark"];
 const BACKGROUND_MINUTES = 15;
 
 export interface SettingsHost {
+  /** Plays a few keys on the chosen switch. */
+  previewKeys: () => void;
   prefs: PrefStore;
   scheme: () => Scheme;
   setFamily: (id: string) => void;
@@ -29,14 +31,25 @@ function template(p: Prefs, scheme: Scheme): string {
     (a) =>
       `<button class="seg-btn${p.appearance === a ? " is-on" : ""}" data-appearance="${a}">${a === "system" ? "Match system" : a[0].toUpperCase() + a.slice(1)}</button>`,
   ).join("");
+  const choices = (name: string, options: readonly (readonly [string, string])[], current: string) =>
+    options
+      .map(
+        ([value, label]) =>
+          `<button class="seg-btn${value === current ? " is-on" : ""}" data-${name}="${value}">${label}</button>`,
+      )
+      .join("");
   const toggle = (label: string, pref: string, checked: boolean) =>
     `<label class="toggle"><span>${label}</span><input type="checkbox" data-pref="${pref}" ${checked ? "checked" : ""}/><i aria-hidden="true"></i></label>`;
   return `
     <div class="pop-section"><div class="pop-label">Theme</div><div class="theme-grid">${swatches}</div></div>
     <div class="pop-section"><div class="pop-label">Appearance</div><div class="seg seg-full">${appearances}</div></div>
+    <div class="pop-section">
+      <div class="pop-label">Typing sounds</div>
+      <div class="seg seg-full">${choices("keysound", KEY_SOUNDS, p.keySound)}</div>
+      <div class="seg seg-full key-volume${p.keySound === "off" ? " is-off" : ""}">${choices("keyvolume", KEY_VOLUMES, p.keyVolume)}</div>
+    </div>
     <div class="pop-section pop-toggles">
       ${toggle("Sounds for sync, copy and new tabs", "sound", p.sound)}
-      ${toggle("Mechanical keys while writing", "typingSounds", p.typingSounds)}
       ${
         isDesktop
           ? `${toggle("Check the remote on launch", "syncOnLaunch", p.syncOnLaunch)}
@@ -45,6 +58,23 @@ function template(p: Prefs, scheme: Scheme): string {
           : ""
       }
     </div>`;
+}
+
+const KEY_SOUNDS = [
+  ["off", "Off"],
+  ["linear", "Linear"],
+  ["tactile", "Tactile"],
+  ["clicky", "Clicky"],
+] as const;
+const KEY_VOLUMES = [
+  ["soft", "Soft"],
+  ["medium", "Medium"],
+  ["loud", "Loud"],
+] as const;
+
+function markChoice(pop: HTMLElement, name: "keysound" | "keyvolume", value: string): void {
+  for (const button of pop.querySelectorAll<HTMLElement>(`[data-${name}]`))
+    button.classList.toggle("is-on", button.dataset[name] === value);
 }
 
 let stopDismissing: (() => void) | null = null;
@@ -87,6 +117,18 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
         b.setAttribute("aria-pressed", String(b.dataset.family === family));
       }
     }
+    const keySound = target.closest<HTMLElement>("[data-keysound]")?.dataset.keysound as Prefs["keySound"] | undefined;
+    const keyVolume = target.closest<HTMLElement>("[data-keyvolume]")?.dataset.keyvolume as Prefs["keyVolume"] | undefined;
+    if (keySound || keyVolume) {
+      host.prefs.update((p) => {
+        p.keySound = keySound ?? p.keySound;
+        p.keyVolume = keyVolume ?? p.keyVolume;
+      });
+      markChoice(pop, "keysound", host.prefs.value.keySound);
+      markChoice(pop, "keyvolume", host.prefs.value.keyVolume);
+      pop.querySelector(".key-volume")?.classList.toggle("is-off", host.prefs.value.keySound === "off");
+      host.previewKeys();
+    }
     const appearance = target.closest<HTMLElement>("[data-appearance]")?.dataset.appearance as Appearance | undefined;
     if (appearance) {
       host.setAppearance(appearance);
@@ -99,11 +141,6 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   pop.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.dataset.pref === "sound") host.setSound(input.checked);
-    if (input.dataset.pref === "typingSounds") {
-      host.prefs.update((p) => {
-        p.typingSounds = input.checked;
-      });
-    }
     if (input.dataset.pref === "syncOnLaunch") {
       host.prefs.update((p) => {
         p.syncOnLaunch = input.checked;
@@ -118,6 +155,12 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   });
 
   pop.querySelector<HTMLElement>(".theme-swatch.is-on")?.focus({ preventScroll: true });
+}
+
+/** Plays a few keys on the chosen switch, unless typing sounds are off. */
+export function previewKeys(prefs: PrefStore, sound: Sound): void {
+  const { keySound, keyVolume } = prefs.value;
+  if (keySound !== "off") void sound.keys.preview(keySound, keyVolume);
 }
 
 export function applySound(prefs: PrefStore, sound: Sound, on: boolean): void {

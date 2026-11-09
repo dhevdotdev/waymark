@@ -12,6 +12,8 @@ Waymark treats note content as untrusted, because a vault can be cloned from any
 
 Report a problem privately to the repository owner through a GitHub security advisory.
 
+The app may fetch only its own bundled files and its native bridge. It needs the bundled files to decode its key sounds, and no note can start a fetch because notes cannot run scripts.
+
 ## Writing notes
 
 In the app, the only code that changes a note's text is `write_note` in `src-tauri/src/vault.rs`. It accepts Markdown files inside the vault, refuses dot-folders and symlinks that leave the vault, and replaces a file only if it still holds the text the caller expected. Another app writing in the instant between that check and the rename cannot be detected. Note content cannot trigger a write: a task box only acts if this render created it, so one written as HTML in a note does nothing. The development server has a stand-in with the same rule, for browser tests only.

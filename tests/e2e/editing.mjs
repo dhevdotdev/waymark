@@ -477,9 +477,10 @@ try {
   await pause(200);
 
   await openNote("Tasks");
+  await page.waitForFunction(() => window.waymark.sound.keys.load("tactile"));
   await page.evaluate(() => {
     window.typed = [];
-    window.waymark.sound.onPlay = (sound) => window.typed.push(sound);
+    window.waymark.sound.keys.onStrike = (sound) => window.typed.push(sound);
   });
   const sounds = () => page.evaluate(() => window.typed.splice(0));
   await page.keyboard.type("x");
@@ -491,28 +492,62 @@ try {
   await page.keyboard.type("a b");
   await page.keyboard.press("Enter");
   await page.keyboard.press("Backspace");
-  check("typing makes a key sound for each press", (await sounds()).join() === "key,space,key,return,delete");
-  await page.keyboard.press("ArrowLeft");
-  await page.keyboard.press("Meta+b");
-  check("navigation and shortcuts are silent", (await sounds()).length === 0);
-  const rendered = await page.evaluate(async () => {
-    const render = async (stroke) => {
-      const ctx = new OfflineAudioContext(1, 44100 * 0.25, 44100);
-      window.waymark.sound.keystroke(stroke, ctx);
-      const samples = (await ctx.startRendering()).getChannelData(0);
-      let sounding = samples.length - 1;
-      while (sounding > 0 && Math.abs(samples[sounding]) < 0.001) sounding--;
+  check(
+    "each key plays its press and its release",
+    (await sounds()).join() ===
+      "key-down,key-up,space-down,space-up,key-down,key-up,enter-down,enter-up,backspace-down,backspace-up",
+  );
+  await page.keyboard.down("z");
+  await page.keyboard.down("z");
+  await page.keyboard.down("z");
+  await page.keyboard.up("z");
+  check("a held key sounds once", (await sounds()).join() === "key-down,key-up");
+  const offlineRender = await page.evaluate(async () => {
+    const { KeySounds } = await import(/* @vite-ignore */ `${location.origin}/src/ui/key-sounds.ts`);
+    const render = async (profile, volume, code) => {
+      const ctx = new OfflineAudioContext(2, 44100 * 0.4, 44100);
+      const keys = new KeySounds(() => ctx);
+      await keys.load(profile);
+      keys.use(profile, volume);
+      keys.press(code);
+      keys.release(code);
+      const out = await ctx.startRendering();
+      const [left, right] = [out.getChannelData(0), out.getChannelData(1)];
+      const energy = (channel) => channel.reduce((sum, value) => sum + value * value, 0);
+      let sounding = left.length - 1;
+      while (sounding > 0 && Math.abs(left[sounding]) < 0.001) sounding--;
       let crossings = 0;
-      for (let i = 1; i <= sounding; i++) if (samples[i] > 0 !== samples[i - 1] > 0) crossings++;
-      const pitch = crossings / sounding;
-      return { peak: Math.max(...samples.map(Math.abs)), tail: Math.max(...samples.slice(44100 * 0.1).map(Math.abs)), pitch };
+      for (let i = 1; i <= sounding; i++) if (left[i] > 0 !== left[i - 1] > 0) crossings++;
+      return {
+        peak: Math.max(...left.map(Math.abs), ...right.map(Math.abs)),
+        left: energy(left),
+        right: energy(right),
+        pitch: crossings / sounding,
+        last: sounding / 44100,
+      };
     };
-    return { key: await render("key"), space: await render("space") };
+    const mean = async (profile) => {
+      let total = 0;
+      for (let i = 0; i < 24; i++) total += (await render(profile, "medium", "KeyG")).pitch;
+      return total / 24;
+    };
+    return {
+      leftKey: await render("tactile", "medium", "KeyQ"),
+      rightKey: await render("tactile", "medium", "KeyP"),
+      soft: await render("tactile", "soft", "KeyG"),
+      loud: await render("tactile", "loud", "KeyG"),
+      loudest: await render("clicky", "loud", "Backspace"),
+      linearPitch: await mean("linear"),
+      clickyPitch: await mean("clicky"),
+    };
   });
-  check("a key press is audible and not loud", rendered.key.peak > 0.02 && rendered.key.peak < 0.4, JSON.stringify(rendered.key));
-  check("it ends within a tenth of a second", rendered.key.tail < 0.0005 && rendered.space.tail < 0.0005);
-  check("the space bar sounds deeper than a letter", rendered.space.pitch < rendered.key.pitch, JSON.stringify(rendered));
-  await sounds();
+  const { leftKey, rightKey, soft, loud, loudest, linearPitch, clickyPitch } = offlineRender;
+  check("the recording plays clearly and does not clip", loud.peak > 0.3 && loudest.peak <= 1, `${loud.peak} ${loudest.peak}`);
+  check("a key on the left sounds from the left", leftKey.left > leftKey.right * 1.5, JSON.stringify(leftKey));
+  check("a key on the right sounds from the right", rightKey.right > rightKey.left * 1.5, JSON.stringify(rightKey));
+  check("loud is louder than soft", loud.peak > soft.peak * 1.8, `${soft.peak} ${loud.peak}`);
+  check("the sound ends quickly", loud.last < 0.2, String(loud.last));
+  check("clicky is brighter than linear", clickyPitch > linearPitch, `${linearPitch} ${clickyPitch}`);
   await page.evaluate(() => {
     window.waymark.sound.muted = true;
   });
@@ -521,6 +556,33 @@ try {
   await page.evaluate(() => {
     window.waymark.sound.muted = false;
   });
+  await page.click('[data-act="settings"]');
+  await pause(250);
+  await page.click('[data-keysound="clicky"]');
+  await pause(300);
+  const previewed = await sounds();
+  check("picking a switch plays a few keys", previewed.length >= 10, String(previewed.length));
+  check("the volume stays available", !(await page.locator(".key-volume").evaluate((row) => row.classList.contains("is-off"))));
+  const volumeTop = () => page.locator(".key-volume").evaluate((row) => row.getBoundingClientRect().top);
+  const beforeOff = await volumeTop();
+  await page.click('[data-keysound="off"]');
+  await pause(200);
+  check(
+    "turning sounds off disables the volume",
+    await page.locator(".key-volume").evaluate((row) => row.classList.contains("is-off")),
+  );
+  check("and moves nothing", (await volumeTop()) === beforeOff);
+  await sounds();
+  await page.keyboard.press("Escape");
+  await pause(200);
+  await page.locator(".cm-content").click();
+  await page.keyboard.type("w");
+  check("off means silent", (await sounds()).length === 0);
+  await page.click('[data-act="settings"]');
+  await pause(250);
+  await page.click('[data-keysound="tactile"]');
+  await page.keyboard.press("Escape");
+  await pause(200);
   await page.keyboard.press("Meta+e");
   await pause(200);
 

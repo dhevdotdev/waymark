@@ -10,6 +10,9 @@ interface VaultState {
   recent?: { path: string; at: number }[];
 }
 
+export type SwitchProfile = "linear" | "tactile" | "clicky";
+export type KeyVolume = "soft" | "medium" | "loud";
+
 export interface Prefs {
   lastVault: string | null;
   recentVaults: string[];
@@ -26,7 +29,8 @@ export interface Prefs {
   railPane: "links" | "info";
   sidebarWidth: number;
   diffWrap: boolean;
-  typingSounds: boolean;
+  keySound: SwitchProfile | "off";
+  keyVolume: KeyVolume;
 }
 
 const DEFAULTS: Prefs = {
@@ -44,7 +48,8 @@ const DEFAULTS: Prefs = {
   railPane: "links",
   sidebarWidth: 268,
   diffWrap: true,
-  typingSounds: true,
+  keySound: "tactile",
+  keyVolume: "medium",
 };
 
 const LOCAL_KEY = "waymark.prefs";

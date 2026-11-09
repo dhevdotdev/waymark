@@ -66,3 +66,7 @@ All of these use a generated fixture vault, so no real notes are needed.
 ## Contributing
 
 `AGENTS.md` lists the commands and rules. `ARCHITECTURE.md` maps the code. `DESIGN.md` holds the design rationale.
+
+## Credits
+
+The typing sounds are recordings from the [Keyboard Sound Dataset](https://zenodo.org/records/16564409) (MIT, Sony) and [typing.wav by Dustin_Davis](https://freesound.org/people/Dustin_Davis/sounds/399603/) (CC0), as edited by [Switchtone](https://github.com/gabrimatic/switchtone) (MIT). The notices are in `public/licenses/key-sounds.txt`.

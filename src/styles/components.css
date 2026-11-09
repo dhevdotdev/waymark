@@ -1683,3 +1683,12 @@
   font-weight: 450;
   color: var(--ink-3);
 }
+
+.key-volume {
+  margin-block-start: 6px;
+  transition: opacity var(--t-hover) ease;
+}
+.key-volume.is-off {
+  opacity: 0.4;
+  pointer-events: none;
+}

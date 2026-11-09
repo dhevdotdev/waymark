@@ -7,5 +7,6 @@
     "@fontsource-variable/jetbrains-mono",
     "@fontsource-variable/source-serif-4"
   ],
-  "ignore": []
+  "ignore": [],
+  "ignoreBinaries": ["ffmpeg"]
 }

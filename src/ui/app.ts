@@ -6,7 +6,7 @@ import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { resolveColor } from "./colors";
 import { type Metrics, Reader } from "./reader";
-import { keystrokeOf, Sound } from "./sound";
+import { Sound } from "./sound";
 import { showWelcome } from "./welcome";
 
 const MAX_RECENT_VAULTS = 8;
@@ -36,7 +36,10 @@ export class App {
     this.prefs.ephemeral = override !== undefined;
     await this.prefs.load();
     this.sound.muted = !this.prefs.value.sound;
-    window.addEventListener("keydown", (e) => this.soundKeyPress(e), true);
+    window.addEventListener("keydown", (e) => this.soundKey(e, true), true);
+    window.addEventListener("keyup", (e) => this.soundKey(e, false), true);
+    window.addEventListener("blur", () => this.sound.keys.forgetHeld());
+    if (this.prefs.value.keySound !== "off") void this.sound.keys.load(this.prefs.value.keySound);
     this.applyTheme();
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     window.addEventListener("keydown", (e) => this.reader?.handleKey(e), true);
@@ -170,10 +173,13 @@ export class App {
     });
   }
 
-  private soundKeyPress(e: KeyboardEvent): void {
-    if (!this.prefs.value.typingSounds || !(e.target as Element).closest?.(".doc-editing")) return;
-    const stroke = keystrokeOf(e);
-    if (stroke) this.sound.keystroke(stroke);
+  private soundKey(e: KeyboardEvent, pressed: boolean): void {
+    const { keySound, keyVolume } = this.prefs.value;
+    if (keySound === "off" || !e.code) return;
+    const { keys } = this.sound;
+    keys.use(keySound, keyVolume);
+    if (!pressed) keys.release(e.code);
+    else if ((e.target as Element).closest?.(".doc-editing")) keys.press(e.code, e.repeat);
   }
 
   /** The window shows its own colour in newly exposed space while it grows, before the page has resized. */

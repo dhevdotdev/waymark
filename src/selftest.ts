@@ -43,6 +43,7 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
     () => false,
   );
   check("the window colour can follow the theme", colourSet);
+  check("the key sounds load under the content policy", await app.sound.keys.load("tactile"));
 }
 
 const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
