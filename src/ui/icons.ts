@@ -19,12 +19,14 @@ export const icons = {
   ),
   note: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M9 2.5v3h3"/>`),
   folder: svg(`<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>`),
-  newNote: svg(`<path d="M4.25 2.5h4.6l2.9 2.9v8.1h-7.5z"/><path d="M8 7.2v4M6 9.2h4"/>`),
+  newNote: svg(
+    `<path d="M10.25 7V5.4L7.35 2.5h-3.6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3.5"/><path d="M7.35 2.5v2.9h2.9"/><path d="M11.75 9.25v4.5M9.5 11.5H14"/>`,
+  ),
   newFolder: svg(
-    `<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.4v3.2M6.4 9h3.2"/>`,
+    `<path d="M13.75 7.5v-1a1 1 0 0 0-1-1H7.6L6.1 3.5H3.25a1 1 0 0 0-1 1v7.25a1 1 0 0 0 1 1h4.5"/><path d="M11.75 9.25v4.5M9.5 11.5H14"/>`,
   ),
   more: svg(`<circle cx="3.5" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="12.5" cy="8" r=".6"/>`),
-  collapse: svg(`<path d="m5 3 3 3 3-3M5 13l3-3 3 3"/>`),
+  collapse: svg(`<path d="M2.5 8h11"/><path d="m5.5 2.5 2.5 2.5 2.5-2.5"/><path d="m5.5 13.5 2.5-2.5 2.5 2.5"/>`),
   sun: svg(
     `<circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/>`,
   ),
