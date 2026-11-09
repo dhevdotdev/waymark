@@ -264,6 +264,7 @@ try {
   await page.mouse.up();
   await pause(200);
   check("selecting text offers formatting", (await page.locator(".edit-bubble-btn").count()) === 6);
+  check("the toolbar is on screen", (await page.locator(".edit-bubble").boundingBox()).y > 0);
   await page.locator(".edit-bubble-btn.is-bold").click();
   await saved();
   await pause(600);

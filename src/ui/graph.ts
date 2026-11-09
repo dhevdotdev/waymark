@@ -480,6 +480,9 @@ export class GraphCanvas {
     const groupAlpha = focus || this.filter ? 0 : this.spot !== null ? 1 : clamp01((2.2 - k) / 0.4);
     if (groupAlpha > 0) {
       const size = 12.5 / k;
+      const view = ctx.getTransform();
+      const edgeLeft = -view.e / view.a;
+      const edgeRight = (ctx.canvas.width - view.e) / view.a;
       ctx.font = `600 ${size}px ${p.font}`;
       for (const g of this.groups) {
         const c = centres.get(g.id);
@@ -488,11 +491,12 @@ export class GraphCanvas {
         const w = ctx.measureText(text).width;
         const gap = 8 / k;
         const choices = [c.top - gap - size, c.bottom + gap];
-        const boxFor = (y: number): Box => [c.x - w / 2 - pad, y - pad, c.x + w / 2 + pad, y + size + pad];
+        const x = Math.min(Math.max(c.x, edgeLeft + w / 2 + pad), edgeRight - w / 2 - pad);
+        const boxFor = (y: number): Box => [x - w / 2 - pad, y - pad, x + w / 2 + pad, y + size + pad];
         const y = choices.find((v) => !placed.some((b) => hits(boxFor(v), b)));
         if (y === undefined) continue;
         placed.push(boxFor(y));
-        halo(text, c.x, y, p.label, groupAlpha);
+        halo(text, x, y, p.label, groupAlpha);
       }
     }
 

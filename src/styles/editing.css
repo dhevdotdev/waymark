@@ -445,7 +445,7 @@
   color: var(--ink-2);
   font-size: 0.8125rem;
 }
-.pane-head:has(.edit-banner:not([hidden])) .crumbs {
+.pane-head:has(.edit-banner:not([hidden])) :is(.crumbs, .edit-state) {
   display: none;
 }
 .edit-banner[hidden] {
@@ -648,7 +648,7 @@ button.task-box:focus-visible {
   border: 0;
   border-radius: var(--r-control);
   background: var(--fill);
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 0.8125rem;
   cursor: default;
 }
@@ -995,4 +995,8 @@ button.task-box:focus-visible {
 
 .context-item.is-danger {
   color: var(--danger-ink);
+}
+
+:root[data-scheme="dark"] .doc-editing .cm-callout {
+  background: color-mix(in oklab, var(--c) calc(var(--tint) * 1.6), var(--paper));
 }

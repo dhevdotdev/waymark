@@ -334,30 +334,7 @@ export class GitPanel {
     const backup = this.backupLine();
     if (backup) summary.append(backup);
 
-    const actions = el("div", "sync-actions");
-    const btn = (label: string, primary: boolean, enabled: boolean, onClick: () => void, hint?: string) => {
-      const b = el("button", primary ? "btn btn-primary" : "btn", label);
-      b.disabled = !enabled || this.busy;
-      b.onclick = onClick;
-      if (hint) b.title = hint;
-      actions.append(b);
-      return b;
-    };
-    btn(
-      "Sync",
-      st.files.length === 0,
-      true,
-      () => void this.sync(),
-      "Fetch, then apply incoming commits when that is a fast-forward",
-    );
-    btn(
-      `Push${st.ahead ? ` ${st.ahead}` : ""}`,
-      false,
-      st.ahead > 0 && st.behind === 0,
-      () => void this.push(),
-      st.behind ? "Sync first" : undefined,
-    );
-    summary.append(actions);
+    summary.append(this.syncActions(st));
     root.append(summary);
 
     if (this.state.kind === "error") root.append(this.explain(this.state.error));
@@ -393,6 +370,36 @@ export class GitPanel {
       box?.focus({ preventScroll: true });
       box?.setSelectionRange(typing.selectionStart, typing.selectionEnd);
     }
+  }
+
+  private syncActions(st: GitStatus): HTMLElement {
+    const actions = el("div", "sync-actions");
+    const btn = (label: string, primary: boolean, enabled: boolean, onClick: () => void, hint?: string) => {
+      const b = el("button", primary ? "btn btn-primary" : "btn", label);
+      b.disabled = !enabled || this.busy;
+      b.onclick = onClick;
+      if (hint) b.title = hint;
+      actions.append(b);
+      return b;
+    };
+    const blocked = (st.ahead > 0 && st.behind > 0) || Boolean(st.operation);
+    if (blocked)
+      btn("Open in Terminal", true, true, () => void native.openTerminal(), "Resolve it there, where Git can ask you what to do");
+    btn(
+      blocked ? "Check again" : "Sync",
+      st.files.length === 0 && !blocked,
+      true,
+      () => void this.sync(),
+      blocked ? "Fetch and look again" : "Fetch, then apply incoming commits when that is a fast-forward",
+    );
+    btn(
+      `Push${st.ahead ? ` ${st.ahead}` : ""}`,
+      false,
+      st.ahead > 0 && st.behind === 0,
+      () => void this.push(),
+      st.behind ? "Sync first" : undefined,
+    );
+    return actions;
   }
 
   /** When the last backup ran and whether it got as far as the remote. Present only once backups are in use. */

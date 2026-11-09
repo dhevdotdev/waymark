@@ -49,7 +49,7 @@ export function nameInPlace(row: HTMLElement, options: InlineNameOptions): Promi
     input.addEventListener("blur", () => finish(accepted() && problem(typed()) === null ? typed() : null));
     row.replaceWith(editor);
     input.focus();
-    input.select();
+    input.setSelectionRange(0, input.value.length, "backward");
     input.scrollLeft = 0;
   });
 }

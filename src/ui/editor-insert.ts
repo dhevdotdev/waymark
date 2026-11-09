@@ -221,11 +221,10 @@ function slashSource(options: InsertOptions) {
       boost: 99 - position,
       apply: (view, _completion, _from, to) => apply(view, slash, to, options),
     });
-    return {
-      from: slash + 1,
-      options: items.map(entry),
-      validFor: /^[\w-]*$/,
-    };
+    /* Filtered here rather than by the fuzzy ranking, so a block keeps its place in the list as you type. */
+    const query = state.sliceDoc(slash + 1, context.pos).toLowerCase();
+    const shown = items.filter(([label, keywords]) => `${label} ${keywords}`.toLowerCase().includes(query));
+    return { from: slash + 1, options: shown.map(entry), filter: false };
   };
 }
 

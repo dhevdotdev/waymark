@@ -509,6 +509,9 @@
   font-size: var(--text-small);
   line-height: 1.6;
 }
+:root[data-scheme="dark"] .callout {
+  background: color-mix(in oklab, var(--c) calc(var(--tint) * 1.6), var(--paper));
+}
 .callout[data-callout="abstract"] {
   --c: var(--c-abstract);
 }

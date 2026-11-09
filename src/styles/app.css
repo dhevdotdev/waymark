@@ -907,7 +907,7 @@ kbd {
     color var(--t-hover) ease;
 }
 .trail-node.is-on-path {
-  --trail-ink: var(--accent);
+  --trail-ink: var(--accent-ink);
   background: color-mix(in oklab, var(--accent) 5%, var(--paper));
 }
 .trail-node.is-current {
@@ -957,7 +957,7 @@ kbd {
     --trail-ink: var(--ink);
   }
   .trail-node.is-on-path:not(.is-current):hover {
-    --trail-ink: var(--accent);
+    --trail-ink: var(--accent-ink);
     background: color-mix(in oklab, var(--accent) 12%, var(--paper));
   }
 }

@@ -452,7 +452,7 @@ export class NoteEditing {
     banner.hidden = !(state.kind === "conflict" || state.kind === "missing" || state.kind === "failed");
     banner.replaceChildren();
     if (state.kind === "conflict") {
-      text.textContent = "This note changed outside this editor. Your version is safe here.";
+      text.textContent = "Changed outside this editor. Yours is safe here.";
       const compare = button("Compare", true, () => void this.compare(session));
       compare.dataset.tip = "See both versions before choosing";
       const both = button("Keep both", false, () => void this.keepBoth(session, state.disk));

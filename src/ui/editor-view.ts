@@ -10,13 +10,15 @@ import {
   StateEffect,
   StateField,
 } from "@codemirror/state";
-import { EditorView, keymap, placeholder, showTooltip, type Tooltip, ViewPlugin } from "@codemirror/view";
+import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
 import { findPanel } from "./editor-find";
 import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
+
+const STATUS_BAR_ROOM = 34;
 
 const External = Annotation.define<boolean>();
 const GRAMMAR_WAIT_MS = 400;
@@ -145,6 +147,31 @@ function bubbleFor(state: EditorState): Tooltip | null {
   };
 }
 
+/**
+ * Keeps the line being written away from the window's edges. This is not done
+ * with CodeMirror's scroll margins, because it hides any tooltip inside them,
+ * which took the selection toolbar and the slash menu away near the edges.
+ */
+const caretRoom = EditorView.updateListener.of((update) => {
+  const fromKeys = update.transactions.some(
+    (tr) =>
+      tr.isUserEvent("input") || tr.isUserEvent("delete") || (tr.isUserEvent("select") && !tr.isUserEvent("select.pointer")),
+  );
+  const scroller = update.view.dom.closest<HTMLElement>(".scroller");
+  if (!fromKeys || !scroller || !update.view.hasFocus) return;
+  update.view.requestMeasure({
+    read: (view) => view.coordsAtPos(view.state.selection.main.head),
+    write: (caret) => {
+      if (!caret) return;
+      const box = scroller.getBoundingClientRect();
+      const below = caret.bottom - (box.bottom - window.innerHeight * CARET_MARGIN_BOTTOM);
+      const above = box.top + CARET_MARGIN_TOP - caret.top;
+      if (below > 0) scroller.scrollTop += below;
+      else if (above > 0) scroller.scrollTop -= above;
+    },
+  });
+});
+
 /** Offered once a mouse selection is finished, so it never trails the pointer or interrupts someone selecting by keyboard. */
 const bubbleField = StateField.define<Tooltip | null>({
   create: () => null,
@@ -265,14 +292,27 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         editorInsert(options),
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
         search({ top: true, createPanel: findPanel }),
+        tooltips({
+          tooltipSpace: (v) => {
+            const box = v.dom.ownerDocument.documentElement.getBoundingClientRect();
+            return {
+              top: box.top,
+              left: box.left,
+              right: box.right,
+              bottom: box.bottom - STATUS_BAR_ROOM,
+              x: 0,
+              y: 0,
+              width: box.width,
+              height: box.height - STATUS_BAR_ROOM,
+              toJSON: () => null,
+            };
+          },
+        }),
         bubbleField,
         bubbleAfterPointer,
         bubbleButtons,
         placeholder("Start writing, or type / for blocks"),
-        EditorView.scrollMargins.of((view) => ({
-          top: CARET_MARGIN_TOP,
-          bottom: Math.round(view.scrollDOM.ownerDocument.defaultView!.innerHeight * CARET_MARGIN_BOTTOM),
-        })),
+        caretRoom,
         clickHandlers(options),
         keymap.of([
           { key: "Mod-Shift-v", run: pastePlain },

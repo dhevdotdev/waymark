@@ -106,7 +106,7 @@ function parseView(raw: unknown, index: number): BaseView {
     }
   } catch (error) {
     if (!(error instanceof Unsupported)) throw error;
-    view.problem = `Waymark cannot evaluate ${error.message}, so this view is not shown.`;
+    view.problem = `Waymark cannot evaluate ${error.message}, so this view is not shown. Change it in another editor to see it here.`;
   }
   return view;
 }
@@ -129,7 +129,7 @@ export function parseBase(text: string): ParsedBase {
       base.filter = parseFilter(raw.filters);
     } catch (error) {
       if (!(error instanceof Unsupported)) throw error;
-      base.problem = `Waymark cannot evaluate ${error.message}, so this file's views are not shown.`;
+      base.problem = `Waymark cannot evaluate ${error.message}, so this file's views are not shown. Change that filter in another editor to see them here.`;
     }
   }
   if (isRecord(raw.properties)) {
