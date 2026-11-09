@@ -86,6 +86,10 @@ await writeFile(file("Table.md"), TABLE);
 await writeFile(file("Mixed.md"), "one\r\ntwo\nthree\r\n");
 await writeFile(file("Blocks.md"), BLOCKS);
 await writeFile(
+  file("Anchored.md"),
+  `# Anchored\n\n${Array.from({ length: 60 }, (_, i) => `Paragraph number ${i} has enough words in it to fill out a line of the column for the test.\n\n${i % 7 === 0 ? `## Section ${i}\n\n` : ""}`).join("")}`,
+);
+await writeFile(
   file("Long para.md"),
   "- The idea here is to build apps that would help boost my identity in particular. i show myself as a java developer but i have been doing whatever i feel like so it is not really ideal because of the projects i keep making\n",
 );
@@ -186,7 +190,30 @@ try {
     !(await page.locator(".pane-meta").isVisible()) && (await page.locator(".edit-state").isVisible()),
   );
   check("the status bar counts words", /Ln \d+, Col \d+ · [\d,]+ words/.test(await page.textContent(".status-stats")));
-  check("heading marks are hidden off the line", !(await page.locator(".cm-content").textContent()).includes("## Third heading"));
+  const headingMark = page.locator(".cm-line", { hasText: "Third heading" }).locator(".cm-hang");
+  const markOpacity = () => headingMark.evaluate((mark) => getComputedStyle(mark).opacity);
+  const headingLeft = () =>
+    page.locator(".cm-line", { hasText: "Third heading" }).evaluate((line) => {
+      const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node && !node.textContent.includes("Third")) node = walker.nextNode();
+      const range = document.createRange();
+      range.setStart(node, 0);
+      range.setEnd(node, 1);
+      return range.getBoundingClientRect().left;
+    });
+  check("heading marks are hidden off the line", (await markOpacity()) === "0", await markOpacity());
+  const headingAway = await headingLeft();
+  await page.locator(".cm-line", { hasText: "Third heading" }).click();
+  await pause(120);
+  check("heading marks show on the line", (await markOpacity()) === "1", await markOpacity());
+  check(
+    "showing them does not move the heading",
+    Math.abs((await headingLeft()) - headingAway) < 0.5,
+    `${headingAway} ${await headingLeft()}`,
+  );
+  await page.locator(".cm-line", { hasText: "Last line." }).click();
+  await pause(120);
   check("bold marks are hidden off the line", !(await page.locator(".cm-content").textContent()).includes("**bold**"));
   check("a task shows as a box", (await page.locator(".cm-task").count()) >= 4);
   check("the wikilink is shown as a link", (await page.locator('.cm-wikilink:has-text("Welcome")').count()) === 1);
@@ -222,6 +249,16 @@ try {
   await page.locator(".cm-line", { hasText: "Last line." }).click();
   await page.keyboard.press("End");
   await page.keyboard.press("Shift+Home");
+  await pause(200);
+  check("selecting by keyboard stays out of the way", (await page.locator(".edit-bubble-btn").count()) === 0);
+  await page.keyboard.press("ArrowRight");
+  const lastLine = await page.locator(".cm-line", { hasText: "Last line." }).boundingBox();
+  await page.mouse.move(lastLine.x + 1, lastLine.y + lastLine.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(lastLine.x + 300, lastLine.y + lastLine.height / 2, { steps: 6 });
+  await pause(60);
+  check("the toolbar waits for a mouse selection to finish", (await page.locator(".edit-bubble-btn").count()) === 0);
+  await page.mouse.up();
   await pause(200);
   check("selecting text offers formatting", (await page.locator(".edit-bubble-btn").count()) === 6);
   await page.locator(".edit-bubble-btn.is-bold").click();
@@ -653,8 +690,8 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.type(" more");
   await pause(100);
-  await page.keyboard.press("Shift+Home");
-  await pause(200);
+  await page.locator(".cm-line", { hasText: "The idea" }).click({ clickCount: 2 });
+  await pause(250);
   const bubbleAlpha = await page.locator(".edit-bubble").evaluate((bubble) => {
     const canvas = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
     canvas.fillStyle = getComputedStyle(bubble).backgroundColor;
@@ -666,6 +703,48 @@ try {
   await saved();
   await page.keyboard.press("Meta+e");
   await pause(200);
+
+  await openNote("Anchored");
+  const topText = () =>
+    page.evaluate(() => {
+      let scroller = document.querySelector(".doc");
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight + 10) scroller = scroller.parentElement;
+      const box = scroller.getBoundingClientRect();
+      const blocks = [...document.querySelectorAll(".doc p, .doc h2, .cm-line")].filter((b) =>
+        /(?:Paragraph number|Section) \d+/.test(b.textContent),
+      );
+      const first = blocks.find((b) => b.getBoundingClientRect().top >= box.top);
+      return {
+        text: first.textContent.match(/(?:Paragraph number|Section) \d+/)[0],
+        y: Math.round(first.getBoundingClientRect().top),
+      };
+    });
+  await page.evaluate(() => {
+    let node = document.querySelector(".doc");
+    while (node && node.scrollHeight <= node.clientHeight + 10) node = node.parentElement;
+    node.scrollTop = 2400;
+  });
+  await pause(150);
+  const beforeEdit = await topText();
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(300);
+  const inEdit = await topText();
+  check("switching to Edit keeps the same text in view", beforeEdit.text === inEdit.text, `${beforeEdit.text} ${inEdit.text}`);
+  check("in the same place on screen", Math.abs(beforeEdit.y - inEdit.y) <= 12, `${beforeEdit.y} ${inEdit.y}`);
+  const statusText = () => page.textContent(".edit-state");
+  await page.keyboard.type("a");
+  await pause(40);
+  check("a fast save never flashes Saving", (await statusText()).startsWith("Saved"), await statusText());
+  await saved();
+  await page.keyboard.press("Backspace");
+  await saved();
+  const editTop = await topText();
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc-title");
+  await pause(300);
+  const inRead = await topText();
+  check("switching back keeps the same text in view", editTop.text === inRead.text, `${editTop.text} ${inRead.text}`);
 
   await openNote("Broken blocks");
   await page.keyboard.press("Meta+e");
@@ -729,9 +808,12 @@ try {
   check("a lone dollar and code are not math", (await editText()).includes("$5") && (await editText()).includes("$code$"));
   check("drawing changes nothing on disk", (await disk("Blocks.md")) === BLOCKS);
 
-  await line2("Inline").click();
+  await line2("Inline").click({ position: { x: 4, y: 10 } });
   await pause(200);
-  check("math shows its source on the cursor's line", (await editText()).includes("$a^2+b^2$"));
+  check("math stays drawn while the cursor is elsewhere on its line", !(await editText()).includes("$a^2+b^2$"));
+  await page.locator(".cm-math-inline").first().click();
+  await pause(200);
+  check("math shows its source when the cursor reaches it", (await editText()).includes("$a^2+b^2$"));
   await line2("After blocks").click();
   await pause(200);
   check("and is drawn again after leaving it", !(await editText()).includes("$a^2+b^2$"));

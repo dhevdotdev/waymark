@@ -7,17 +7,21 @@ import {
   EditorSelection,
   EditorState,
   type Extension,
+  StateEffect,
   StateField,
-  type Transaction,
 } from "@codemirror/state";
-import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
+import { EditorView, keymap, placeholder, showTooltip, type Tooltip, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
 import { editorInsert, type InsertOptions } from "./editor-insert";
+import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
 
 const External = Annotation.define<boolean>();
 const GRAMMAR_WAIT_MS = 400;
+const ALIGN_FRAMES = 6;
+const CARET_MARGIN_TOP = 96;
+const CARET_MARGIN_BOTTOM = 0.3;
 
 export interface EditorStats {
   line: number;
@@ -47,6 +51,10 @@ export interface EditorHandle {
   setFrozen(frozen: boolean): void;
   /** Draws again after code colours changed. */
   redraw(): void;
+  /** The 0-based line at the top of `scroller`, and how far below its top edge that line sits. */
+  topLine(scroller: HTMLElement): { line: number; offset: number };
+  /** Scrolls so a 0-based line sits `offset` pixels below the top of `scroller`. */
+  showLine(scroller: HTMLElement, line: number, offset: number): void;
   destroy(): void;
 }
 
@@ -108,16 +116,18 @@ function prefixLines(view: EditorView, prefix: string): boolean {
   return true;
 }
 
-const BUBBLE: [label: string, title: string, run: (view: EditorView) => boolean][] = [
+const BUBBLE: [face: string, title: string, run: (view: EditorView) => boolean][] = [
   ["B", "Bold", (v) => wrap(v, "**")],
   ["I", "Italic", (v) => wrap(v, "*")],
   ["S", "Strikethrough", (v) => wrap(v, "~~")],
-  ["Code", "Inline code", (v) => wrap(v, "`")],
-  ["Link", "Link", addLink],
-  ["Quote", "Quote", (v) => prefixLines(v, "> ")],
+  [icons.code, "Inline code", (v) => wrap(v, "`")],
+  [icons.link, "Link", addLink],
+  [icons.quote, "Quote", (v) => prefixLines(v, "> ")],
 ];
 
-function selectionBubble(state: EditorState): Tooltip | null {
+const showBubble = StateEffect.define<boolean>();
+
+function bubbleFor(state: EditorState): Tooltip | null {
   const range = state.selection.main;
   if (range.empty) return null;
   return {
@@ -134,19 +144,39 @@ function selectionBubble(state: EditorState): Tooltip | null {
   };
 }
 
+/** Offered once a mouse selection is finished, so it never trails the pointer or interrupts someone selecting by keyboard. */
 const bubbleField = StateField.define<Tooltip | null>({
-  create: selectionBubble,
-  update: (value, tr: Transaction) => (tr.docChanged || tr.selection ? selectionBubble(tr.state) : value),
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) if (effect.is(showBubble)) return effect.value ? bubbleFor(tr.state) : null;
+    return tr.docChanged || tr.selection ? null : value;
+  },
   provide: (field) => showTooltip.compute([field], (state) => state.field(field)),
+});
+
+const bubbleAfterPointer = ViewPlugin.define((view) => {
+  const finish = () => view.dispatch({ effects: showBubble.of(true) });
+  const start = (event: MouseEvent) => {
+    if (event.button === 0 && !(event.target as HTMLElement).closest(".cm-table-widget, .cm-tooltip"))
+      window.addEventListener("mouseup", finish, { once: true });
+  };
+  view.contentDOM.addEventListener("mousedown", start);
+  return {
+    destroy() {
+      view.contentDOM.removeEventListener("mousedown", start);
+      window.removeEventListener("mouseup", finish);
+    },
+  };
 });
 
 const bubbleButtons = EditorView.updateListener.of((update) => {
   for (const dom of update.view.dom.querySelectorAll<HTMLElement>(".edit-bubble:empty")) {
-    for (const [label, title, run] of BUBBLE) {
+    for (const [face, title, run] of BUBBLE) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = label;
+      button.innerHTML = face;
       button.title = title;
+      button.setAttribute("aria-label", title);
       button.className = `edit-bubble-btn is-${title.split(" ")[0].toLowerCase()}`;
       button.addEventListener("mousedown", (e) => {
         e.preventDefault();
@@ -235,7 +265,13 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
         search({ top: true }),
         bubbleField,
+        bubbleAfterPointer,
         bubbleButtons,
+        placeholder("Start writing, or type / for blocks"),
+        EditorView.scrollMargins.of((view) => ({
+          top: CARET_MARGIN_TOP,
+          bottom: Math.round(view.scrollDOM.ownerDocument.defaultView!.innerHeight * CARET_MARGIN_BOTTOM),
+        })),
         clickHandlers(options),
         keymap.of([
           { key: "Mod-b", run: (v) => wrap(v, "**") },
@@ -295,6 +331,22 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       if (!frozen && focusedBeforeFreeze) view.focus();
     },
     redraw,
+    topLine(scroller) {
+      const top = scroller.getBoundingClientRect().top;
+      const block = view.lineBlockAtHeight(top - view.documentTop);
+      return { line: view.state.doc.lineAt(block.from).number - 1, offset: view.documentTop + block.top - top };
+    },
+    showLine(scroller, line, offset) {
+      const { doc } = view.state;
+      const at = doc.line(Math.min(doc.lines, line + 1)).from;
+      /* Heights off screen are estimates until drawn, so the first jump lands close and the next frames correct it. */
+      const align = (frames: number) => {
+        const off = view.documentTop + view.lineBlockAt(at).top - scroller.getBoundingClientRect().top - offset;
+        scroller.scrollTop += off;
+        if (frames > 0 && !view.composing) requestAnimationFrame(() => align(frames - 1));
+      };
+      align(ALIGN_FRAMES);
+    },
     destroy() {
       clearTimeout(grammarWait);
       view.destroy();

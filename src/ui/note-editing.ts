@@ -38,6 +38,27 @@ const TYPE_EXTENSION: Record<string, string> = {
   "image/webp": "webp",
 };
 const SHOWN_AS_IMAGE = /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i;
+interface ScrollAnchor {
+  line: number;
+  offset: number;
+}
+
+const readingBlocks = (scroller: HTMLElement) => [...scroller.querySelectorAll<HTMLElement>(".doc [data-line]")];
+
+/** The block at the top of the reading view and how far below the top edge it sits. Null at the very top of a note. */
+function readingAnchor(scroller: HTMLElement): ScrollAnchor | null {
+  if (scroller.scrollTop <= 0) return null;
+  const top = scroller.getBoundingClientRect().top;
+  const block = readingBlocks(scroller).find((candidate) => candidate.getBoundingClientRect().bottom > top);
+  return block ? { line: Number(block.dataset.line), offset: block.getBoundingClientRect().top - top } : null;
+}
+
+function showReadingLine(scroller: HTMLElement, { line, offset }: ScrollAnchor): void {
+  const block = readingBlocks(scroller).findLast((candidate) => Number(candidate.dataset.line) <= line);
+  if (block) scroller.scrollTop += block.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset;
+}
+
+const SLOW_SAVE_MS = 900;
 const STATE_LABEL: Record<DraftState["kind"], string> = {
   saved: "Saved",
   unsaved: "Saving…",
@@ -57,6 +78,7 @@ function stamp(compact = false): string {
 
 /** Everything that changes a note: clicking a task, and editing one note at a time. */
 export class NoteEditing {
+  private savingLabel: ReturnType<typeof setTimeout> | undefined;
   private session: Session | null = null;
   private opening = false;
   private toggling = false;
@@ -110,9 +132,11 @@ export class NoteEditing {
   async finish(): Promise<void> {
     const { scroller } = this.host.els;
     const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+    const anchor = scroller.scrollTop > 0 ? this.session?.editor.topLine(scroller) : undefined;
     if (!(await this.close())) return;
     await this.host.reshow();
     scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight);
+    if (anchor) showReadingLine(scroller, anchor);
   }
 
   async open(options: { focusTitle?: boolean } = {}): Promise<void> {
@@ -132,6 +156,7 @@ export class NoteEditing {
       await highlighter.prepare(text);
       if (notePath() !== path) return;
       const { scroller } = els;
+      const anchor = readingAnchor(scroller);
       const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
       const title = scroller.querySelector(".doc-title")?.textContent ?? vault.index.title(path);
       const { page, banner, surface, heading } = this.mountPage(title);
@@ -172,6 +197,7 @@ export class NoteEditing {
       this.showState(draft.state);
       this.markMode(true);
       scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight);
+      if (anchor) editor.showLine(scroller, anchor.line, anchor.offset);
       const box = surface.getBoundingClientRect();
       editor.placeCursorAt(box.left + 8, Math.max(box.top, scroller.getBoundingClientRect().top) + 12);
       if (options.focusTitle) {
@@ -408,8 +434,15 @@ export class NoteEditing {
 
   private showState(state: DraftState): void {
     const { editState } = this.host.els;
-    editState.textContent = STATE_LABEL[state.kind];
     editState.dataset.state = state.kind;
+    clearTimeout(this.savingLabel);
+    const show = () => {
+      editState.textContent = STATE_LABEL[state.kind];
+      editState.dataset.shown = state.kind;
+    };
+    /* Autosave is usually instant, so "Saving…" appears only if it is taking long enough to matter. */
+    if (state.kind === "unsaved" || state.kind === "saving") this.savingLabel = setTimeout(show, SLOW_SAVE_MS);
+    else show();
     const banner = this.session?.banner;
     if (banner) this.renderBanner(banner, state);
   }

@@ -16,6 +16,7 @@ const RENDERER_DATA = new Set([
   "data-callout",
   "data-type",
   "data-lang",
+  "data-line",
   "data-lines",
   "data-diagram",
   "data-src",

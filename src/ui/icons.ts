@@ -25,6 +25,11 @@ export const icons = {
   newFolder: svg(
     `<path d="M13.75 7.5v-1a1 1 0 0 0-1-1H7.6L6.1 3.5H3.25a1 1 0 0 0-1 1v7.25a1 1 0 0 0 1 1h4.5"/><path d="M11.75 9.25v4.5M9.5 11.5H14"/>`,
   ),
+  code: svg(`<path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/>`),
+  link: svg(
+    `<path d="M6.5 9.5a2.8 2.8 0 0 0 4 0l2-2a2.8 2.8 0 0 0-4-4l-.8.8"/><path d="M9.5 6.5a2.8 2.8 0 0 0-4 0l-2 2a2.8 2.8 0 0 0 4 4l.8-.8"/>`,
+  ),
+  quote: svg(`<path d="M6.5 5H3.5v3.5h3zM6.5 8.5c0 2-1 3-2.5 3M12.5 5h-3v3.5h3zM12.5 8.5c0 2-1 3-2.5 3"/>`),
   grip: svg(
     `<circle cx="6" cy="4" r=".5"/><circle cx="10" cy="4" r=".5"/><circle cx="6" cy="8" r=".5"/><circle cx="10" cy="8" r=".5"/><circle cx="6" cy="12" r=".5"/><circle cx="10" cy="12" r=".5"/>`,
   ),

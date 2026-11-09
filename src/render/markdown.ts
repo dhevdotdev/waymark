@@ -50,6 +50,7 @@ export function createMarkdown(): MarkdownIt {
   md.core.ruler.after("block", "callouts", calloutRule);
   md.core.ruler.after("inline", "task_lists", taskListRule);
   md.core.ruler.push("heading_ids", headingRule);
+  md.core.ruler.push("line_anchors", lineAnchorRule);
 
   md.renderer.rules.task_box = (tokens, i, _opts, env) => {
     const { done, line } = tokens[i].meta as { done: boolean; line: number };
@@ -76,7 +77,7 @@ export function createMarkdown(): MarkdownIt {
     const open = findOpen(tokens, i, "blockquote_open");
     return open?.meta?.callout ? `</div></div></div>` : self.renderToken(tokens, i, opts);
   };
-  md.renderer.rules.table_open = () => `<div class="table-wrap" tabindex="0"><table>`;
+  md.renderer.rules.table_open = (tokens, i) => `<div class="table-wrap" tabindex="0"${lineAttr(tokens[i])}><table>`;
   md.renderer.rules.table_close = () => `</table></div>`;
 
   const defaultImage = md.renderer.rules.image!;
@@ -193,6 +194,16 @@ function calloutRule(state: StateCore): void {
   }
 }
 
+/** Marks each top-level block with its line in the file, so Read and Edit can keep the same text in view. */
+function lineAnchorRule(state: StateCore): void {
+  const offset = (state.env as unknown as RenderEnv).taskLineOffset;
+  if (offset === null || offset === undefined) return;
+  for (const token of state.tokens) {
+    if (token.level === 0 && token.nesting >= 0 && token.map && token.block)
+      token.attrSet("data-line", String(token.map[0] + offset));
+  }
+}
+
 function headingRule(state: StateCore): void {
   const env = state.env as unknown as RenderEnv;
   const seen = new Map<string, number>();
@@ -288,13 +299,18 @@ function renderFence(md: MarkdownIt, token: Token, env: RenderEnv): string {
   const lang = token.info.trim().split(/\s+/)[0].toLowerCase();
   const code = token.content.replace(/\n$/, "");
   if (lang === "mermaid") {
-    return `<figure class="diagram" data-diagram="mermaid"><pre class="diagram-source">${md.utils.escapeHtml(code)}</pre></figure>`;
+    return `<figure class="diagram"${lineAttr(token)} data-diagram="mermaid"><pre class="diagram-source">${md.utils.escapeHtml(code)}</pre></figure>`;
   }
   const highlighted = lang ? env.highlight(code, lang) : null;
   const body = highlighted ?? `<pre class="shiki plain"><code>${md.utils.escapeHtml(code)}</code></pre>`;
   const lines = code.split("\n").length;
   const textArt = /[\u2500-\u257F]/.test(code) ? " is-text-art" : "";
-  return `<div class="code${textArt}" data-lang="${escapeAttr(lang)}" data-lines="${lines}"><div class="code-bar"><button class="code-copy" type="button" aria-label="Copy code"><span>Copy</span></button></div>${body}</div>`;
+  return `<div class="code${textArt}"${lineAttr(token)} data-lang="${escapeAttr(lang)}" data-lines="${lines}"><div class="code-bar"><button class="code-copy" type="button" aria-label="Copy code"><span>Copy</span></button></div>${body}</div>`;
+}
+
+function lineAttr(token: Token): string {
+  const line = token.attrGet("data-line");
+  return line === null ? "" : ` data-line="${line}"`;
 }
 
 function escapeAttr(s: string): string {

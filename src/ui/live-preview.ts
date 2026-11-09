@@ -124,6 +124,16 @@ class Builder {
     if (from < to && !this.isActive(from)) this.out.push(hide.range(from, to));
   }
 
+  /** Reveals a span's marks only when the cursor is at that span, so moving along a line doesn't shift it. */
+  private hideUntilTouched(spanFrom: number, spanTo: number, from: number, to: number): void {
+    if (from < to && !this.touchesSelection(spanFrom, spanTo)) this.out.push(hide.range(from, to));
+  }
+
+  /** Keeps a block's marks in the margin, so showing them never moves the text they belong to. */
+  private hangMark(from: number, to: number): void {
+    this.out.push(mark(this.isActive(from) ? "cm-hang is-shown" : "cm-hang").range(from, to));
+  }
+
   private withTrailingSpace(to: number): number {
     return this.state.doc.sliceString(to, to + 1) === " " ? to + 1 : to;
   }
@@ -141,7 +151,7 @@ class Builder {
     const heading = HEADING.exec(name);
     if (heading) this.lineClass(from, `cm-h${heading[1]}`);
     else if (INLINE_STYLE[name]) this.out.push(mark(INLINE_STYLE[name]).range(from, to));
-    else if (HIDDEN_MARK.has(name)) this.hideUnlessActive(from, to);
+    else if (HIDDEN_MARK.has(name)) this.hideUntilTouched(ref.node.parent?.from ?? from, ref.node.parent?.to ?? to, from, to);
     else if (name === "Link") return this.link(ref.node);
     else this.block(name, ref);
     return name !== "FencedCode" && name !== "InlineCode";
@@ -163,13 +173,13 @@ class Builder {
   }
 
   private headerMark(parent: string, from: number, to: number): void {
-    if (parent.startsWith("ATX")) this.hideUnlessActive(from, this.withTrailingSpace(to));
+    if (parent.startsWith("ATX")) this.hangMark(from, this.withTrailingSpace(to));
     else this.out.push(mark("cm-syntax").range(from, to));
   }
 
   private inlineCode(node: SyntaxNode): void {
     this.out.push(mark("cm-inline-code").range(node.from, node.to));
-    for (const m of node.getChildren("CodeMark")) this.hideUnlessActive(m.from, m.to);
+    for (const m of node.getChildren("CodeMark")) this.hideUntilTouched(node.from, node.to, m.from, m.to);
   }
 
   private fencedCode(node: SyntaxNode): void {
@@ -223,7 +233,7 @@ class Builder {
 
   private quoteMark(from: number, to: number): void {
     this.lineClass(from, "cm-quote");
-    this.hideUnlessActive(from, this.withTrailingSpace(to));
+    this.hangMark(from, this.withTrailingSpace(to));
   }
 
   private listDepth(node: SyntaxNode): number {
@@ -271,8 +281,8 @@ class Builder {
       const href = this.state.doc.sliceString(url.from, url.to);
       this.out.push(Decoration.mark({ class: "cm-link", attributes: { "data-href": href } }).range(label[0], label[1]));
     }
-    this.hideUnlessActive(marks[0].from, marks[0].to);
-    this.hideUnlessActive(marks[1].from, node.to);
+    this.hideUntilTouched(node.from, node.to, marks[0].from, marks[0].to);
+    this.hideUntilTouched(node.from, node.to, marks[1].from, node.to);
     return false;
   }
 
@@ -303,7 +313,7 @@ class Builder {
   private embedsIn(start: number, text: string): void {
     for (const match of text.matchAll(EMBED)) {
       const at = start + match.index;
-      if (this.isActive(at) || this.inCode(at + 2)) continue;
+      if (this.touchesSelection(at, at + match[0].length) || this.inCode(at + 2)) continue;
       const url = this.options.assetUrl(match[1] ?? decodeURI(match[2]));
       if (url) this.out.push(Decoration.replace({ widget: new ImageWidget(url) }).range(at, at + match[0].length));
     }
@@ -313,7 +323,7 @@ class Builder {
     if (!text.includes("$")) return;
     for (const match of text.matchAll(INLINE_MATH)) {
       const at = start + match.index;
-      if (this.isActive(at) || this.inCode(at + 1)) continue;
+      if (this.touchesSelection(at, at + match[0].length) || this.inCode(at + 1)) continue;
       this.out.push(Decoration.replace({ widget: new MathWidget(match[1], false) }).range(at, at + match[0].length));
     }
   }
@@ -330,8 +340,8 @@ class Builder {
         const link = target + heading;
         this.out.push(Decoration.mark({ class: "cm-wikilink", attributes: { "data-wikilink": link } }).range(shownFrom, shownTo));
       }
-      this.hideUnlessActive(at, shownFrom);
-      this.hideUnlessActive(shownTo, end);
+      this.hideUntilTouched(at, end, at, shownFrom);
+      this.hideUntilTouched(at, end, shownTo, end);
     }
   }
 }
