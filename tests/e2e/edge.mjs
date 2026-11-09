@@ -123,6 +123,8 @@ await withApp({}, async (page, app, { errors }) => {
 await withApp({}, async (page, app, { errors }) => {
   await writeFile(path.join(app.vault, "Tasks.md"), "- [ ] open item\n- [x] done item\n- plain item\n\n1. [ ] numbered item\n");
   await page.goto(`${app.url}?note=Tasks`);
+  await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
+  await page.waitForTimeout(400);
   await page.waitForSelector(".doc .task-box");
   const items = await page.$$eval(".doc ul > li", (lis) =>
     lis.map((li) => {
@@ -137,9 +139,9 @@ await withApp({}, async (page, app, { errors }) => {
   );
   check("task text lines up with bullet text", new Set(items.map((i) => i.left)).size === 1, JSON.stringify(items));
   check("the typed brackets are gone", !(await page.textContent(".doc")).includes("[ ]"));
-  const box = await page.locator(".doc ol .task-box").boundingBox();
+  const boxLeft = await page.locator(".doc ol .task-box").evaluate((box) => box.getBoundingClientRect().left);
   const number = await page.locator(".doc ol li").evaluate((li) => li.getBoundingClientRect().left);
-  check("a numbered task keeps its number clear of the box", box.x >= number, `${box.x} ${number}`);
+  check("a numbered task keeps its number clear of the box", boxLeft >= number, `${boxLeft} ${number}`);
   check("nothing throws on a task list", errors.length === 0, errors[0]);
 });
 
