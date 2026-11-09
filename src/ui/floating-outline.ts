@@ -1,10 +1,12 @@
+const SPY_OFFSET = 96;
+
 export interface OutlineHeading {
   level: number;
   text: string;
   id: string;
 }
 
-/** A dash per heading on the right edge, for reading with the inspector closed. Hovering opens the titles. */
+/** The note's outline: a dash per heading on the right edge. Hovering opens the titles. */
 export class FloatingOutline {
   readonly root = document.createElement("nav");
   private links: HTMLAnchorElement[] = [];
@@ -35,7 +37,20 @@ export class FloatingOutline {
     this.root.hidden = this.links.length < 2;
   }
 
-  setActive(index: number): void {
+  /** Marks the heading being read. */
+  spy(scroller: HTMLElement): void {
+    if (!this.links.length) return;
+    const line = scroller.getBoundingClientRect().top + SPY_OFFSET;
+    let current = 0;
+    this.links.forEach((link, i) => {
+      const heading = document.getElementById(link.dataset.target!);
+      if (heading && heading.getBoundingClientRect().top <= line) current = i;
+    });
+    const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4 && scroller.scrollTop > 0;
+    this.setActive(atEnd ? this.links.length - 1 : current);
+  }
+
+  private setActive(index: number): void {
     if (index === this.active) return;
     this.links[this.active]?.classList.remove("is-active");
     this.links[index]?.classList.add("is-active");

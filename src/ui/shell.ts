@@ -15,7 +15,6 @@ export interface ShellElements {
   editState: HTMLElement;
   modeSwitch: HTMLElement;
   statusStats: HTMLElement;
-  outline: HTMLElement;
   links: HTMLElement;
   info: HTMLElement;
   railBody: HTMLElement;
@@ -84,12 +83,10 @@ function template(options: ShellOptions): string {
       <aside class="rail" aria-label="Inspector">
         <div class="rail-inner">
           <div class="seg seg-full rail-tabs" role="tablist">
-            <button class="seg-btn" role="tab" data-rail="outline">Outline</button>
             <button class="seg-btn" role="tab" data-rail="links">Links</button>
             <button class="seg-btn" role="tab" data-rail="info">Info</button>
           </div>
           <div class="rail-body">
-            <div class="rail-pane rail-outline" data-pane="outline"></div>
             <div class="rail-pane rail-links" data-pane="links"></div>
             <div class="rail-pane rail-info" data-pane="info"></div>
           </div>
@@ -128,7 +125,6 @@ export function mountShell(host: HTMLElement, options: ShellOptions): ShellEleme
     editState: q(".edit-state"),
     modeSwitch: q(".mode-switch"),
     statusStats: q(".status-stats"),
-    outline: q(".rail-outline"),
     links: q(".rail-links"),
     info: q(".rail-info"),
     railBody: q(".rail-body"),

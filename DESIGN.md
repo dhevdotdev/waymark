@@ -9,7 +9,7 @@ Waymark is a client for an Obsidian vault kept in Git, and reading comes first. 
 3. **Keep a reading measure.** Prose stays at 42rem, up to about 85 characters. 37rem read as too narrow on a laptop window. Code blocks and tables keep the prose's left edge and may grow right by 5rem. Diagrams centre on the wider column. Nothing runs edge to edge.
 4. **Use one accent.** Catppuccin mauve marks links, focus, and the current note in the graphs. Callout hues are the only other colours, and they mark the kind of callout.
 5. **Impose no organisation.** Waymark has opinions about how notes look, and none about how they are arranged. It shows the folders on disk and renders Markdown as written. No filename, folder name, heading or frontmatter key has special meaning, except `aliases`, which is how Obsidian links resolve. Frontmatter appears in the Info pane exactly as written.
-6. **Give every kind of thing one home.** Files live in the left tree. The note's location and reading time sit above it, in the pane head. Outline, links and properties live in the inspector on the right, with the local graph pinned below them. Vault state, Git and whole-vault views live in the status bar. The note body holds only the note, and the sidebar column sets where tabs begin.
+6. **Give every kind of thing one home.** Files live in the left tree. The note's location and reading time sit above it, in the pane head. The outline sits on the right edge of the reading pane. Links and properties live in the inspector, with the local graph pinned below them. Vault state, Git and whole-vault views live in the status bar. The note body holds only the note, and the sidebar column sets where tabs begin.
 7. **Fail visibly and safely.** Waymark never resolves a missing link or an ambiguous name by guessing. A missing link is dashed and muted. A name shared by several files is flagged, and Waymark lists the candidates. A diagram that does not parse shows its error above the readable source. A remote image becomes a labelled placeholder and is not fetched.
 
 ## Navigation
@@ -27,7 +27,7 @@ Every state has a visible way in and a visible way out.
 - Read and Edit are a switch at the right of the pane head, because two modes need to be visible. ⌘E flips between them, and reading stays the default.
 - Editing keeps the reading column and type. Syntax appears only on the line being edited, a tick means the disk has it, and the status bar shows line, column and word count.
 - A table in the editor is a real table. Each cell is typed into directly and written back to just that cell's text in the file, and Tab, Enter and the arrows move between cells. Edit as text is there for the odd table that needs it.
-- With the inspector closed, a dash per heading sits on the right edge. Hovering opens the titles. The dashes step aside while editing.
+- The outline is a dash per heading on the right edge, whether or not the inspector is open. Hovering opens the titles. There is one outline, so the inspector has no tab for it. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.
 - Selecting text while editing offers a small formatting bubble. It never appears without a selection.
 - Close controls lead their label on tabs and trail stops, in a 20px target with a 13px icon, the same size as the new-tab plus. Every trail stop has a quiet pill, so its always-visible remove control belongs to something.

@@ -109,7 +109,7 @@ export function readerCommands(r: Reader): Command[] {
       label: "Toggle inspector",
       keys: ["mod+alt+\\"],
       hint: "⌥⌘\\",
-      keywords: "outline linked notes properties",
+      keywords: "linked notes properties",
       run: () => r.toggleRail(),
     },
     {

@@ -23,7 +23,7 @@ export interface Prefs {
   remoteChecksApplied: boolean;
   sidebar: boolean;
   rail: boolean;
-  railPane: "outline" | "links" | "info";
+  railPane: "links" | "info";
   sidebarWidth: number;
 }
 
@@ -39,7 +39,7 @@ const DEFAULTS: Prefs = {
   remoteChecksApplied: true,
   sidebar: true,
   rail: true,
-  railPane: "outline",
+  railPane: "links",
   sidebarWidth: 268,
 };
 
@@ -47,7 +47,7 @@ const LOCAL_KEY = "waymark.prefs";
 
 const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
   appearance: ["system", "light", "dark"],
-  railPane: ["outline", "links", "info"],
+  railPane: ["links", "info"],
 };
 
 /** Read from disk or browser storage, so each key is checked and falls back to its own default. */

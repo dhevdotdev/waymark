@@ -60,7 +60,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
     [".diagram-expand", (el) => lightbox(el.closest(".diagram")!.querySelector("svg")!.cloneNode(true) as Element)],
     ["img.embed-image", (el) => lightbox(el.cloneNode() as Element)],
     [
-      ".outline a, .floating-outline a",
+      ".floating-outline a",
       (el, e) => {
         e.preventDefault();
         document

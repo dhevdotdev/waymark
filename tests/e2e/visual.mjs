@@ -34,7 +34,7 @@ async function capture(page, dir, scheme) {
   await shot("links");
   await page.click('[data-rail="info"]');
   await shot("info");
-  await page.click('[data-rail="outline"]');
+  await page.click('[data-rail="links"]');
   await page.keyboard.press("Meta+k");
   await shot("palette");
   await page.keyboard.type("tide");

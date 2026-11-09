@@ -28,6 +28,10 @@ describe("PrefStore.load", () => {
     expect((await load({ appearance: "neon", railPane: "elsewhere" })).appearance).toBe("system");
   });
 
+  it("moves a saved Outline tab to Links now that the inspector has no outline", async () => {
+    expect((await load({ railPane: "outline" })).railPane).toBe("links");
+  });
+
   it("survives malformed JSON", async () => {
     localStorage.setItem(KEY, "{broken");
     const store = new PrefStore();

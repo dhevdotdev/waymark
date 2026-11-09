@@ -291,7 +291,7 @@ await page.click('[data-rail="links"]');
 await pause(120);
 const backlinks = await page.locator(".rail-links .rail-link:visible").count();
 check("the Links pane lists connected notes", backlinks > 0, `${backlinks}`);
-await page.click('[data-rail="outline"]');
+await page.click('[data-rail="links"]');
 const railGraph = await page.evaluate(() => document.querySelector(".local-graph canvas")?.getBoundingClientRect().height ?? 0);
 check("local graph renders in the rail", railGraph > 100, `${railGraph}px`);
 
@@ -514,7 +514,7 @@ check(
 await page.click('[data-rail="info"]');
 await pause(150);
 check("the Info pane has a history section", (await page.textContent(".rail-history")).includes("History"));
-await page.click('[data-rail="outline"]');
+await page.click('[data-rail="links"]');
 
 const tabsBefore = await page.locator(".tab").count();
 const noteBefore = await title();

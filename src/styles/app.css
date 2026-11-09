@@ -1116,29 +1116,6 @@ kbd {
     color: var(--ink);
   }
 }
-.outline a {
-  display: block;
-  padding: 3px 8px;
-  color: var(--chrome-ink-3);
-  text-decoration: none;
-  border-radius: var(--r-control);
-  transition:
-    color var(--t-hover) ease,
-    background-color var(--t-hover) ease;
-  text-wrap: pretty;
-}
-.outline a.l3 {
-  padding-left: 20px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .outline a:hover {
-    color: var(--ink);
-    background: var(--row-hover);
-  }
-}
-.outline a.is-active {
-  color: var(--ink);
-}
 .rail-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

@@ -278,6 +278,9 @@ try {
   check("it says why", (await page.textContent("body")).includes("line endings"));
 
   await openNote("Tasks");
+  check("there is one outline, not an inspector tab as well", (await page.locator('[data-rail="outline"]').count()) === 0);
+  check("the inspector opens on Links", await page.locator('[data-rail="links"].is-on').isVisible());
+  check("the outline shows with the inspector open", await page.locator(".floating-outline").isVisible());
   if (await page.locator(".shell:not(.rail-closed)").count()) await page.keyboard.press("Meta+Alt+\\");
   await pause(400);
   const outline = page.locator(".floating-outline");
@@ -311,7 +314,7 @@ try {
   await pause(300);
   await page.keyboard.press("Meta+Alt+\\");
   await pause(400);
-  check("the outline leaves when the inspector opens", !(await outline.isVisible()));
+  check("the outline stays when the inspector opens", await outline.isVisible());
 
   await page.keyboard.press("Meta+t");
   await pause(300);

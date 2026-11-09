@@ -340,7 +340,7 @@ button.task-box:focus-visible {
 
 .floating-outline {
   position: absolute;
-  inset-inline-end: 8px;
+  inset-inline-end: 2px;
   inset-block-start: 50%;
   translate: 0 -50%;
   z-index: 3;
@@ -354,7 +354,7 @@ button.task-box:focus-visible {
   border-radius: var(--r-control);
   scrollbar-width: none;
 }
-.shell.rail-closed:not(.is-graph, .is-blank, .is-editing) .floating-outline:not([hidden]) {
+.shell:not(.is-graph, .is-blank, .is-editing) .floating-outline:not([hidden]) {
   display: flex;
 }
 .fo-item {

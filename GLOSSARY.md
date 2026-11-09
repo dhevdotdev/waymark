@@ -20,7 +20,9 @@
 
 **Stop**: one place on a trail.
 
-**Inspector**: the right panel, holding Outline, Links and Info. Also called the rail in code.
+**Inspector**: the right panel, holding Links and Info. Also called the rail in code.
+
+**Outline**: the dashes on the right edge of the reading pane, one per heading.
 
 **Community**: a group of notes that link to each other more than to the rest. Waymark derives it from links alone.
 

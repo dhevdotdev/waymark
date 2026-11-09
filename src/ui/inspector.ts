@@ -7,20 +7,17 @@ import { LocalGraph } from "./local-graph";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import type { ShellElements } from "./shell";
 
-export type RailPane = "outline" | "links" | "info";
-
-const SPY_OFFSET = 96;
+export type RailPane = "links" | "info";
 
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
 }
 
-/** The right panel: outline, links, note details and the local graph. */
+/** The right panel: links, note details and the local graph. It also owns the heading outline on the reading pane. */
 export class Inspector {
   private readonly history: NoteHistory;
   private readonly floating = new FloatingOutline();
   private localGraph: LocalGraph | null = null;
-  private spyActive: HTMLElement | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
 
@@ -38,11 +35,10 @@ export class Inspector {
   render(path: string, rendered: RenderedNote): void {
     this.current = path;
     this.rendered = rendered;
-    this.renderOutline(rendered);
+    this.floating.render(rendered.headings.filter((h) => h.level === 2 || h.level === 3));
     this.renderLinks();
     this.renderInfo(rendered);
     this.renderLocalGraph();
-    this.spyActive = null;
     this.spy();
   }
 
@@ -60,8 +56,6 @@ export class Inspector {
     }
     for (const el of shell.querySelectorAll<HTMLElement>("[data-pane]")) el.hidden = el.dataset.pane !== pane;
     railBody.scrollTop = 0;
-    this.spyActive = null;
-    this.spy();
     this.refreshHistory();
   }
 
@@ -75,30 +69,11 @@ export class Inspector {
     this.localGraph?.refreshTheme();
   }
 
-  /** Marks the heading being read and keeps it visible in the outline. */
+  /** Keeps the outline on the heading being read. */
   spy(): void {
-    const { scroller, paneHead, outline, railBody } = this.els;
+    const { scroller, paneHead } = this.els;
     paneHead.classList.toggle("is-scrolled", scroller.scrollTop > 2);
-    const links = [...outline.querySelectorAll<HTMLAnchorElement>("a[data-target]")];
-    if (!links.length) return;
-    const line = scroller.getBoundingClientRect().top + SPY_OFFSET;
-    let current = links[0];
-    for (const link of links) {
-      const heading = document.getElementById(link.dataset.target!);
-      if (heading && heading.getBoundingClientRect().top <= line) current = link;
-    }
-    if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4 && scroller.scrollTop > 0) {
-      current = links[links.length - 1];
-    }
-    if (current === this.spyActive) return;
-    this.spyActive = current;
-    this.floating.setActive(links.indexOf(current));
-    for (const link of links) link.classList.toggle("is-active", link === current);
-    if (outline.hidden) return;
-    const view = railBody.getBoundingClientRect();
-    const r = current.getBoundingClientRect();
-    if (r.top < view.top) railBody.scrollTop += r.top - view.top - 8;
-    else if (r.bottom > view.bottom) railBody.scrollTop += r.bottom - view.bottom + 8;
+    this.floating.spy(scroller);
   }
 
   private empty(text: string): HTMLElement {
@@ -113,28 +88,6 @@ export class Inspector {
     el.className = "rail-title";
     el.textContent = text;
     return el;
-  }
-
-  private renderOutline(rendered: RenderedNote): void {
-    const { outline } = this.els;
-    const items = rendered.headings.filter((h) => h.level === 2 || h.level === 3);
-    this.floating.render(items);
-    outline.replaceChildren();
-    if (!items.length) {
-      outline.append(this.empty("This note has no headings."));
-      return;
-    }
-    const list = document.createElement("nav");
-    list.className = "outline";
-    for (const heading of items) {
-      const a = document.createElement("a");
-      a.href = `#${heading.id}`;
-      a.className = `l${heading.level}`;
-      a.dataset.target = heading.id;
-      a.textContent = heading.text.replace(/`/g, "");
-      list.append(a);
-    }
-    outline.append(list);
   }
 
   private renderLinks(): void {

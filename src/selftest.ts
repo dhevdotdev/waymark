@@ -167,7 +167,7 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   check("a history entry offers the old version", !!document.querySelector(".sheet-actions .btn"));
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   await wait(250);
-  reader.inspector.setPane("outline");
+  reader.inspector.setPane("links");
   reader.openGraph("vault");
   await wait(1500);
   check("graph opens", !!document.querySelector(".graph-view canvas"));
@@ -245,7 +245,7 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
       "the Info pane flags uncommitted edits",
       document.querySelector(".rail-history .rail-commit-subject")?.textContent === "Uncommitted changes",
     );
-    reader.inspector.setPane("outline");
+    reader.inspector.setPane("links");
   }
   if (mode === "blocked") check("local edit preserved", (vault.texts.get("Welcome.md") ?? "").includes("my local edit"));
   check("a refused sync plays the problem cue once", played.filter((c) => c === "problem").length === 1, played);
