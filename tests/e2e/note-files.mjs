@@ -423,6 +423,19 @@ try {
     return box.top >= row.top - 1 && box.bottom <= row.bottom + 1 && box.right < row.right;
   });
   check("the actions sit on the row, clear of the count", inRow);
+  const offCentre = await page.$$eval(".row-actions .row-action", (buttons) =>
+    Math.max(
+      ...buttons.map((button) => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector("svg").getBoundingClientRect();
+        return Math.max(
+          Math.abs(box.left + box.width / 2 - (icon.left + icon.width / 2)),
+          Math.abs(box.top + box.height / 2 - (icon.top + icon.height / 2)),
+        );
+      }),
+    ),
+  );
+  check("each icon is centred in its button", offCentre <= 0.5, String(offCentre));
 
   await page.locator('.tree-head[data-folder="Journeys"]').click({ button: "right" });
   await pause(100);

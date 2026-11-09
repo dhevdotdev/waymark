@@ -423,6 +423,7 @@ kbd {
   block-size: 20px;
   appearance: none;
   border: 0;
+  padding: 0;
   border-radius: var(--r-chip);
   background: none;
   color: var(--chrome-ink-3);

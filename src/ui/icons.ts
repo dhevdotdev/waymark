@@ -19,7 +19,7 @@ export const icons = {
   ),
   note: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M9 2.5v3h3"/>`),
   folder: svg(`<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>`),
-  newNote: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M8.25 7.2v4M6.25 9.2h4"/>`),
+  newNote: svg(`<path d="M4.25 2.5h4.6l2.9 2.9v8.1h-7.5z"/><path d="M8 7.2v4M6 9.2h4"/>`),
   newFolder: svg(
     `<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.4v3.2M6.4 9h3.2"/>`,
   ),
