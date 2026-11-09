@@ -258,7 +258,7 @@ fn an_agent_committing_at_the_same_time_loses_nothing() {
         let mut made = 0;
         for i in 0..25 {
             std::fs::write(agent_dir.join(format!("Agent {i}.md")), "agent\n").unwrap();
-            let added = Command::new("git")
+            let _ = Command::new("git")
                 .current_dir(&agent_dir)
                 .args(["add", &format!("Agent {i}.md")])
                 .output()
@@ -276,7 +276,7 @@ fn an_agent_committing_at_the_same_time_loses_nothing() {
                 ])
                 .output()
                 .unwrap();
-            if added.status.success() && done.status.success() {
+            if done.status.success() {
                 made += 1;
             }
         }
@@ -287,13 +287,12 @@ fn an_agent_committing_at_the_same_time_loses_nothing() {
     for i in 0..25 {
         write(&a, &format!("Mine {i}.md"), "mine\n");
         match backup(&a, MESSAGE, &gate) {
-            Ok(report) => {
-                if let Some(problem) = report.problem {
-                    if !problem.message.contains("index.lock") {
-                        unexpected.push(problem.message);
-                    }
-                }
-            }
+            Ok(report) => unexpected.extend(
+                report
+                    .problem
+                    .map(|problem| problem.message)
+                    .filter(|message| !message.contains("index.lock")),
+            ),
             Err(error) => unexpected.push(error.message),
         }
     }

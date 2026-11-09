@@ -34,8 +34,12 @@ fn index_is_locked(root: &Path) -> GitResult<bool> {
     Ok(root.join(out.trim()).exists())
 }
 
+/// Another Git process, such as an agent committing in this vault, got there first.
 fn lost_the_lock(error: &GitError) -> bool {
-    error.message.contains("index.lock")
+    let message = error.message.to_ascii_lowercase();
+    message.contains("index.lock")
+        || message.contains("cannot lock ref")
+        || (message.contains("unable to create") && message.contains(".lock"))
 }
 
 fn report(outcome: BackupOutcome, status: Status) -> BackupReport {
@@ -46,6 +50,13 @@ fn report(outcome: BackupOutcome, status: Status) -> BackupReport {
         problem: None,
         status,
     }
+}
+
+fn already_committed(error: &GitError) -> bool {
+    error.message == "Nothing is staged."
+        || error.message.contains("nothing added to commit")
+        || error.message.contains("nothing to commit")
+        || error.message.contains("no changes added to commit")
 }
 
 /// Stages everything Git would track and commits it. False means no change survived staging.
@@ -59,7 +70,12 @@ fn commit_everything(root: &Path, message: &str) -> GitResult<(bool, Status)> {
     {
         return Ok((false, staged));
     }
-    Ok((true, commit(root, message)?))
+    match commit(root, message) {
+        Ok(after) => Ok((true, after)),
+        /* Another process committed what was just staged, so the work is already safe. */
+        Err(error) if already_committed(&error) => Ok((false, status(root)?)),
+        Err(error) => Err(error),
+    }
 }
 
 /**

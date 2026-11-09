@@ -1,3 +1,4 @@
+import { isDesktop, native } from "../platform";
 import { type BaseFile, type BaseRow, cellValue, columnLabel, parseBase, rowsFor } from "../vault/base-file";
 import { parseFrontmatter } from "../vault/frontmatter";
 import type { VaultStore } from "../vault/store";
@@ -49,7 +50,7 @@ export class BaseView {
     }
     const parsed = parseBase(text);
     if (!parsed.ok) {
-      doc.append(this.notice(parsed.error));
+      doc.append(this.notice(parsed.error, path));
       return this.mount(doc, scrollTop);
     }
     const { base } = parsed;
@@ -66,7 +67,7 @@ export class BaseView {
 
   private fill(doc: HTMLElement, path: string, base: BaseFile, rows: BaseRow[], stale: () => boolean, scrollTop: number): void {
     if (base.problem) {
-      doc.append(this.notice(base.problem));
+      doc.append(this.notice(base.problem, path));
       return;
     }
     if (!base.views.length) {
@@ -90,7 +91,7 @@ export class BaseView {
     }
     const view = base.views[index];
     if (view.problem) {
-      doc.append(this.notice(view.problem));
+      doc.append(this.notice(view.problem, path));
       return;
     }
     const shown = rowsFor(base, view, rows);
@@ -138,10 +139,15 @@ export class BaseView {
     return wrap;
   }
 
-  private notice(message: string): HTMLElement {
+  private notice(message: string, path?: string): HTMLElement {
     const box = element("div", "notice is-quiet base-notice");
     box.setAttribute("role", "status");
     box.append(element("p", "", message));
+    if (path && isDesktop) {
+      const reveal = element("button", "btn btn-small", "Reveal the file in Finder");
+      reveal.onclick = () => void native.reveal(path);
+      box.append(reveal);
+    }
     return box;
   }
 

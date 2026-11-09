@@ -9,7 +9,7 @@ export type Filter =
   | { none: Filter[] }
   | { property: string; equals: boolean; value: string };
 
-export interface BaseSort {
+interface BaseSort {
   property: string;
   descending: boolean;
 }

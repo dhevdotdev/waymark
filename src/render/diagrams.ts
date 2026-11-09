@@ -31,7 +31,7 @@ function themeVariables(): MermaidConfig["themeVariables"] {
   const ink = role("var(--ink)");
   const line = role("var(--ink-3)");
   const node = role("var(--paper)");
-  const border = role("var(--rule-strong)");
+  const border = role("color-mix(in oklab, var(--rule-strong) 55%, var(--ink))");
   const accent = role("var(--accent)");
   const cluster = role("color-mix(in oklab, var(--p-surface0) 40%, var(--code-bg))");
   return {

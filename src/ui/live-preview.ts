@@ -397,7 +397,8 @@ class Builder {
       if (this.inCode(at + 2)) continue;
       const [whole, target, heading = "", alias] = match;
       const end = at + whole.length;
-      const shownFrom = alias === undefined ? at + 2 : end - 2 - alias.length;
+      const samePageHeading = alias === undefined && !target && heading.startsWith("#");
+      const shownFrom = alias === undefined ? at + 2 + (samePageHeading ? 1 : 0) : end - 2 - alias.length;
       const shownTo = alias === undefined ? at + 2 + target.length + heading.length : end - 2;
       if (shownFrom < shownTo) {
         const link = target + heading;

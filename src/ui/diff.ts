@@ -116,7 +116,7 @@ function emphasise(a: string, b: string): [DocumentFragment, DocumentFragment] {
   return [build(a, start, endA), build(b, start, endB)];
 }
 
-export interface DiffOptions {
+interface DiffOptions {
   emptyMessage?: string;
   wrapped: boolean;
   onWrapChange: (wrapped: boolean) => void;
@@ -140,6 +140,7 @@ function wrapToggle(root: HTMLElement, opts: DiffOptions): HTMLElement {
   return button;
 }
 
+/** @public The browser tests render a diff directly. */
 export function renderDiff(text: string, opts: DiffOptions): HTMLElement {
   const root = document.createElement("div");
   root.className = "diff";

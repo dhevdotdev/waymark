@@ -82,7 +82,6 @@ export class GitPanel {
   ): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
-    await this.host.backupDone();
     const before = this.status;
     this.state = { kind: "busy", label };
     this.work.start(label, () => {
@@ -90,6 +89,7 @@ export class GitPanel {
       this.host.onStatus(this.status, this.state);
     });
     try {
+      await this.host.backupDone();
       const now = await op();
       this.status = now;
       this.state = this.backupProblem ? { kind: "error", error: this.backupProblem } : { kind: "idle" };

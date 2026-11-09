@@ -19,6 +19,7 @@ import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from 
 import { tableEditor } from "./table-editor";
 
 const STATUS_BAR_ROOM = 34;
+const BUBBLE_GAP = { x: 0, y: 6 };
 
 const External = Annotation.define<boolean>();
 const GRAMMAR_WAIT_MS = 400;
@@ -142,7 +143,7 @@ function bubbleFor(state: EditorState): Tooltip | null {
       dom.className = "edit-bubble";
       dom.setAttribute("role", "toolbar");
       dom.setAttribute("aria-label", "Format selection");
-      return { dom };
+      return { dom, offset: BUBBLE_GAP };
     },
   };
 }
@@ -155,7 +156,9 @@ function bubbleFor(state: EditorState): Tooltip | null {
 const caretRoom = EditorView.updateListener.of((update) => {
   const fromKeys = update.transactions.some(
     (tr) =>
-      tr.isUserEvent("input") || tr.isUserEvent("delete") || (tr.isUserEvent("select") && !tr.isUserEvent("select.pointer")),
+      tr.isUserEvent("input") ||
+      tr.isUserEvent("delete") ||
+      (tr.isUserEvent("select") && !tr.isUserEvent("select.pointer") && !tr.isUserEvent("select.search")),
   );
   const scroller = update.view.dom.closest<HTMLElement>(".scroller");
   if (!fromKeys || !scroller || !update.view.hasFocus) return;

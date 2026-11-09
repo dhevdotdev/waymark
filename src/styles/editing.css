@@ -434,6 +434,7 @@
 }
 .doc-editing .cm-searchMatch-selected {
   background: color-mix(in oklab, var(--accent) 38%, transparent);
+  box-shadow: 0 0 0 1.5px var(--accent);
 }
 .edit-banner {
   flex: 1;
@@ -772,6 +773,7 @@ button.task-box:focus-visible {
   padding: 0;
   max-block-size: 256px;
   min-inline-size: 220px;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
   font-family: var(--font-ui);
   scrollbar-width: none;
 }
@@ -956,7 +958,7 @@ button.task-box:focus-visible {
   .doc-editing .cm-preview-block .diagram {
     margin-inline: -62px;
   }
-  .cm-embed-image {
+  .doc-editing .cm-line .cm-embed-image {
     position: relative;
     inset-inline-start: 50%;
     translate: -50% 0;
@@ -999,4 +1001,8 @@ button.task-box:focus-visible {
 
 :root[data-scheme="dark"] .doc-editing .cm-callout {
   background: color-mix(in oklab, var(--c) calc(var(--tint) * 1.6), var(--paper));
+}
+
+.reader:has(.findbar) :is(.edit-state, .pane-meta) {
+  visibility: hidden;
 }
