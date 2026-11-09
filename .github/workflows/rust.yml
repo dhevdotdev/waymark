@@ -1,0 +1,32 @@
+name: Rust
+
+# The Git and file-safety tests need macOS, whose minutes cost ten times Linux minutes
+# on a private repository, so this runs only when Rust code or its dependencies change.
+on:
+  push:
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/rust.yml"
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo test --manifest-path src-tauri/Cargo.toml

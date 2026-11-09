@@ -25,6 +25,18 @@ const RENDERER_DATA = new Set([
   "data-task-line",
 ]);
 
+/** The only thing a frame may show. Note HTML can copy the app's markup, so this looks at the file, not the wrapper. */
+function isVaultPdf(src: string): boolean {
+  if (!LOCAL_ASSET.test(src)) return false;
+  try {
+    const url = new URL(src, "http://localhost");
+    const path = url.protocol === "vault:" ? decodeURIComponent(url.pathname) : (url.searchParams.get("path") ?? "");
+    return /\.pdf$/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
 let configured = false;
 
 function configure(): void {
@@ -34,7 +46,7 @@ function configure(): void {
     if (!(node instanceof Element)) return;
     if (data.tagName === "iframe") {
       const src = node.getAttribute("src") ?? "";
-      if (!node.parentElement?.classList.contains("embed-pdf") || !LOCAL_ASSET.test(src)) node.remove();
+      if (!node.parentElement?.classList.contains("embed-pdf") || !isVaultPdf(src)) node.remove();
     }
     if (data.tagName === "img") {
       const src = node.getAttribute("src") ?? "";
@@ -56,6 +68,7 @@ function configure(): void {
     if (LOADING_ATTRS.has(data.attrName) && !isNavigation(node) && !LOCAL_LOAD.test(value)) data.keepAttr = false;
   });
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "IFRAME") node.setAttribute("sandbox", "");
     if (node instanceof HTMLAnchorElement && /^https?:/i.test(node.getAttribute("href") ?? "")) {
       node.setAttribute("rel", "noreferrer noopener");
     }

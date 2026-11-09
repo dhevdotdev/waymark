@@ -10,7 +10,7 @@ use serde::Serialize;
 pub(super) enum Mode {
     /// Reads the repository. Safe to stop if it hangs.
     Read,
-    /// Changes the index or worktree. Never killed, since stopping it midway can leave a half-updated checkout.
+    /// Changes the index or worktree. Never killed, since stopping it midway can leave a half-updated checkout. After a while Waymark stops waiting and leaves it running.
     Write,
     /// Talks to a remote, with SSH prompts disabled.
     Network,
@@ -20,12 +20,16 @@ impl Mode {
     fn time_limit(self) -> Option<Duration> {
         match self {
             Mode::Read => Some(LOCAL_TIMEOUT),
-            Mode::Write => None,
+            Mode::Write => Some(WRITE_PATIENCE),
             Mode::Network => Some(NETWORK_TIMEOUT),
         }
     }
 }
 
+#[cfg(not(test))]
+pub(super) const WRITE_PATIENCE: Duration = Duration::from_secs(120);
+#[cfg(test)]
+pub(super) const WRITE_PATIENCE: Duration = Duration::from_secs(3);
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(90);
 const LOCAL_TIMEOUT: Duration = Duration::from_secs(30);
 pub(super) const MAX_OUTPUT: usize = 4 * 1024 * 1024;
@@ -72,6 +76,7 @@ pub(super) fn base_command(root: &Path, mode: Mode) -> Command {
     let mut cmd = Command::new("git");
     cmd.current_dir(root)
         .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_LITERAL_PATHSPECS", "1")
         .env("GCM_INTERACTIVE", "never")
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("LC_ALL", "C")
@@ -163,6 +168,18 @@ pub(super) fn run_with_input(
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
+            Ok(None) if mode == Mode::Write && limit.is_some_and(|l| start.elapsed() > l) => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
+                return Err(GitError::new(
+                    ErrorKind::Timeout,
+                    format!(
+                        "git {} is still running, so Waymark stopped waiting",
+                        args[0]
+                    ),
+                ));
+            }
             Ok(None) if limit.is_some_and(|l| start.elapsed() > l) => {
                 let _ = child.kill();
                 let _ = child.wait();

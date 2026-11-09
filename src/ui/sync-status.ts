@@ -1,4 +1,4 @@
-import type { GitErrorKind, GitStatus } from "../platform";
+import type { FileChange, GitErrorKind, GitStatus } from "../platform";
 import type { SyncState } from "./git-panel";
 
 type SyncTone = "ok" | "off" | "busy" | "warn" | "incoming" | "outgoing" | "changed";
@@ -40,4 +40,18 @@ export function describeSync(
   if (!upstream) return { tone: "off", text: "No remote", tip: "This branch does not track a remote branch" };
   if (!context.everSynced) return { tone: "off", text: "Not checked", tip: "Press Sync to compare with the remote" };
   return { tone: "ok", text: "Synced", tip: "Up to date with the remote" };
+}
+
+const NOTE_OR_MEDIA = /\.(md|png|jpe?g|gif|webp|avif|svg|pdf)$/i;
+
+/**
+ * What Commit & Sync takes when nothing is staged: the notes and their files.
+ * Obsidian's settings, other hidden files and stray untracked files stay out
+ * unless the user stages them.
+ */
+export function autoStagePaths(files: FileChange[]): string[] {
+  return files
+    .filter((f) => !f.path.split("/").some((part) => part.startsWith(".")))
+    .filter((f) => f.unstaged !== "?" || NOTE_OR_MEDIA.test(f.path))
+    .map((f) => f.path);
 }

@@ -49,7 +49,9 @@ export class VaultStore {
   /** Reads every note not yet in memory and builds the link and search indexes. */
   async loadAll(): Promise<void> {
     await this.readInto(this.index.notes.filter((p) => !this.texts.has(p)));
-    for (const path of this.index.notes) this.ingest(path);
+    this.registerAliases(this.index.notes);
+    this.relinkAll();
+    for (const path of this.index.notes) this.updateSearch(path);
   }
 
   /** Brings the store up to date after files changed on disk. */
@@ -61,14 +63,24 @@ export class VaultStore {
     if (structural) {
       this.index = new VaultIndex(files);
       this.links = new LinkGraph(this.index);
-      for (const p of [...this.texts.keys()]) if (!fileSet.has(p)) this.texts.delete(p);
+      for (const path of [...this.texts.keys()]) {
+        if (fileSet.has(path)) continue;
+        this.texts.delete(path);
+        this.search.set(path, "", null);
+      }
     }
     const candidates = paths.filter((p) => p.endsWith(".md") && fileSet.has(p));
     const before = new Map(candidates.map((p) => [p, this.texts.get(p)]));
     await this.readInto(candidates);
     const changed = candidates.filter((p) => this.texts.get(p) !== before.get(p));
-    await this.readInto(this.index.notes.filter((p) => !this.texts.has(p)));
-    for (const path of structural ? this.index.notes : changed) this.ingest(path);
+    const added = this.index.notes.filter((p) => !this.texts.has(p));
+    await this.readInto(added);
+    /* Aliases first: whether a link resolves can depend on a note that sorts after it. */
+    const aliasesMoved = this.registerAliases(structural ? this.index.notes : changed);
+    if (structural || aliasesMoved) this.relinkAll();
+    else for (const path of changed) this.links.update(path, this.texts.get(path) ?? null);
+    this.communityCache = null;
+    for (const path of new Set([...changed, ...added])) this.updateSearch(path);
     return { structural, changed };
   }
 
@@ -77,7 +89,7 @@ export class VaultStore {
     const outcome = await this.source.writeNote(path, text, expected);
     if (outcome.kind === "saved") {
       this.texts.set(path, text);
-      if (this.index.notes.includes(path)) this.ingest(path);
+      if (this.index.notes.includes(path)) this.applyNote(path);
     }
     return outcome;
   }
@@ -87,7 +99,7 @@ export class VaultStore {
     const text = await this.source.readText(path).catch(() => null);
     if (text !== null && text !== this.texts.get(path)) {
       this.texts.set(path, text);
-      if (this.index.notes.includes(path)) this.ingest(path);
+      if (this.index.notes.includes(path)) this.applyNote(path);
     }
     return text;
   }
@@ -139,20 +151,34 @@ export class VaultStore {
     }
   }
 
-  /** Updates every derived index for one note. A note with no text has been removed. */
-  private ingest(path: string): void {
+  /** Updates what depends on one note after its text changed. */
+  private applyNote(path: string): void {
+    if (this.registerAliases([path])) this.relinkAll();
+    else this.links.update(path, this.texts.get(path) ?? null);
     this.communityCache = null;
-    const text = this.texts.get(path) ?? null;
-    if (text === null) {
-      this.links.update(path, null);
-      this.search.set(path, "", null);
-      return;
-    }
-    const { data } = parseFrontmatter(text);
+    this.updateSearch(path);
+  }
+
+  private aliasesIn(path: string): string[] {
+    const { data } = parseFrontmatter(this.texts.get(path) ?? "");
     const aliases = data.aliases ?? data.alias;
-    const list = aliases ? (Array.isArray(aliases) ? aliases : [aliases]) : [];
-    if (list.length) this.index.addAliases(path, list);
-    this.links.update(path, text);
-    this.search.set(path, this.index.title(path), text, list);
+    if (!aliases) return [];
+    return Array.isArray(aliases) ? aliases : [aliases];
+  }
+
+  private registerAliases(paths: string[]): boolean {
+    let changed = false;
+    for (const path of paths) if (this.index.setAliases(path, this.aliasesIn(path))) changed = true;
+    return changed;
+  }
+
+  private relinkAll(): void {
+    this.communityCache = null;
+    for (const path of this.index.notes) this.links.update(path, this.texts.get(path) ?? null);
+  }
+
+  private updateSearch(path: string): void {
+    const text = this.texts.get(path) ?? null;
+    this.search.set(path, this.index.title(path), text, this.aliasesIn(path));
   }
 }

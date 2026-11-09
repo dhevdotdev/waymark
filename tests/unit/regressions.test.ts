@@ -117,3 +117,26 @@ describe("phrase search", () => {
     expect(search.search('"alpha beta two"', 2).map((h) => h.path)).toEqual(["target.md"]);
   });
 });
+
+describe("frames written as HTML in a note", () => {
+  const frameIn = (html: string) => sanitize(html).querySelector("iframe");
+
+  it("cannot show an SVG or other vault file", () => {
+    expect(frameIn('<figure class="embed-pdf"><iframe src="vault://localhost/Attachments/x.svg"></iframe></figure>')).toBeNull();
+    expect(frameIn('<figure class="embed-pdf"><iframe src="vault://localhost/x.svg?a=.pdf"></iframe></figure>')).toBeNull();
+    expect(frameIn('<figure class="embed-pdf"><iframe src="/@vault/file?path=x.html"></iframe></figure>')).toBeNull();
+  });
+
+  it("is always sandboxed even when it shows a PDF", () => {
+    const frame = frameIn(
+      '<figure class="embed-pdf"><iframe src="vault://localhost/a.pdf" sandbox="allow-scripts allow-same-origin"></iframe></figure>',
+    );
+    expect(frame?.getAttribute("sandbox")).toBe("");
+  });
+
+  it("still allows the app's own PDF embed", () => {
+    expect(
+      frameIn('<figure class="embed-pdf"><iframe src="vault://localhost/My%20file.pdf#toolbar=0" sandbox=""></iframe></figure>'),
+    ).not.toBeNull();
+  });
+});

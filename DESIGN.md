@@ -23,7 +23,7 @@ Every state has a visible way in and a visible way out.
 - The palette keeps one height while typing, and headings appear only before a query, so results never jump.
 - The Dock icon follows the theme family while Waymark runs, recoloured from one artwork by `scripts/theme-icons.mjs`. macOS shows the bundled Catppuccin icon whenever the app is closed.
 - Sync opens as a centred sheet at one fixed size, like a diff. It is a separate task, so it does not slide out of the panel that describes the current note.
-- Notes are created with ⌘N or the toolbar, named in the title, and managed from a right-click in Files. New notes and attachments go where the vault's Obsidian settings say. Renaming updates links in other notes, and deleting goes to the macOS Trash.
+- Notes are created with ⌘N or the toolbar, named in the title, and managed from a right-click in Files. New notes and attachments go where the vault's Obsidian settings say. Renaming updates links in other notes, and deleting goes to the macOS Trash. Commit & Sync takes the changed notes and their files. Hidden files such as Obsidian's settings are committed only if staged by hand.
 - In the editor, `/` inserts blocks and `[[` completes links and headings. Pasting or dropping an image saves it into the vault and embeds it.
 - The toolbar holds the search button, so Files and Search need no row of their own, and the inspector's tabs share the top row with its toggle.
 - Task boxes sit where the bullet would be and toggle the task in the file. ⌘Z undoes the last one. Done items are dimmed, not struck through, so they stay easy to read.

@@ -1,4 +1,4 @@
-use super::runner::MAX_OUTPUT;
+use super::runner::{ErrorKind, MAX_OUTPUT, WRITE_PATIENCE};
 use super::*;
 use std::process::Command;
 
@@ -245,4 +245,45 @@ u UU N... 100644 100644 100644 100644 a b c Both.md\0? Untracked file.md\0";
     assert_eq!(st.files[0].orig_path.as_deref(), Some("Old name.md"));
     assert!(st.files[1].conflicted);
     assert_eq!(st.files[2].unstaged, "?");
+}
+
+#[test]
+fn staged_paths_are_taken_literally() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    std::fs::write(repo.join("a.md"), "a").unwrap();
+    std::fs::write(repo.join("b.md"), "b").unwrap();
+    assert!(stage(repo, &["*.md".to_string()]).is_err());
+    assert!(stage(repo, &[":/".to_string()]).is_err());
+    let st = status(repo).unwrap();
+    assert!(st.files.iter().all(|f| f.unstaged == "?"), "{:?}", st.files);
+}
+
+#[test]
+fn a_stuck_commit_stops_the_wait_but_is_not_killed() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    git(repo, &["config", "user.name", "T"]);
+    git(repo, &["config", "user.email", "t@example.invalid"]);
+    std::fs::write(repo.join("a.md"), "a").unwrap();
+    stage(repo, &["a.md".to_string()]).unwrap();
+    let hook = repo.join(".git/hooks/pre-commit");
+    std::fs::write(
+        &hook,
+        format!("#!/bin/sh\nsleep {}\n", WRITE_PATIENCE.as_secs() + 2),
+    )
+    .unwrap();
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let started = std::time::Instant::now();
+    let error = commit(repo, "slow").unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Timeout);
+    assert!(started.elapsed() < WRITE_PATIENCE + std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    assert!(
+        status(repo).unwrap().head.is_some(),
+        "the commit should finish on its own"
+    );
 }

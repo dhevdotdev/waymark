@@ -548,11 +548,17 @@ pub fn run() {
                         .map(|b| (abs, b))
                         .map_err(|e| e.to_string())
                 }) {
-                    Ok((abs, bytes)) => Response::builder()
-                        .status(StatusCode::OK)
-                        .header("Content-Type", vault::mime_for(&abs))
-                        .header("Cache-Control", "no-cache")
-                        .body(bytes),
+                    Ok((abs, bytes)) => {
+                        let mut response = Response::builder()
+                            .status(StatusCode::OK)
+                            .header("Content-Type", vault::mime_for(&abs))
+                            .header("Cache-Control", "no-cache")
+                            .header("X-Content-Type-Options", "nosniff");
+                        if let Some(policy) = vault::csp_for(&abs) {
+                            response = response.header("Content-Security-Policy", policy);
+                        }
+                        response.body(bytes)
+                    }
                     Err(_) => Response::builder()
                         .status(StatusCode::NOT_FOUND)
                         .body(Vec::new()),

@@ -33,7 +33,10 @@ export const EXPLAIN: Record<string, { title: string; body: string; terminal?: b
     body: "This branch does not track a remote branch. Set one in a terminal with git push -u.",
     terminal: true,
   },
-  timeout: { title: "Git took too long", body: "The operation was stopped after waiting. Check your connection and try again." },
+  timeout: {
+    title: "Git took too long",
+    body: "Waymark stopped waiting. For a commit, a Git hook or signing prompt may still be running, and it was left alone so nothing is half-written. Otherwise check your connection and try again.",
+  },
   notARepo: {
     title: "Not a Git repository",
     body: "This vault is a plain folder. Waymark reads it normally, but sync and history need Git.",

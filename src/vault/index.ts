@@ -22,6 +22,7 @@ export class VaultIndex {
   private byName = new Map<string, string[]>();
   private byPath = new Map<string, string>();
   private aliases = new Map<string, string[]>();
+  private aliasesOf = new Map<string, string[]>();
 
   constructor(files: string[]) {
     this.notes = files.filter((f) => f.toLowerCase().endsWith(NOTE_EXT));
@@ -36,13 +37,19 @@ export class VaultIndex {
     }
   }
 
-  addAliases(path: string, aliases: string[]): void {
-    for (const alias of aliases) {
-      const key = fold(alias);
-      const list = this.aliases.get(key) ?? [];
-      if (!list.includes(path)) list.push(path);
-      this.aliases.set(key, list);
+  /** Replaces a note's aliases. Returns whether they changed, since links may then resolve differently. */
+  setAliases(path: string, aliases: string[]): boolean {
+    const next = [...new Set(aliases.map(fold))];
+    const previous = this.aliasesOf.get(path) ?? [];
+    if (previous.length === next.length && previous.every((key) => next.includes(key))) return false;
+    for (const key of previous) {
+      const remaining = (this.aliases.get(key) ?? []).filter((owner) => owner !== path);
+      if (remaining.length) this.aliases.set(key, remaining);
+      else this.aliases.delete(key);
     }
+    for (const key of next) this.aliases.set(key, [...(this.aliases.get(key) ?? []), path]);
+    this.aliasesOf.set(path, next);
+    return true;
   }
 
   /** Resolves the target part of `[[target#heading|alias]]` or `![[file.png]]`. */

@@ -17,7 +17,7 @@ const files = [
 
 describe("VaultIndex.resolve", () => {
   const index = new VaultIndex(files);
-  index.addAliases("Notes/Tide and wind.md", ["Sea conditions"]);
+  index.setAliases("Notes/Tide and wind.md", ["Sea conditions"]);
 
   it("matches a note by name, ignoring case", () => {
     expect(index.resolve("tide and wind")).toEqual({ kind: "found", path: "Notes/Tide and wind.md" });

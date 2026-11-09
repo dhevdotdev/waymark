@@ -2,6 +2,7 @@ import { type Commit, type FileChange, GitError, type GitStatus, git, native } f
 import { renderDiff } from "./diff";
 import { EXPLAIN, el, openSheet, relative, remoteName } from "./git-panel-parts";
 import type { Cue } from "./sound";
+import { autoStagePaths } from "./sync-status";
 
 export interface GitHost {
   /** Saves any note being edited. False means the user still has to choose what to keep. */
@@ -174,12 +175,13 @@ export class GitPanel {
     await this.push();
   }
 
-  /** Commits what is staged, or every change when nothing is. */
+  /** Commits what is staged, or the changed notes when nothing is. Having nothing to commit is not a failure. */
   private async commitChanges(message: string): Promise<boolean> {
     const files = this.status?.files ?? [];
-    if (!files.length) return true;
     if (!files.some((f) => f.staged !== "." && f.staged !== "?")) {
-      if (!(await this.run("Staging", () => git.stage(files.map((f) => f.path))))) return false;
+      const paths = autoStagePaths(files);
+      if (!paths.length) return true;
+      if (!(await this.run("Staging", () => git.stage(paths)))) return false;
     }
     if (!(await this.run("Committing", () => git.commit(message)))) return false;
     this.message = null;
@@ -515,9 +517,11 @@ export class GitPanel {
   }
 
   private defaultMessage(st: GitStatus): string {
-    const notes = st.files.filter((f) => f.path.endsWith(".md"));
-    if (st.files.length === 1 && notes.length === 1) return `Update ${this.host.title(notes[0].path)}`;
-    return `Update ${st.files.length} ${notes.length === st.files.length ? "notes" : "files"}`;
+    const staged = st.files.filter((f) => f.staged !== "." && f.staged !== "?").map((f) => f.path);
+    const paths = staged.length ? staged : autoStagePaths(st.files);
+    const notes = paths.filter((path) => path.endsWith(".md"));
+    if (paths.length === 1 && notes.length === 1) return `Update ${this.host.title(notes[0])}`;
+    return `Update ${paths.length} ${notes.length === paths.length ? "notes" : "files"}`;
   }
 
   private async push(): Promise<void> {

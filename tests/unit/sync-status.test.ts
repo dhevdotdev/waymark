@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { GitError, type GitStatus } from "../../src/platform";
-import { describeSync } from "../../src/ui/sync-status";
+import { type FileChange, GitError, type GitStatus } from "../../src/platform";
+import { autoStagePaths, describeSync } from "../../src/ui/sync-status";
 
 const clean: GitStatus = {
   isRepo: true,
@@ -48,5 +48,28 @@ describe("describeSync", () => {
 
   it("does not claim a sync state in the browser preview", () => {
     expect(describeSync(clean, idle, { desktop: false, everSynced: true }).text).toBe("Preview");
+  });
+});
+
+describe("autoStagePaths", () => {
+  const change = (path: string, unstaged = "M"): FileChange => ({
+    path,
+    origPath: null,
+    staged: ".",
+    unstaged,
+    conflicted: false,
+  });
+
+  it("takes notes and their attachments, including new ones and deletions", () => {
+    const files = [change("Notes/a.md"), change("Inbox/new.md", "?"), change("Attachments/p.png", "?"), change("old.md", "D")];
+    expect(autoStagePaths(files)).toEqual(["Notes/a.md", "Inbox/new.md", "Attachments/p.png", "old.md"]);
+  });
+
+  it("leaves Obsidian's settings and other hidden files for the user to stage", () => {
+    expect(autoStagePaths([change(".obsidian/workspace.json"), change(".gitignore"), change("a/.hidden/x.md")])).toEqual([]);
+  });
+
+  it("leaves stray untracked files alone but keeps tracked ones", () => {
+    expect(autoStagePaths([change("backup.zip", "?"), change("data.csv")])).toEqual(["data.csv"]);
   });
 });

@@ -303,6 +303,12 @@ pub fn list(root: &Path) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// A vault file is content, never a program. PDFs are left out because WebKit's own viewer has to run for them.
+pub fn csp_for(path: &Path) -> Option<&'static str> {
+    (!has_extension(path, &["pdf"]))
+        .then_some("default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox")
+}
+
 pub fn mime_for(path: &Path) -> &'static str {
     match path
         .extension()
@@ -561,6 +567,13 @@ mod tests {
         assert_eq!(read.new_note_folder, "/In");
         std::fs::write(dir.path().join(".obsidian/app.json"), "not json").unwrap();
         assert_eq!(settings(dir.path()), VaultSettings::default());
+    }
+
+    #[test]
+    fn vault_files_cannot_run_scripts_when_served() {
+        let policy = csp_for(Path::new("Attachments/x.svg")).unwrap();
+        assert!(policy.contains("sandbox") && policy.contains("default-src 'none'"));
+        assert_eq!(csp_for(Path::new("a.PDF")), None);
     }
 
     #[test]

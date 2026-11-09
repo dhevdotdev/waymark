@@ -117,7 +117,7 @@ interface Callout {
   fold: "" | "+" | "-";
 }
 
-/** Task items. The box only shows state, because Waymark never writes to a note. */
+/** Task items. The box is clickable only in the reading view of the note itself. */
 function taskListRule(state: StateCore): void {
   state.tokens.forEach((item, i) => {
     if (item.type !== "list_item_open" || state.tokens[i + 1]?.type !== "paragraph_open") return;

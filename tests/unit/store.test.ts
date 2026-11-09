@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { VaultSource } from "../../src/vault/source";
 import { VaultStore } from "../../src/vault/store";
 
@@ -69,5 +69,64 @@ describe("VaultStore", () => {
     const store = await VaultStore.open(fake);
     await store.loadAll();
     expect(store.linkContext("a.md", "b.md")).toBe("Read this with the other one later");
+  });
+
+  describe("aliases", () => {
+    it("links a note that sorts before the alias's owner", async () => {
+      const { fake } = source({ "a.md": "[[Zed alias]]", "z.md": "---\naliases: [Zed alias]\n---\nbody" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      expect(store.links.backlinks("z.md")).toEqual(["a.md"]);
+    });
+
+    it("forgets an alias removed from a note, along with the links through it", async () => {
+      const { fake, files } = source({ "a.md": "[[Zed alias]]", "z.md": "---\naliases: [Zed alias]\n---\nbody" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      files["z.md"] = "body";
+      await store.applyChanges(["z.md"]);
+      expect(store.index.resolve("Zed alias")).toEqual({ kind: "missing" });
+      expect(store.links.backlinks("z.md")).toEqual([]);
+    });
+
+    it("picks up links when an alias is added later", async () => {
+      const { fake, files } = source({ "a.md": "[[Later]]", "z.md": "body" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      files["z.md"] = "---\naliases: [Later]\n---\nbody";
+      await store.applyChanges(["z.md"]);
+      expect(store.links.backlinks("z.md")).toEqual(["a.md"]);
+    });
+  });
+
+  describe("search after files change", () => {
+    it("stops finding a deleted note", async () => {
+      const { fake, files } = source({ "keep.md": "ordinary", "gone.md": "xylophone" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      delete files["gone.md"];
+      await store.applyChanges([]);
+      expect(store.search.search("xylophone")).toEqual([]);
+    });
+
+    it("finds a renamed note only under its new name", async () => {
+      const { fake, files } = source({ "old.md": "xylophone" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      files["new.md"] = files["old.md"];
+      delete files["old.md"];
+      await store.applyChanges(["new.md"]);
+      expect(store.search.search("xylophone").map((h) => h.path)).toEqual(["new.md"]);
+    });
+
+    it("indexes only the new note when one is added", async () => {
+      const { fake, files } = source({ "a.md": "one", "b.md": "two" });
+      const store = await VaultStore.open(fake);
+      await store.loadAll();
+      const indexed = vi.spyOn(store.search, "set");
+      files["c.md"] = "three";
+      await store.applyChanges(["c.md"]);
+      expect(indexed.mock.calls.map(([path]) => path)).toEqual(["c.md"]);
+    });
   });
 });
