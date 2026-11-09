@@ -2,6 +2,7 @@ import { type Commit, type FileChange, GitError, type GitStatus, git, native } f
 import type { PrefStore } from "../prefs";
 import { renderDiff } from "./diff";
 import { EXPLAIN, el, openSheet, relative, remoteName, WorkIndicator } from "./git-panel-parts";
+import { plural } from "./plural";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
 
@@ -116,7 +117,7 @@ export class GitPanel {
     const st = this.status;
     if (st.behind > 0 && st.ahead === 0) {
       if (await this.applyIncoming(st.behind)) {
-        this.host.toast(`Updated with ${st.behind} incoming commit${st.behind === 1 ? "" : "s"}`);
+        this.host.toast(`Updated with ${plural(st.behind, "incoming commit")}`);
       }
       return;
     }
@@ -128,7 +129,7 @@ export class GitPanel {
   }
 
   private async applyIncoming(count: number): Promise<boolean> {
-    const applied = await this.run(`Updating ${count} commit${count === 1 ? "" : "s"}`, () => git.fastForward());
+    const applied = await this.run(`Updating ${plural(count, "commit")}`, () => git.fastForward());
     if (applied) this.host.play("incoming");
     return applied;
   }
@@ -142,7 +143,10 @@ export class GitPanel {
   private divergedError(st: GitStatus): void {
     this.state = {
       kind: "error",
-      error: new GitError("diverged", `This copy has ${st.ahead} and the remote has ${st.behind} commits the other lacks.`),
+      error: new GitError(
+        "diverged",
+        `This copy has ${plural(st.ahead, "commit")} the remote lacks, and the remote has ${plural(st.behind, "commit")} this copy lacks.`,
+      ),
     };
     this.host.play("problem");
     this.host.onStatus(this.status, this.state);
@@ -251,6 +255,8 @@ export class GitPanel {
   private render(): void {
     const root = this.root!;
     const st = this.status;
+    const typing = root.querySelector<HTMLTextAreaElement>(".commit-box textarea:focus");
+    const caret = typing ? [typing.selectionStart, typing.selectionEnd] : null;
     root.replaceChildren();
 
     const head = el("header", "sync-head");
@@ -353,6 +359,11 @@ export class GitPanel {
     root.append(body);
     if (this.tab === "changes") this.renderChanges(body, st);
     else this.renderHistory(body);
+    if (caret) {
+      const box = root.querySelector<HTMLTextAreaElement>(".commit-box textarea");
+      box?.focus({ preventScroll: true });
+      box?.setSelectionRange(caret[0], caret[1]);
+    }
   }
 
   private explain(error: GitError): HTMLElement {
@@ -533,7 +544,7 @@ export class GitPanel {
     );
     if (ok) {
       this.host.play("pushed");
-      this.host.toast(`Pushed ${n} commit${n === 1 ? "" : "s"}`);
+      this.host.toast(`Pushed ${plural(n, "commit")}`);
     }
   }
 

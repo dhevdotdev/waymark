@@ -63,6 +63,13 @@
   scroll-margin-top: var(--s6);
   text-wrap: balance;
 }
+.doc h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.008em;
+  margin: var(--s7) 0 var(--s3);
+}
 .doc h2 {
   font-size: var(--text-h2);
   line-height: var(--leading-tight);
@@ -811,7 +818,7 @@ button.callout-title:focus-visible {
 
 /* Heading anchors land with a brief accent flash so the eye finds the target. */
 .doc .is-target {
-  animation: target-flash 1.2s var(--ease-out);
+  animation: target-flash 600ms var(--ease-out);
   border-radius: var(--r-chip);
 }
 @keyframes target-flash {

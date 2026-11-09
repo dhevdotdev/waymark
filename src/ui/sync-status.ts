@@ -34,9 +34,10 @@ export function describeSync(
   const { ahead, behind, files, operation, upstream } = status;
   if (operation) return { tone: "warn", text: `${operation} in progress`, tip: "Finish it in a terminal" };
   if (ahead && behind) return { tone: "warn", text: "Diverged", tip: `${ahead} local and ${behind} remote commits` };
-  if (behind) return { tone: "incoming", text: `${behind} incoming`, tip: "Press Sync to apply" };
-  if (ahead) return { tone: "outgoing", text: `${ahead} to push`, tip: "Committed here, not yet pushed" };
-  if (files.length) return { tone: "changed", text: `${files.length} changed`, tip: "Saved here, not committed yet" };
+  if (behind) return { tone: "incoming", text: `${behind.toLocaleString()} incoming`, tip: "Press Sync to apply" };
+  if (ahead) return { tone: "outgoing", text: `${ahead.toLocaleString()} to push`, tip: "Committed here, not yet pushed" };
+  if (files.length)
+    return { tone: "changed", text: `${files.length.toLocaleString()} changed`, tip: "Saved here, not committed yet" };
   if (!upstream) return { tone: "off", text: "No remote", tip: "This branch does not track a remote branch" };
   if (!context.everSynced) return { tone: "off", text: "Not checked", tip: "Press Sync to compare with the remote" };
   return { tone: "ok", text: "Synced", tip: "Up to date with the remote" };

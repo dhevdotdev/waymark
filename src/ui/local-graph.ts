@@ -10,7 +10,6 @@ import {
 } from "d3-force";
 import { resolveColor } from "./colors";
 import { groupColor } from "./graph-paint";
-import { reducedMotion } from "./media";
 
 export interface Neighbour {
   id: string;
@@ -162,30 +161,10 @@ export class LocalGraph {
       )
       .force("collide", forceCollide<Node>(10))
       .stop();
-    /* Keyboard order follows the angle around the centre once the layout settles. */
-    const settle = () => {
-      this.order = this.nodes.filter((d) => !d.center).sort((a, b) => Math.atan2(a.y!, a.x!) - Math.atan2(b.y!, b.x!));
-      this.fit();
-      this.draw();
-    };
-    if (reducedMotion()) {
-      for (let i = 0; i < 220; i++) sim.tick();
-      settle();
-      return;
-    }
-    /* Most of the settling happens off screen; the last stretch plays, so a note change reads as the graph rearranging. */
     for (let i = 0; i < 150; i++) sim.tick();
+    this.order = this.nodes.filter((d) => !d.center).sort((a, b) => Math.atan2(a.y!, a.x!) - Math.atan2(b.y!, b.x!));
     this.fit();
-    let frames = 0;
-    const loop = () => {
-      sim.tick();
-      this.fit();
-      this.draw();
-      if (++frames < 40 && sim.alpha() > sim.alphaMin()) this.frame = requestAnimationFrame(loop);
-      else settle();
-    };
-    settle();
-    this.frame = requestAnimationFrame(loop);
+    this.draw();
   }
 
   /** Fits the whole neighbourhood to the canvas, centred on its bounding box. */

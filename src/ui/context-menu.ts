@@ -1,4 +1,4 @@
-import { dismissOnOutside } from "./overlays";
+import { dismissOnOutside, fadeOut } from "./overlays";
 
 export interface MenuItem {
   label: string;
@@ -20,7 +20,7 @@ export function showContextMenu(x: number, y: number, items: MenuItem[], options
   menu.className = "popover context-menu";
   menu.setAttribute("role", "menu");
   const close = () => {
-    menu.remove();
+    fadeOut(menu);
     options.onClose?.();
   };
   const stop = dismissOnOutside([menu], close);
@@ -47,4 +47,5 @@ export function showContextMenu(x: number, y: number, items: MenuItem[], options
   const left = options.alignEnd ? x - width : x;
   menu.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
   menu.style.top = `${Math.min(y, innerHeight - height - 8)}px`;
+  menu.style.transformOrigin = options.alignEnd ? "right top" : "left top";
 }

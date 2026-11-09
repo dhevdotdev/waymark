@@ -420,7 +420,10 @@ export class NoteEditing {
     banner.setAttribute("role", "alert");
     const surface = document.createElement("div");
     surface.className = "edit-surface";
-    page.append(head, banner, surface);
+    const bannerSlot = document.createElement("div");
+    bannerSlot.className = "edit-banner-slot";
+    bannerSlot.append(banner);
+    page.append(head, bannerSlot, surface);
     return { page, banner, surface, heading };
   }
 

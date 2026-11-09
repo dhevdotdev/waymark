@@ -59,3 +59,11 @@ export function dismissOnOutside(inside: Node[], close: () => void): () => void 
   window.addEventListener("keydown", onEvent, true);
   return stop;
 }
+
+const FADE_OUT_MS = 140;
+
+/** Removes a floating surface after a short fade. Leaving is quicker than arriving. */
+export function fadeOut(element: HTMLElement): void {
+  element.classList.add("is-leaving");
+  setTimeout(() => element.remove(), FADE_OUT_MS);
+}

@@ -4,6 +4,7 @@ import { GraphCanvas } from "./graph";
 import { groupColor } from "./graph-paint";
 import type { GraphData } from "./graph-types";
 import { icons } from "./icons";
+import { plural } from "./plural";
 
 export type GraphTabView = Extract<View, { kind: "graph" }>;
 
@@ -86,7 +87,8 @@ export class GraphView {
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-depth]"))
       b.classList.toggle("is-on", Number(b.dataset.depth) === this.depth);
     this.root.querySelector<HTMLElement>(".graph-depth")!.hidden = scope !== "local";
-    this.root.querySelector(".graph-stats")!.textContent = `${data.nodes.length} notes · ${data.links.length} links`;
+    this.root.querySelector(".graph-stats")!.textContent =
+      `${plural(data.nodes.length, "note")} · ${plural(data.links.length, "link")}`;
     this.spotlit = null;
     this.renderChips(data);
   }

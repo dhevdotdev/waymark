@@ -3,6 +3,7 @@ import type { VaultStore } from "../vault/store";
 import { type TaskList, taskLists } from "../vault/tasks";
 import { relative } from "./git-panel-parts";
 import { icons } from "./icons";
+import { plural } from "./plural";
 
 const RECENT_KEPT = 12;
 const RECENT_SHOWN = 7;
@@ -67,6 +68,7 @@ function recentRow(vault: VaultStore, path: string, at: number): HTMLElement {
   const row = element("a", "wikilink-plain start-row");
   row.href = "#";
   row.dataset.path = path;
+  row.dataset.tip = vault.index.title(path);
   const title = element("span", "start-title", vault.index.title(path));
   const icon = element("span", "start-icon");
   icon.innerHTML = icons.note;
@@ -82,7 +84,10 @@ export function startPage(vault: VaultStore, prefs: PrefStore, root: string, nam
   const page = element("section", "start-page");
   const head = element("header", "start-head");
   const date = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-  head.append(element("h1", "start-date", date), element("span", "start-vault", `${name} · ${vault.index.notes.length} notes`));
+  head.append(
+    element("h1", "start-date", date),
+    element("span", "start-vault", `${name} · ${plural(vault.index.notes.length, "note")}`),
+  );
   page.append(head);
 
   const actions = element("div", "start-actions");

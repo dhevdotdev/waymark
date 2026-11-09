@@ -72,7 +72,6 @@ kbd {
   grid-template-rows: var(--chrome-h) minmax(0, 1fr) var(--status-h);
   height: 100vh;
   overflow: clip;
-  transition: grid-template-columns var(--t-slide) var(--ease-in-out);
 }
 .shell.sidebar-closed {
   --col-left: 0px;
@@ -125,7 +124,6 @@ kbd {
   height: 100%;
   padding: 0 8px 0 84px;
   box-shadow: inset -1px 0 var(--rule);
-  transition: width var(--t-slide) var(--ease-in-out);
 }
 .shell.sidebar-closed .titlebar-lead {
   box-shadow: none;
@@ -147,7 +145,6 @@ kbd {
   height: 100%;
   padding-right: 8px;
   box-shadow: inset 1px 0 var(--rule);
-  transition: width var(--t-slide) var(--ease-in-out);
 }
 .shell.rail-closed .titlebar-trail,
 .shell.is-graph .titlebar-trail {
@@ -238,6 +235,9 @@ kbd {
 .tab.is-clipped .tab-title {
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
 }
+.tab:active {
+  transform: scale(0.98);
+}
 .tab-close {
   width: 20px;
   height: 20px;
@@ -246,6 +246,9 @@ kbd {
   opacity: 0;
   flex: none;
   margin-right: 2px;
+  transition:
+    opacity var(--t-hover) ease,
+    background-color var(--t-hover) ease;
 }
 .tab-close svg {
   width: 13px;
@@ -440,6 +443,9 @@ kbd {
   background: none;
   color: var(--chrome-ink-3);
   cursor: default;
+  transition:
+    background-color var(--t-hover) ease,
+    transform var(--t-press) var(--ease-out);
 }
 .row-action svg {
   inline-size: 14px;
@@ -450,9 +456,14 @@ kbd {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.row-action:hover {
-  background: var(--fill);
-  color: var(--ink);
+.row-action:active {
+  transform: scale(0.95);
+}
+@media (hover: hover) and (pointer: fine) {
+  .row-action:hover {
+    background: var(--fill);
+    color: var(--ink);
+  }
 }
 .nav-item.is-naming {
   background: var(--row-hover);
@@ -542,11 +553,11 @@ kbd {
 }
 .nav-item {
   gap: 7px;
-  padding-inline: calc(8px + var(--d, 0) * var(--step)) 8px;
+  padding-inline: calc(8px + min(var(--d, 0), 6) * var(--step)) 8px;
 }
 .tree-head {
   gap: 6px;
-  padding-inline: calc(8px + var(--d, 0) * var(--step)) 8px;
+  padding-inline: calc(8px + min(var(--d, 0), 6) * var(--step)) 8px;
 }
 .tree-head svg,
 .nav-item svg {
@@ -656,7 +667,7 @@ kbd {
   content: "";
   position: absolute;
   inset-block: 2px;
-  inset-inline-start: calc(14px + var(--d, 0) * 14px);
+  inset-inline-start: calc(14px + min(var(--d, 0), 6) * 14px);
   inline-size: 1px;
   background: var(--rule);
 }
@@ -744,6 +755,8 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 .search-hit {
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -759,7 +772,7 @@ kbd {
 }
 @media (hover: hover) and (pointer: fine) {
   .search-hit:hover {
-    background: var(--hover);
+    background: var(--row-hover);
   }
 }
 .search-hit.is-selected {
@@ -1304,6 +1317,8 @@ kbd {
   }
 }
 .rail-commit-subject {
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
   font-weight: 500;
   text-wrap: pretty;
 }

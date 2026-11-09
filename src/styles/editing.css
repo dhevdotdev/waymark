@@ -31,12 +31,11 @@
   font-weight: 600;
   line-height: var(--leading-tight);
   letter-spacing: -0.006em;
-  padding-block-start: 0.5em;
+  padding-block-start: 20px;
 }
 .doc-editing .cm-h1 {
-  font-size: 2em;
-  font-weight: 700;
-  line-height: var(--leading-body);
+  font-size: 1.75rem;
+  letter-spacing: -0.008em;
 }
 .doc-editing .cm-h2 {
   font-size: var(--text-h2);
@@ -258,7 +257,7 @@
 }
 .doc-editing .cm-table-line {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-code);
 }
 .doc-editing .cm-list-line {
   padding-inline-start: calc(var(--list-depth) * 1.5em);
@@ -299,7 +298,7 @@
   display: flex;
   gap: 1px;
   padding: 3px;
-  border-radius: var(--r-control);
+  border-radius: var(--r-float);
   background: var(--float-bg);
   box-shadow: var(--shadow-float);
   font-family: var(--font-ui);
@@ -389,17 +388,21 @@
 .doc-editing .cm-searchMatch-selected {
   background: color-mix(in oklab, var(--accent) 48%, transparent);
 }
-.edit-banner {
+.edit-banner-slot {
   position: sticky;
   inset-block-start: 8px;
   z-index: 3;
+  block-size: 0;
+}
+.edit-banner {
+  position: absolute;
+  inset-inline: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-block-end: var(--s4);
   padding: 10px 12px;
-  border-radius: var(--r-control);
+  border-radius: var(--r-float);
   background: var(--float-bg);
   box-shadow: var(--shadow-float);
   font-family: var(--font-ui);
@@ -447,7 +450,9 @@ button.task-box:focus-visible {
 .shell.is-editing .edit-state {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 5px;
+  inline-size: 5.5em;
 }
 .shell.is-editing .pane-meta {
   display: none;
@@ -577,6 +582,8 @@ button.task-box:focus-visible {
   color: var(--ink);
 }
 .start-vault {
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
   font-size: 0.75rem;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -600,6 +607,15 @@ button.task-box:focus-visible {
   color: var(--ink-2);
   font-size: 0.8125rem;
   cursor: default;
+}
+.start-action,
+.start-row {
+  transition:
+    background-color var(--t-hover) ease,
+    transform var(--t-press) var(--ease-out);
+}
+.start-action:active {
+  transform: scale(0.97);
 }
 .start-action kbd {
   color: var(--ink-3);

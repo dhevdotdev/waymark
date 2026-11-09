@@ -9,6 +9,7 @@ import { icons } from "./icons";
 import { nameInPlace } from "./inline-name";
 import type { NoteEditing } from "./note-editing";
 import { Palette, type PaletteItem } from "./palette";
+import { plural } from "./plural";
 import { confirmAction, promptText } from "./prompts";
 import { type RowAction, RowActions } from "./row-actions";
 import { renameRecent } from "./start-page";
@@ -41,7 +42,6 @@ const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/
 const inFolder = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
 const folderName = (folder: string) => folder.slice(folder.lastIndexOf("/") + 1);
 const isInside = (folder: string, path: string) => path.startsWith(`${folder}/`);
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Creating, renaming, moving and deleting notes, and keeping links true afterwards. */
 export class NoteFiles {

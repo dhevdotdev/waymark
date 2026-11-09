@@ -1,7 +1,7 @@
 import { isDesktop } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { FAMILIES, type Scheme } from "../themes";
-import { dismissOnOutside, toast } from "./overlays";
+import { dismissOnOutside, fadeOut, toast } from "./overlays";
 import type { Sound } from "./sound";
 
 type Appearance = Prefs["appearance"];
@@ -102,7 +102,7 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   pop.style.transformOrigin = `calc(100% - ${r.width / 2 + 4}px) bottom`;
 
   const close = () => {
-    pop.remove();
+    fadeOut(pop);
     anchor.classList.remove("is-on");
   };
   stopDismissing = dismissOnOutside([pop, anchor], close);
@@ -132,9 +132,8 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
     const appearance = target.closest<HTMLElement>("[data-appearance]")?.dataset.appearance as Appearance | undefined;
     if (appearance) {
       host.setAppearance(appearance);
-      stopDismissing?.();
-      close();
-      toggleSettings(anchor, host);
+      pop.innerHTML = template(host.prefs.value, host.scheme());
+      pop.querySelector<HTMLElement>(`[data-appearance="${appearance}"]`)?.focus();
     }
   });
 

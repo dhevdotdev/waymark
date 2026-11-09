@@ -90,7 +90,8 @@ export class FileTree {
       ? `<span class="tree-name"></span>${CHEVRON}<span class="tree-count"></span>`
       : `${CHEVRON}${treeIcon(icons.folder)}<span class="tree-name"></span><span class="tree-count"></span>`;
     head.querySelector(".tree-name")!.textContent = folder.name;
-    head.querySelector(".tree-count")!.textContent = String(folder.count);
+    head.querySelector(".tree-count")!.textContent = folder.count.toLocaleString();
+    head.dataset.tip = folder.name;
 
     const inner = document.createElement("div");
     inner.className = "tree-inner";

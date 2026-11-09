@@ -81,7 +81,7 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-label", title);
   const head = el("header", "sheet-head");
-  const titles = el("div");
+  const titles = el("div", "sheet-titles");
   titles.append(el("h2", "sheet-title", title), el("div", "sheet-sub", subtitle));
   const close = el("button", "icon-btn");
   close.setAttribute("aria-label", "Close");

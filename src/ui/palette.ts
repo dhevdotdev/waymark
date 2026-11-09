@@ -97,7 +97,6 @@ export class Palette {
     const root = this.root;
     this.root = null;
     root.classList.add("is-leaving");
-    root.addEventListener("animationend", () => root.remove(), { once: true });
     setTimeout(() => root.remove(), 200);
     if (this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
   }

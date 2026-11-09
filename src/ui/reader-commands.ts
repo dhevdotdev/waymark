@@ -3,6 +3,7 @@ import { ancestors } from "../vault/tree";
 import { type Command, labelOf } from "./commands";
 import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
+import { plural } from "./plural";
 import type { Reader } from "./reader";
 import { applySound } from "./settings";
 
@@ -215,7 +216,7 @@ export function readerCommands(r: Reader): Command[] {
       id: "push",
       label: () => {
         const ahead = r.sync.panel.status?.ahead ?? 0;
-        return `Push ${ahead} commit${ahead === 1 ? "" : "s"}`;
+        return `Push ${plural(ahead, "commit")}`;
       },
       desktop: true,
       when: () => {
