@@ -91,7 +91,17 @@ export function deleteRow(lines: string[], row: number): string[] {
   return lines.filter((_, i) => i !== lineOfRow(row));
 }
 
+/** Adds a column after `afterColumn`, or at the very start when it is -1. */
 export function insertColumn(lines: string[], afterColumn: number): string[] {
+  if (afterColumn < 0) {
+    return lines.map((line, i) => {
+      const cell = i === 1 ? " --- " : "  ";
+      /* Without an outer pipe, a blank first cell would read as one. */
+      if (!line.trimStart().startsWith("|")) return `|${cell}| ${line}`;
+      const at = segments(line)[0].from;
+      return `${line.slice(0, at)}${cell}|${line.slice(at)}`;
+    });
+  }
   const needed = afterColumn + 1;
   return lines.map((original, i) => {
     const line = withCells(original, needed);
@@ -109,4 +119,11 @@ export function deleteColumn(lines: string[], column: number): string[] {
     const next = all[column + 1];
     return next ? line.slice(0, target.from) + line.slice(next.from) : line.slice(0, target.from - 1) + line.slice(target.to);
   });
+}
+
+export function setAlignment(lines: string[], column: number, align: ParsedTable["align"][number]): string[] {
+  const line = withCells(lines[1], column + 1);
+  const { from, to } = segments(line)[column];
+  const marker = { left: ":---", center: ":---:", right: "---:", "": "---" }[align];
+  return replaced(lines, 1, `${line.slice(0, from)} ${marker} ${line.slice(to)}`);
 }

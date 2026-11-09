@@ -432,23 +432,71 @@ try {
   const withRow = await disk("Table.md");
   check("the new row is in the file, right under the table", /\| Grace .*\n\| new \|\s+\|\s+\|\n\n> /.test(withRow));
   const beforeColumn = withRow;
-  await page.locator('.cm-table-tools button:has-text("Add column")').click();
+  const gripMenu = async (kind, item) => {
+    await page.locator(`.cm-table-grip.is-${kind}`).click();
+    await pause(120);
+    await page.locator(`.context-item:has-text("${item}")`).click();
+  };
+  await gripMenu("column", "Insert column right");
   await pause(600);
   check("a column can be added", (await page.locator(".cm-table-widget th").count()) === 4);
   check("the delimiter row grows too", (await disk("Table.md")).includes("|:------| --- |"));
   check("focus follows into the new column", (await activeCell()) === "3,1");
-  await page.locator('.cm-table-tools button:has-text("Delete column")').click();
+  await gripMenu("column", "Delete column");
   await pause(600);
   check("a column can be deleted, leaving the file as it was", (await disk("Table.md")) === beforeColumn);
   await cell(3, 0).click();
-  await page.locator('.cm-table-tools button:has-text("Delete row")').click();
+  await gripMenu("row", "Delete row");
   await pause(600);
   check(
     "a row can be deleted",
     (await page.locator(".cm-table-widget tr").count()) === 3 && !(await disk("Table.md")).includes("| new |"),
   );
+  await cell(2, 1).click();
+  const columnWidths = () =>
+    page.locator(".cm-table-widget th").evaluateAll((heads) => heads.map((h) => Math.round(h.getBoundingClientRect().width)));
+  const widthsBefore = await columnWidths();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" and one more word with spaces in it");
+  await saved();
+  await pause(150);
+  check("spaces survive typing in a cell", (await disk("Table.md")).includes("and one more word with spaces in it"));
+  check("columns hold still while typing", (await columnWidths()).join() === widthsBefore.join(), (await columnWidths()).join());
+  await gripMenu("column", "Align center");
+  await saved();
+  await pause(150);
+  check(
+    "a column can be aligned from its handle",
+    (await disk("Table.md")).includes("| :---: |"),
+    (await disk("Table.md")).split("\n")[3],
+  );
   await cell(1, 0).click();
-  await page.locator('.cm-table-tools button:has-text("Edit as text")').click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowRight");
+  check("the right arrow at a cell's end moves to the next cell", (await activeCell()) === "1,1");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowLeft");
+  check("the left arrow at a cell's start moves back", (await activeCell()) === "1,0");
+  const rowsBefore = await page.locator(".cm-table-widget tr").count();
+  await page.locator(".cm-table-add.is-row").click();
+  await pause(500);
+  check("the bar under a table adds a row", (await page.locator(".cm-table-widget tr").count()) === rowsBefore + 1);
+  await gripMenu("row", "Delete row");
+  await pause(500);
+  const lined = await page.evaluate(() => {
+    const textLeft = (el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return range.getBoundingClientRect().left;
+    };
+    return (
+      textLeft(document.querySelector(".cm-table-widget th")) -
+      textLeft([...document.querySelectorAll(".cm-line")].find((l) => l.textContent.includes("After.")))
+    );
+  });
+  check("a table's text lines up with the paragraphs", Math.abs(lined) <= 1, String(lined));
+  await cell(1, 0).click();
+  await gripMenu("row", "Edit as Markdown");
   await pause(250);
   check("a table can be edited as text", (await content()).includes("|:------|"));
   await page.locator(".cm-line", { hasText: "After." }).click();

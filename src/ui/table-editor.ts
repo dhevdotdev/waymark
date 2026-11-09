@@ -1,8 +1,10 @@
-import { undo } from "@codemirror/commands";
+import { redo, undo } from "@codemirror/commands";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { type EditorState, type Extension, type Range, StateEffect, StateField, type Transaction } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
-import { deleteColumn, deleteRow, insertColumn, insertRow, parseTable, setCell } from "../vault/markdown-table";
+import { deleteColumn, deleteRow, insertColumn, insertRow, parseTable, setAlignment, setCell } from "../vault/markdown-table";
+import { type MenuItem, showContextMenu } from "./context-menu";
+import { icons } from "./icons";
 
 export interface TableEditorOptions {
   renderInline: (text: string) => DocumentFragment;
@@ -24,18 +26,29 @@ interface FieldValue {
 
 const showAsText = StateEffect.define<number | null>();
 const PARSE_BUDGET_MS = 100;
+const MENU_GAP = 4;
+const HANDLE_DEPTH = 13;
 
 const linesOf = (state: EditorState, { from, to }: TableRange): string[] => state.sliceDoc(from, to).split(state.lineBreak);
 const cellsIn = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>("th, td")];
 const position = (cell: HTMLElement) => ({ row: Number(cell.dataset.row), column: Number(cell.dataset.column) });
 
-function caretToEnd(cell: HTMLElement): void {
+function caretToEnd(cell: HTMLElement, atStart = false): void {
   const range = document.createRange();
   range.selectNodeContents(cell);
-  range.collapse(false);
+  range.collapse(atStart);
   const selection = getSelection();
   selection?.removeAllRanges();
   selection?.addRange(range);
+}
+
+function caretOffset(cell: HTMLElement): number {
+  const selection = getSelection();
+  if (!selection?.rangeCount || !selection.isCollapsed) return -1;
+  const before = selection.getRangeAt(0).cloneRange();
+  before.selectNodeContents(cell);
+  before.setEnd(selection.anchorNode!, selection.anchorOffset);
+  return before.toString().length;
 }
 
 /** Shows a table as a table. Each cell edit is written back to just that cell's text in the file. */
@@ -59,7 +72,7 @@ class TableWidget extends WidgetType {
     const wrap = document.createElement("div");
     wrap.className = "table-wrap";
     wrap.append(this.buildTable());
-    root.append(this.buildTools(view, root), wrap);
+    root.append(wrap, ...this.buildHandles(view, root));
     this.bind(view, root);
     return root;
   }
@@ -73,6 +86,8 @@ class TableWidget extends WidgetType {
       const { row, column } = position(cell);
       const text = rows[row][column];
       cell.style.textAlign = align[column];
+      /* The file trims a cell, but the space just typed at its end must stay on screen for the next word. */
+      if (cell === document.activeElement && (cell.textContent ?? "").trim() === text) continue;
       if (cell.dataset.source === text) continue;
       cell.dataset.source = text;
       this.showCell(cell);
@@ -113,45 +128,135 @@ class TableWidget extends WidgetType {
     return table;
   }
 
-  private buildTools(view: EditorView, root: HTMLElement): HTMLElement {
-    const tools = document.createElement("div");
-    tools.className = "cm-table-tools edit-bubble";
-    tools.setAttribute("role", "toolbar");
-    tools.setAttribute("aria-label", "Table");
-    const button = (label: string, run: (cell: HTMLElement) => void) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "edit-bubble-btn";
-      b.textContent = label;
-      b.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        if (document.activeElement instanceof HTMLElement && root.contains(document.activeElement)) run(document.activeElement);
-      });
-      tools.append(b);
+  /** The row and column handles, and the bars that add to the table's edges. They float over the page, so nothing moves. */
+  private buildHandles(view: EditorView, root: HTMLElement): HTMLElement[] {
+    const handle = (className: string, label: string, icon: string, run: (button: HTMLElement) => void) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.tabIndex = -1;
+      button.innerHTML = icon;
+      button.setAttribute("aria-label", label);
+      button.addEventListener("mousedown", (e) => e.preventDefault());
+      button.addEventListener("click", () => run(button));
+      return button;
     };
-    button("Add row", (cell) => {
-      const { row, column } = position(cell);
-      this.reshape(view, root, (lines) => insertRow(lines, row), row + 1, column);
+    const at = (button: HTMLElement) => {
+      const { left, bottom } = button.getBoundingClientRect();
+      return [left, bottom + MENU_GAP] as const;
+    };
+    const aimed = () => root.querySelector<HTMLElement>("[data-aimed]");
+    return [
+      handle("cm-table-grip is-row", "Row actions", icons.grip, (button) => {
+        const cell = aimed();
+        if (cell) showContextMenu(...at(button), this.rowMenu(view, root, cell));
+      }),
+      handle("cm-table-grip is-column", "Column actions", icons.gripWide, (button) => {
+        const cell = aimed();
+        if (cell) showContextMenu(...at(button), this.columnMenu(view, root, cell));
+      }),
+      handle("cm-table-add is-row", "Add a row", icons.plus, () => {
+        const last = root.querySelectorAll("tr").length - 1;
+        this.reshape(view, root, (lines) => insertRow(lines, last), last + 1, 0);
+      }),
+      handle("cm-table-add is-column", "Add a column", icons.plus, () => {
+        const last = root.querySelectorAll("th").length - 1;
+        this.reshape(view, root, (lines) => insertColumn(lines, last), 0, last + 1);
+      }),
+    ];
+  }
+
+  private asText(view: EditorView, root: HTMLElement): MenuItem {
+    return {
+      label: "Edit as Markdown",
+      startsGroup: true,
+      run: () => {
+        const range = this.range()(view, root);
+        if (!range) return;
+        view.dispatch({ effects: showAsText.of(range.from), selection: { anchor: range.from } });
+        view.focus();
+      },
+    };
+  }
+
+  private rowMenu(view: EditorView, root: HTMLElement, cell: HTMLElement): MenuItem[] {
+    const { row, column } = position(cell);
+    const change = (edit: (lines: string[]) => string[], toRow: number) => () => this.reshape(view, root, edit, toRow, column);
+    return [
+      ...(row > 0 ? [{ label: "Insert row above", run: change((lines) => insertRow(lines, row - 1), row) }] : []),
+      { label: "Insert row below", run: change((lines) => insertRow(lines, row), row + 1) },
+      ...(row > 0 ? [{ label: "Delete row", startsGroup: true, run: change((lines) => deleteRow(lines, row), row - 1) }] : []),
+      this.asText(view, root),
+    ];
+  }
+
+  private columnMenu(view: EditorView, root: HTMLElement, cell: HTMLElement): MenuItem[] {
+    const { row, column } = position(cell);
+    const change = (edit: (lines: string[]) => string[], toColumn: number) => () => this.reshape(view, root, edit, row, toColumn);
+    const align = (label: string, value: "left" | "center" | "right", startsGroup = false) => ({
+      label,
+      startsGroup,
+      run: () => this.write(view, root, (lines) => setAlignment(lines, column, value), "input"),
     });
-    button("Add column", (cell) => {
-      const { row, column } = position(cell);
-      this.reshape(view, root, (lines) => insertColumn(lines, column), row, column + 1);
-    });
-    button("Delete row", (cell) => {
-      const { row, column } = position(cell);
-      if (row > 0) this.reshape(view, root, (lines) => deleteRow(lines, row), row - 1, column);
-    });
-    button("Delete column", (cell) => {
-      const { row, column } = position(cell);
-      this.reshape(view, root, (lines) => deleteColumn(lines, column), row, Math.max(0, column - 1));
-    });
-    button("Edit as text", () => {
-      const range = this.range()(view, root);
-      if (!range) return;
-      view.dispatch({ effects: showAsText.of(range.from), selection: { anchor: range.from } });
-      view.focus();
-    });
-    return tools;
+    const columns = root.querySelectorAll("th").length;
+    return [
+      { label: "Insert column left", run: change((lines) => insertColumn(lines, column - 1), column) },
+      { label: "Insert column right", run: change((lines) => insertColumn(lines, column), column + 1) },
+      align("Align left", "left", true),
+      align("Align center", "center"),
+      align("Align right", "right"),
+      ...(columns > 1
+        ? [
+            {
+              label: "Delete column",
+              startsGroup: true,
+              run: change((lines) => deleteColumn(lines, column), Math.max(0, column - 1)),
+            },
+          ]
+        : []),
+      this.asText(view, root),
+    ];
+  }
+
+  /** Puts the handles on the row and column of `cell`. */
+  private aim(root: HTMLElement, cell: HTMLElement): void {
+    root.querySelector("[data-aimed]")?.removeAttribute("data-aimed");
+    cell.dataset.aimed = "";
+    root.classList.add("has-handles");
+    const box = root.getBoundingClientRect();
+    const rect = cell.getBoundingClientRect();
+    const row = cell.parentElement!.getBoundingClientRect();
+    const table = root.querySelector("table")!.getBoundingClientRect();
+    const rowGrip = root.querySelector<HTMLElement>(".cm-table-grip.is-row")!;
+    rowGrip.style.insetBlockStart = `${row.top - box.top}px`;
+    rowGrip.style.blockSize = `${row.height}px`;
+    const columnGrip = root.querySelector<HTMLElement>(".cm-table-grip.is-column")!;
+    columnGrip.style.insetInlineStart = `${rect.left - box.left}px`;
+    columnGrip.style.inlineSize = `${rect.width}px`;
+    columnGrip.style.insetBlockStart = `${table.top - box.top - HANDLE_DEPTH}px`;
+  }
+
+  /** Holds the columns at their width for as long as the table is being edited, so typing never slides them. */
+  private freeze(root: HTMLElement): void {
+    const table = root.querySelector("table")!;
+    if (table.style.tableLayout === "fixed") return;
+    const widths = [...table.querySelectorAll("th")].map((head) => head.getBoundingClientRect().width);
+    const columns = document.createElement("colgroup");
+    for (const width of widths) {
+      const column = document.createElement("col");
+      column.style.width = `${width}px`;
+      columns.append(column);
+    }
+    table.prepend(columns);
+    table.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
+    table.style.tableLayout = "fixed";
+  }
+
+  private release(root: HTMLElement): void {
+    const table = root.querySelector("table")!;
+    table.querySelector("colgroup")?.remove();
+    table.style.width = "";
+    table.style.tableLayout = "";
   }
 
   private write(view: EditorView, root: HTMLElement, change: (lines: string[]) => string[], userEvent: string): boolean {
@@ -210,7 +315,13 @@ class TableWidget extends WidgetType {
     const cells = cellsIn(root);
     const rowCount = root.querySelectorAll("tr").length;
     const columnCount = cells.length / rowCount;
-    if (key === "Tab") {
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const index = cells.indexOf(cell) + (key === "ArrowLeft" ? -1 : 1);
+      const target = cells[index];
+      if (!target) return;
+      target.focus();
+      caretToEnd(target, key === "ArrowRight");
+    } else if (key === "Tab") {
       const next = cells.indexOf(cell) + (back ? -1 : 1);
       if (next >= cells.length) this.reshape(view, root, (lines) => insertRow(lines, row), row + 1, 0);
       else if (next >= 0) this.focusCell(root, Math.floor(next / columnCount), next % columnCount);
@@ -228,9 +339,10 @@ class TableWidget extends WidgetType {
 
   private onKey(view: EditorView, root: HTMLElement, cell: HTMLElement, e: KeyboardEvent): void {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
+    if (mod && e.key.toLowerCase() === "z") {
       e.preventDefault();
-      undo(view);
+      if (e.shiftKey) redo(view);
+      else undo(view);
     } else if (mod && (e.key === "b" || e.key === "i")) {
       e.preventDefault();
       const marker = e.key === "b" ? "**" : "*";
@@ -238,6 +350,14 @@ class TableWidget extends WidgetType {
     } else if (e.key === "Escape") {
       e.preventDefault();
       this.leave(view, root, false);
+    } else if (
+      ((e.key === "ArrowLeft" && caretOffset(cell) === 0) ||
+        (e.key === "ArrowRight" && caretOffset(cell) === (cell.textContent ?? "").length)) &&
+      !mod &&
+      !e.shiftKey
+    ) {
+      e.preventDefault();
+      this.move(view, root, cell, e.key, false);
     } else if (["Tab", "Enter", "ArrowUp", "ArrowDown"].includes(e.key) && !mod) {
       e.preventDefault();
       this.move(view, root, cell, e.key, e.shiftKey);
@@ -273,12 +393,26 @@ class TableWidget extends WidgetType {
     root.addEventListener("focusin", (e) => {
       const cell = cellOf(e);
       if (!cell) return;
+      this.freeze(root);
       cell.textContent = cell.dataset.source ?? "";
       caretToEnd(cell);
+      this.aim(root, cell);
     });
     root.addEventListener("focusout", (e) => {
       const cell = cellOf(e);
       if (cell) cell.replaceChildren(this.options.renderInline(cell.dataset.source ?? ""));
+      if (!root.contains(e.relatedTarget as Node | null)) this.release(root);
+    });
+    root.addEventListener("mouseover", (e) => {
+      const cell = cellOf(e);
+      if (cell && !root.contains(document.activeElement)) this.aim(root, cell);
+    });
+    root.addEventListener("mouseleave", () => {
+      if (!root.contains(document.activeElement)) root.classList.remove("has-handles");
+    });
+    root.querySelector(".table-wrap")!.addEventListener("scroll", () => {
+      const cell = root.querySelector<HTMLElement>("[data-aimed]");
+      if (cell) this.aim(root, cell);
     });
     root.addEventListener("keydown", (e) => {
       const cell = cellOf(e);
@@ -299,6 +433,7 @@ class TableWidget extends WidgetType {
       const { row, column } = position(cell);
       cell.dataset.source = text;
       this.write(view, root, (lines) => setCell(lines, row, column, text), "input.type");
+      this.aim(root, cell);
     });
   }
 }

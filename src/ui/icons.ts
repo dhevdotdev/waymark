@@ -25,6 +25,12 @@ export const icons = {
   newFolder: svg(
     `<path d="M13.75 7.5v-1a1 1 0 0 0-1-1H7.6L6.1 3.5H3.25a1 1 0 0 0-1 1v7.25a1 1 0 0 0 1 1h4.5"/><path d="M11.75 9.25v4.5M9.5 11.5H14"/>`,
   ),
+  grip: svg(
+    `<circle cx="6" cy="4" r=".5"/><circle cx="10" cy="4" r=".5"/><circle cx="6" cy="8" r=".5"/><circle cx="10" cy="8" r=".5"/><circle cx="6" cy="12" r=".5"/><circle cx="10" cy="12" r=".5"/>`,
+  ),
+  gripWide: svg(
+    `<circle cx="4" cy="6" r=".5"/><circle cx="8" cy="6" r=".5"/><circle cx="12" cy="6" r=".5"/><circle cx="4" cy="10" r=".5"/><circle cx="8" cy="10" r=".5"/><circle cx="12" cy="10" r=".5"/>`,
+  ),
   more: svg(`<circle cx="3.5" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="12.5" cy="8" r=".6"/>`),
   collapse: svg(`<path d="M3.5 8h9"/><path d="m6 3.25 2 2 2-2"/><path d="m6 12.75 2-2 2 2"/>`),
   sun: svg(

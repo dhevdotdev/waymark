@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { deleteColumn, deleteRow, insertColumn, insertRow, parseTable, setCell } from "../../src/vault/markdown-table";
+import {
+  deleteColumn,
+  deleteRow,
+  insertColumn,
+  insertRow,
+  parseTable,
+  setAlignment,
+  setCell,
+} from "../../src/vault/markdown-table";
 
 const TABLE = ["| Name  |   Age | Note |", "|:------|------:|:---:|", "| Ada   |    36 | **x** |", "| Grace | 85 | a \\| b |"];
 
@@ -92,5 +100,35 @@ describe("rows and columns", () => {
 
   it("survives a row too short for the column being deleted", () => {
     expect(deleteColumn(["| a | b |", "|---|---|", "| 1 |"], 1)[2]).toBe("| 1 |");
+  });
+});
+
+describe("insertColumn at the start", () => {
+  it("adds an empty first column to every line", () => {
+    const after = insertColumn(["| a | b |", "|---|---|", "| 1 | 2 |"], -1);
+    expect(parseTable(after).rows).toEqual([
+      ["", "a", "b"],
+      ["", "1", "2"],
+    ]);
+  });
+
+  it("works on a table with no outer pipes", () => {
+    expect(parseTable(insertColumn(["a | b", "--- | ---", "1 | 2"], -1)).rows[1]).toEqual(["", "1", "2"]);
+  });
+});
+
+describe("setAlignment", () => {
+  const table = ["| a | b |", "|---|---|", "| 1 | 2 |"];
+
+  it.each([
+    ["left", "left"],
+    ["center", "center"],
+    ["right", "right"],
+  ] as const)("sets %s alignment on one column only", (align, expected) => {
+    expect(parseTable(setAlignment(table, 1, align)).align).toEqual(["", expected]);
+  });
+
+  it("leaves every cell's text alone", () => {
+    expect(parseTable(setAlignment(table, 0, "right")).rows).toEqual(parseTable(table).rows);
   });
 });
