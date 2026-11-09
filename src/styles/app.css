@@ -176,7 +176,7 @@ kbd {
   min-width: 72px;
   max-width: 320px;
   flex: 0 1 auto;
-  padding: 0 6px 0 12px;
+  padding: 0 12px 0 6px;
   border-radius: var(--r-control);
   color: var(--chrome-ink-3);
   transition:
@@ -240,24 +240,18 @@ kbd {
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
 }
 .tab-close {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   border-radius: var(--r-chip);
   opacity: 0;
   flex: none;
-  margin-left: 2px;
-}
-/* A mixed-case title sits visually below its line box's centre, so the mark drops to meet its x-height. */
-.tab-close svg {
-  width: 10px;
-  height: 10px;
-  stroke-width: 1.8;
-  translate: 0 1px;
+  margin-right: 2px;
 }
 /* One tab is the window's title, not a choice: plain text, no pill. */
 .single-tab .tab {
   background: none;
-  padding-left: 4px;
+  padding: 0 6px 0 4px;
   max-width: 420px;
   color: var(--chrome-ink);
 }
@@ -742,15 +736,18 @@ kbd {
 }
 
 /* A graph tab uses the whole note area, and the inspector has nothing to say about it. */
-.shell.is-graph {
+.shell:is(.is-graph, .is-blank) {
   --col-right: 0px;
 }
-.shell.is-graph .rail {
+.shell:is(.is-graph, .is-blank) .rail {
   opacity: 0;
   pointer-events: none;
 }
 .shell.is-graph :is(.pane-head, .scroller) {
   display: none;
+}
+.shell.is-blank .pane-head {
+  visibility: hidden;
 }
 
 /* The tab's trail: where following links has taken it. */
@@ -817,7 +814,7 @@ kbd {
   align-items: center;
   block-size: 28px;
   margin-block-start: 2px;
-  padding-inline-end: 4px;
+  padding-inline-start: 4px;
   border-radius: var(--r-control);
   color: var(--trail-ink);
   transition:
@@ -842,7 +839,7 @@ kbd {
   gap: 5px;
   block-size: 28px;
   max-inline-size: 260px;
-  padding-inline: 8px 3px;
+  padding-inline: 3px 8px;
   border-radius: var(--r-control);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -884,8 +881,8 @@ kbd {
   border: 0;
   cursor: default;
   padding: 0;
-  inline-size: 18px;
-  block-size: 18px;
+  inline-size: 20px;
+  block-size: 20px;
   display: grid;
   place-items: center;
   border-radius: var(--r-chip);
@@ -899,15 +896,14 @@ kbd {
 .trail-x::after {
   content: "";
   position: absolute;
-  inset: -5px -4px;
+  inset: -4px;
 }
 .trail-x svg {
-  inline-size: 10px;
-  block-size: 10px;
-  translate: 0 0.5px;
+  inline-size: 16px;
+  block-size: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.6;
   stroke-linecap: round;
 }
 .trail-x:active {

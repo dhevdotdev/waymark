@@ -150,13 +150,12 @@ export class TrailMap {
       const text = document.createElement("span");
       text.textContent = entry.label;
       name.append(text);
-      node.append(name);
       const x = document.createElement("button");
       x.className = "trail-x";
       x.dataset.trailRemove = String(entry.id);
       x.setAttribute("aria-label", `Remove ${entry.label} from the trail`);
       x.innerHTML = icons.close;
-      node.append(x);
+      node.append(x, name);
       this.inner.append(node);
       elements.set(entry.id, node);
     }

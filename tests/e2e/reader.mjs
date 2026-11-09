@@ -392,6 +392,21 @@ check("another tab has its own trail", !(await page.locator(".trail").isVisible(
 await page.click(".tab:nth-child(1)");
 await pause(450);
 check("the first tab keeps its map", (await page.locator(".trail-node").count()) === 3);
+const closeControlIsLeading = (root, [button, label]) => {
+  const box = (selector) => root.querySelector(selector).getBoundingClientRect();
+  const control = box(button);
+  const mark = box(`${button} path`);
+  const centred = Math.abs(control.left + control.width / 2 - (mark.left + mark.width / 2)) <= 0.5;
+  return control.right <= box(label).left && control.width >= 20 && mark.width >= 6.9 && centred;
+};
+check(
+  "a tab's close control leads its title, centred and full size",
+  await page.locator(".tab").first().evaluate(closeControlIsLeading, [".tab-close", ".tab-title"]),
+);
+check(
+  "a trail stop's remove control leads its name, centred and full size",
+  await page.locator(".trail-node").first().evaluate(closeControlIsLeading, [".trail-x", ".trail-name span"]),
+);
 await page.click(".tab:nth-child(2) .tab-close", { force: true });
 await pause(300);
 check(
@@ -467,16 +482,54 @@ check("the Info pane has a history section", (await page.textContent(".rail-hist
 await page.click('[data-rail="outline"]');
 
 const tabsBefore = await page.locator(".tab").count();
+const noteBefore = await title();
+const activeTabTitle = () => page.textContent(".tab.is-active .tab-title");
 await page.click('[data-act="new-tab"]');
 await pause(400);
 check(
-  "the + button opens a tab and the palette",
+  "the + button opens a tab labelled New tab, with the palette",
+  (await page.locator(".tab").count()) === tabsBefore + 1 &&
+    (await page.locator(".palette input").isVisible()) &&
+    (await activeTabTitle()) === "New tab",
+);
+check("a new tab does not copy the note", (await page.locator(".doc-title").count()) === 0);
+await page.keyboard.press("Escape");
+await pause(250);
+check(
+  "Escape closes the palette and leaves the blank tab",
+  !(await page.locator(".palette input").isVisible()) &&
+    (await page.locator(".tab").count()) === tabsBefore + 1 &&
+    (await page.locator(".empty-state.is-page").isVisible()),
+);
+await page.keyboard.press("Meta+t");
+await pause(250);
+check(
+  "a second new tab reuses the blank one",
   (await page.locator(".tab").count()) === tabsBefore + 1 && (await page.locator(".palette input").isVisible()),
 );
-await page.keyboard.press("Escape");
-await pause(200);
+await page.keyboard.type("Starter feeding");
+await pause(250);
+await page.keyboard.press("Enter");
+await pause(500);
+check(
+  "picking a note fills the blank tab with nothing to go back to",
+  (await page.locator(".tab").count()) === tabsBefore + 1 &&
+    (await activeTabTitle()).startsWith("Starter feeding") &&
+    (await title()).startsWith("Starter feeding") &&
+    (await page.locator('[data-act="back"]').isDisabled()),
+);
 await page.keyboard.press("Meta+w");
 await pause(300);
+await page.click('[data-act="new-tab"]');
+await pause(300);
+await page.keyboard.press("Escape");
+await pause(250);
+await page.keyboard.press("Escape");
+await pause(400);
+check(
+  "a second Escape closes the blank tab and returns to the note",
+  (await page.locator(".tab").count()) === tabsBefore && (await title()) === noteBefore,
+);
 
 // Settings popover changes theme family
 await page.click('[data-act="settings"]');

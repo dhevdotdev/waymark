@@ -19,6 +19,8 @@ Every state has a visible way in and a visible way out.
 - The sidebar always shows a `Files | Search` switch. Search keeps its query and results while you are in Files. Escape returns to Files, and the X only clears the field.
 - The graph is a tab, as in Obsidian. ⌘G brings an open graph forward or opens one beside the current tab. Clicking a note in it replaces it in that tab, and Back returns to it. Escape steps back or closes the tab.
 - Anything that covers something closes with Escape and has a visible control. The button that opened a view stays pressed while the view is open.
+- A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
+- Close controls lead their label on tabs and trail stops, in a 20px target with the mark at the icon set's own size.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.
 
 ## Trails
