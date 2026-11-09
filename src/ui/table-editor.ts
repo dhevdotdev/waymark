@@ -303,6 +303,16 @@ class TableWidget extends WidgetType {
   }
 }
 
+/** Starts typing in the header of the table at `from`, with its placeholder text selected. */
+export function focusTableAt(view: EditorView, from: number): void {
+  for (const table of view.dom.querySelectorAll<HTMLElement>(".cm-table-widget")) {
+    if (view.posAtDOM(table) !== from) continue;
+    const cell = table.querySelector<HTMLElement>('[data-row="0"][data-column="0"]');
+    cell?.focus();
+    if (cell) getSelection()?.selectAllChildren(cell);
+  }
+}
+
 /** Only tables at the top level can be edited as cells, because a quoted or listed table has a prefix on every line. */
 function findTables(state: EditorState, frontmatterEnd: number): TableRange[] {
   const tree = ensureSyntaxTree(state, state.doc.length, PARSE_BUDGET_MS) ?? syntaxTree(state);

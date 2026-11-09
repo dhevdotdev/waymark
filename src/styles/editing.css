@@ -548,3 +548,165 @@ button.task-box:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.cm-embed-image {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 480px;
+  margin-block: 0.4em;
+  border-radius: var(--r-control);
+  text-indent: 0;
+}
+.doc-editing .doc-title {
+  outline: none;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.doc-editing .cm-tooltip-autocomplete {
+  padding: 4px;
+  border-radius: var(--r-control);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-ui);
+  text-indent: 0;
+}
+.doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul {
+  margin: 0;
+  padding: 0;
+  max-block-size: 260px;
+  min-inline-size: 220px;
+  font-family: var(--font-ui);
+  scrollbar-width: none;
+}
+.doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul > li {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 16px;
+  text-align: start;
+  padding: 5px 8px;
+  border-radius: var(--r-chip);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--selected);
+  color: var(--ink);
+}
+.doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul > li::before {
+  content: none;
+}
+.doc-editing .cm-completionLabel {
+  text-decoration: none;
+}
+.doc-editing .cm-completionMatchedText {
+  text-decoration: none;
+  color: var(--link);
+}
+.doc-editing .cm-completionDetail {
+  margin-inline-start: auto;
+  font-style: normal;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prompt-overlay {
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding-top: 18vh;
+  background: var(--scrim);
+}
+.prompt {
+  display: grid;
+  gap: 10px;
+  inline-size: min(420px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: var(--r-sheet);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+}
+.prompt-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 620;
+}
+.prompt input {
+  block-size: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.prompt input:focus {
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 0 4px var(--accent-soft);
+}
+.prompt-note {
+  margin: 0;
+  min-block-size: 1.2em;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+.prompt-note.is-problem {
+  color: var(--warn, var(--accent));
+}
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.context-menu {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  min-inline-size: 170px;
+  padding: 4px;
+}
+.context-item {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: default;
+  padding: 6px 10px;
+  border-radius: var(--r-chip);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  text-align: start;
+}
+@media (hover: hover) and (pointer: fine) {
+  .context-item:hover {
+    background: var(--selected);
+    color: var(--ink);
+  }
+}
+.appearance-btn span {
+  display: grid;
+}
+:root[data-scheme="dark"] .when-light,
+:root[data-scheme="light"] .when-dark {
+  display: none;
+}
+@media (min-width: 1241px) {
+  .rail-tabs {
+    position: fixed;
+    inset-block-start: calc((var(--chrome-h) - 28px) / 2);
+    inset-inline-end: 44px;
+    z-index: 5;
+    inline-size: calc(var(--rail-w) - 54px);
+  }
+  .rail-inner {
+    padding-block-start: 8px;
+  }
+}
+.sidebar-inner {
+  padding-block-start: 4px;
+}

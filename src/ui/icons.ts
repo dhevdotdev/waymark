@@ -19,6 +19,11 @@ export const icons = {
   ),
   note: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M9 2.5v3h3"/>`),
   folder: svg(`<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>`),
+  newNote: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M8.25 7.2v4M6.25 9.2h4"/>`),
+  sun: svg(
+    `<circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/>`,
+  ),
+  moon: svg(`<path d="M12.8 9.8A5.3 5.3 0 0 1 6.2 3.2a5.3 5.3 0 1 0 6.6 6.6z"/>`),
   plus: svg(`<path d="M8 3.5v9M3.5 8h9"/>`),
   minus: svg(`<path d="M3.5 8h9"/>`),
   fit: svg(`<path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3"/>`),

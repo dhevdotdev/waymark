@@ -11,6 +11,7 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
+import { editorInsert, type InsertOptions } from "./editor-insert";
 import { frontmatterEnd, livePreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
 
@@ -20,9 +21,11 @@ export interface EditorStats {
   line: number;
   column: number;
   words: number;
+  selected: number;
 }
 
-export interface EditorOptions {
+export interface EditorOptions extends InsertOptions {
+  assetUrl: (target: string) => string | null;
   text: string;
   lineSeparator: string;
   onChange: (text: string) => void;
@@ -186,7 +189,14 @@ function clickHandlers(options: EditorOptions): Extension {
 function stats(state: EditorState): EditorStats {
   const head = state.selection.main.head;
   const row = state.doc.lineAt(head);
-  return { line: row.number, column: head - row.from + 1, words: state.doc.toString().split(/\s+/).filter(Boolean).length };
+  const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
+  const { from, to } = state.selection.main;
+  return {
+    line: row.number,
+    column: head - row.from + 1,
+    words: words(state.doc.toString()),
+    selected: words(state.sliceDoc(from, to)),
+  };
 }
 
 export function createEditor(parent: HTMLElement, options: EditorOptions): EditorHandle {
@@ -202,7 +212,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         history(),
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
-        livePreview,
+        livePreview(options.assetUrl),
+        editorInsert(options),
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
         search({ top: true }),
         bubbleField,

@@ -76,6 +76,19 @@ export class Workspace {
   }
 
   /** A blank tab holds nothing worth coming back to, so it is left out. */
+  /** A note was renamed or moved. */
+  replaceNote(from: string, to: string): void {
+    for (const tab of this.tabs) tab.trail.replaceNote(from, to);
+  }
+
+  /** A note is gone, so a tab showing it goes back to being blank. */
+  forgetNote(path: string): void {
+    for (const tab of this.tabs) {
+      const { view } = tab.trail.current;
+      if (view.kind === "note" && view.path === path) tab.trail = new Trail({ kind: "blank" });
+    }
+  }
+
   save(): SavedWorkspace {
     const kept = (tab: Tab) => !isBlank(tab);
     return {

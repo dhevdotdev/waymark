@@ -235,6 +235,15 @@ export class Trail {
     this.current.view = view;
   }
 
+  /** Follows a note to its new path, everywhere this tab remembers it. */
+  replaceNote(from: string, to: string): void {
+    const move = (node: TrailNode) => {
+      if (node.view.kind === "note" && node.view.path === from) node.view = { kind: "note", path: to };
+    };
+    this.nodes.forEach(move);
+    for (const saved of [...this.before, ...this.after]) saved.nodes.forEach(move);
+  }
+
   back(): boolean {
     if (this.position > 0) {
       this.cur = this.visits[--this.position];

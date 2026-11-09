@@ -149,7 +149,7 @@ try {
     "the save state replaces the reading time",
     !(await page.locator(".pane-meta").isVisible()) && (await page.locator(".edit-state").isVisible()),
   );
-  check("the status bar counts words", /Ln \d+, Col \d+ · \d+ words/.test(await page.textContent(".status-stats")));
+  check("the status bar counts words", /Ln \d+, Col \d+ · [\d,]+ words/.test(await page.textContent(".status-stats")));
   check("heading marks are hidden off the line", !(await page.locator(".cm-content").textContent()).includes("## Third heading"));
   check("bold marks are hidden off the line", !(await page.locator(".cm-content").textContent()).includes("**bold**"));
   check("a task shows as a box", (await page.locator(".cm-task").count()) >= 4);

@@ -14,11 +14,13 @@ import { Inspector } from "./inspector";
 import { LinkPreview } from "./link-preview";
 import { isNarrow, railFloats } from "./media";
 import { NoteEditing } from "./note-editing";
+import { NoteFiles } from "./note-files";
 import { NoteView } from "./note-view";
 import { toast } from "./overlays";
 import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
+import { restoreTabs } from "./restore-tabs";
 import { applySound, toggleSettings } from "./settings";
 import { mountShell, type ShellElements } from "./shell";
 import { Sidebar } from "./sidebar";
@@ -80,6 +82,7 @@ export class Reader {
   readonly inspector: Inspector;
   readonly preview: LinkPreview;
   readonly editing: NoteEditing;
+  readonly files: NoteFiles;
   readonly workspace = new Workspace();
   /** The note on screen, or the note a graph tab was opened from. */
   current = "";
@@ -141,6 +144,19 @@ export class Reader {
       open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
       openUrl: (url) => void native.openExternal(url),
       renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
+      rename: (path, name) => this.files.renameTo(path, name),
+    });
+    this.files = new NoteFiles({
+      sidebar: els.sidebar,
+      vault,
+      prefs,
+      root: deps.root,
+      workspace: this.workspace,
+      editing: this.editing,
+      toast,
+      notePath: () => this.notePath,
+      open: (path, newTab) => this.open(path, { newTab, focus: true }),
+      redraw: () => this.redraw(),
     });
 
     this.sync = new SyncController({
@@ -185,7 +201,7 @@ export class Reader {
   /** Shows the restored note as soon as it is read, then reads and indexes the rest of the vault. */
   async start(startedAt: number, initial?: string): Promise<void> {
     const { vault, metrics, codeThemeReady } = this.deps;
-    this.restoreTabs(initial);
+    restoreTabs(this.workspace, vault.index, this.deps.prefs.value.vaults[this.deps.root], initial);
     if (this.workspace.isEmpty) {
       this.noteView.showEmptyVault();
       return;
@@ -364,8 +380,6 @@ export class Reader {
     });
   }
 
-  // External events
-
   /** External edits: re-read what changed, re-index it and re-render the open note in place. */
   async onVaultChanged(paths: string[]): Promise<void> {
     if (paths.some((p) => p.startsWith(".git/"))) this.sync.scheduleRefresh();
@@ -401,7 +415,7 @@ export class Reader {
     const inField =
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement ||
-      (e.target instanceof Element && e.target.closest(".cm-editor") !== null);
+      (e.target instanceof HTMLElement && e.target.isContentEditable);
     if (e.key === "Escape") {
       this.handleEscape(inField);
       return;
@@ -415,7 +429,7 @@ export class Reader {
   /** Escape closes the most recently opened layer first. */
   private handleEscape(inField: boolean): void {
     const { shell } = this.els;
-    if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover")) return;
+    if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover, .prompt-overlay")) return;
     if (this.sync.panel.isOpen) this.sync.panel.close();
     else if (this.find.isOpen) this.find.close();
     else if (!this.workspace.isEmpty && this.onGraph && !inField) this.leaveGraph();
@@ -446,28 +460,8 @@ export class Reader {
     });
   }
 
-  // Rendering
-
   private renderContext(): RenderContext {
     return { index: this.vault.index, highlighter: this.deps.highlighter, assetUrl: this.vault.source.assetUrl };
-  }
-
-  private restoreTabs(initial?: string): void {
-    const { index } = this.vault;
-    const saved = this.deps.prefs.value.vaults[this.deps.root];
-    const wanted = initial ? index.resolve(initial) : null;
-    if (wanted?.kind === "found") {
-      this.workspace.startWith({ kind: "note", path: wanted.path });
-    } else if (saved?.tabs?.length) {
-      this.workspace.restore(
-        { tabs: saved.tabs, active: saved.active ?? 0 },
-        (view) => view.kind !== "blank" && index.notes.includes(view.kind === "note" ? view.path : view.note),
-      );
-    }
-    if (this.workspace.isEmpty) {
-      const fallback = index.notes.find((p) => /^(readme|index|home)\.md$/i.test(p)) ?? index.notes[0];
-      if (fallback) this.workspace.startWith({ kind: "note", path: fallback });
-    }
   }
 
   private async show(opts: ShowOptions = {}): Promise<void> {
@@ -517,6 +511,7 @@ export class Reader {
     this.renderTabChrome(opts.entering);
     if (changedNote || !opts.quiet) this.renderTree();
     this.inspector.render(path, rendered);
+    this.editing.stats.read(path);
     this.persist();
     this.find.refresh();
 
@@ -527,10 +522,17 @@ export class Reader {
     if (opts.find) this.noteView.jumpToText(opts.find);
   }
 
+  /** After files move or vanish, redraws without disturbing a note being edited. */
+  private async redraw(): Promise<void> {
+    if (!this.editing.isOpen) return this.show({ keepScroll: true, keyboard: true });
+    this.current = this.notePath;
+    this.renderTabChrome();
+    this.renderTree();
+  }
+
   private showBlank(): void {
     if (this.find.isOpen) this.find.close();
-    const { prefs, root, name } = this.deps;
-    this.els.scroller.replaceChildren(startPage(this.vault, prefs, root, name));
+    this.els.scroller.replaceChildren(startPage(this.vault, this.deps.prefs, this.deps.root, this.deps.name));
     paint("search", []);
     this.renderTabChrome();
     this.renderTree();
@@ -590,6 +592,7 @@ export class Reader {
     this.renderTrail();
     shell.classList.toggle("is-graph", this.onGraph);
     shell.classList.toggle("is-blank", this.onBlank);
+    if (this.onGraph || this.onBlank) this.editing.stats.hide();
     graphButton.classList.toggle("is-on", this.onGraph);
     graphButton.setAttribute("aria-pressed", String(this.onGraph));
     back.disabled = !trail.canBack;

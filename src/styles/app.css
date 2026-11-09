@@ -82,7 +82,7 @@ kbd {
 }
 .shell.no-anim,
 .shell.no-anim .sidebar-inner,
-.shell.no-anim .sidebar-head {
+.shell.no-anim .sidebar-search {
   transition: none;
 }
 
@@ -387,17 +387,6 @@ kbd {
   flex-direction: column;
   box-shadow: inset -1px 0 var(--rule);
 }
-.sidebar-head {
-  width: var(--sidebar-w);
-  flex: none;
-  padding: 5px 10px 8px;
-  transition:
-    opacity var(--t-slide) ease,
-    translate var(--t-slide) var(--ease-in-out);
-}
-.sidebar-head .seg-btn {
-  padding: 0 6px;
-}
 .sidebar-inner {
   flex: 1;
   min-height: 0;
@@ -410,7 +399,7 @@ kbd {
     opacity var(--t-slide) ease,
     translate var(--t-slide) var(--ease-in-out);
 }
-.shell.sidebar-closed :is(.sidebar-inner, .sidebar-head, .sidebar-search) {
+.shell.sidebar-closed :is(.sidebar-inner, .sidebar-search) {
   opacity: 0;
   translate: -12px 0;
   pointer-events: none;
@@ -1419,7 +1408,7 @@ kbd {
   .shell.sidebar-peek .sidebar {
     translate: 0 0;
   }
-  .shell :is(.sidebar-inner, .sidebar-head) {
+  .shell :is(.sidebar-inner, .sidebar-search) {
     opacity: 1;
     translate: 0 0;
     pointer-events: auto;

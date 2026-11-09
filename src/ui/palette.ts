@@ -40,6 +40,7 @@ export class Palette {
   constructor(
     private source: (query: string) => PaletteItem[],
     private recent: () => PaletteItem[],
+    private readonly look: { placeholder: string; compact?: boolean } = { placeholder: "Go to a note, or type > for commands" },
   ) {}
 
   get isOpen(): boolean {
@@ -58,11 +59,11 @@ export class Palette {
       <div class="palette" role="dialog" aria-label="Command palette">
         <div class="palette-field">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
-          <input type="text" spellcheck="false" autocomplete="off" placeholder="Go to a note, or type > for commands" aria-label="Search notes and commands" role="combobox" aria-expanded="true" aria-controls="palette-list" />
+          <input type="text" spellcheck="false" autocomplete="off" placeholder="${this.look.placeholder}" aria-label="Search notes and commands" role="combobox" aria-expanded="true" aria-controls="palette-list" />
           <kbd>esc</kbd>
         </div>
         <div class="palette-list" id="palette-list" role="listbox"></div>
-        <div class="palette-foot"><span><kbd>↵</kbd> open</span><span><kbd>⌘↵</kbd> new tab</span><span><kbd>></kbd> commands</span></div>
+        ${this.look.compact ? "" : `<div class="palette-foot"><span><kbd>↵</kbd> open</span><span><kbd>⌘↵</kbd> new tab</span><span><kbd>></kbd> commands</span></div>`}
       </div>`;
     this.root = root;
     this.input = root.querySelector("input")!;

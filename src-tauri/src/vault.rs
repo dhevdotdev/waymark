@@ -114,12 +114,7 @@ pub fn write_note(
         if expected.is_some() {
             return Ok(WriteOutcome::Missing);
         }
-        let parent = rel_path.parent().filter(|p| !p.as_os_str().is_empty());
-        let dir = match parent {
-            Some(p) => resolve_in(root, p.to_str().ok_or_else(refused)?)?,
-            None => root.canonicalize().map_err(|e| e.to_string())?,
-        };
-        dir.join(rel_path.file_name().ok_or_else(refused)?)
+        prepared_parent(root, rel_path)?.join(rel_path.file_name().ok_or_else(refused)?)
     };
     if target.exists() {
         let current =
@@ -174,6 +169,87 @@ fn replace_atomically(target: &Path, text: &str) -> std::io::Result<()> {
         let _ = std::fs::remove_file(&temp);
     }
     result
+}
+
+/// The Obsidian settings Waymark follows, so the vault keeps behaving the same in either app.
+#[derive(Serialize, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultSettings {
+    pub attachment_folder: String,
+    pub new_note_location: String,
+    pub new_note_folder: String,
+}
+
+/// Read only. Waymark never writes to `.obsidian`.
+pub fn settings(root: &Path) -> VaultSettings {
+    let config: serde_json::Value = std::fs::read_to_string(root.join(".obsidian/app.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default();
+    let field = |key: &str| config[key].as_str().unwrap_or_default().to_string();
+    VaultSettings {
+        attachment_folder: field("attachmentFolderPath"),
+        new_note_location: field("newFileLocation"),
+        new_note_folder: field("newFileFolderPath"),
+    }
+}
+
+const ATTACHMENT_TYPES: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "avif", "pdf"];
+
+fn plain_relative(path: &Path) -> bool {
+    path.components()
+        .all(|c| matches!(c, Component::Normal(part) if !part.to_string_lossy().starts_with('.')))
+}
+
+fn has_extension(path: &Path, allowed: &[&str]) -> bool {
+    path.extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .is_some_and(|e| allowed.contains(&e.as_str()))
+}
+
+/// The folder a new file goes in, created if needed and confirmed to be inside the vault.
+fn prepared_parent(root: &Path, rel: &Path) -> Result<PathBuf, String> {
+    let Some(parent) = rel.parent().filter(|p| !p.as_os_str().is_empty()) else {
+        return root.canonicalize().map_err(|e| e.to_string());
+    };
+    std::fs::create_dir_all(root.join(parent)).map_err(|e| e.to_string())?;
+    resolve_in(root, &parent.to_string_lossy())
+}
+
+/// Renames or moves a note. Refuses to land on anything that already exists, apart from the same file in a different case.
+pub fn rename_note(root: &Path, from: &str, to: &str) -> Result<(), String> {
+    let (from_path, to_path) = (Path::new(from), Path::new(to));
+    let is_note = |p: &Path| plain_relative(p) && has_extension(p, &["md"]);
+    if !is_note(from_path) || !is_note(to_path) {
+        return Err(format!("Refusing to move outside the vault's notes: {to}"));
+    }
+    let source = resolve_in(root, from)?;
+    let name = to_path.file_name().ok_or("That is not a note name")?;
+    if root.join(to_path).symlink_metadata().is_ok() {
+        let same = root.join(to_path).canonicalize().ok().as_ref() == Some(&source);
+        if !same {
+            return Err(format!("A note already exists at {to}"));
+        }
+    }
+    let target = prepared_parent(root, to_path)?.join(name);
+    std::fs::rename(source, target).map_err(|e| format!("Could not move {from}: {e}"))
+}
+
+/// Adds a new image or PDF to the vault. An existing file is never replaced.
+pub fn write_attachment(root: &Path, rel: &str, bytes: &[u8]) -> Result<(), String> {
+    let path = Path::new(rel);
+    if !plain_relative(path) || !has_extension(path, &ATTACHMENT_TYPES) {
+        return Err(format!("Refusing to add this file to the vault: {rel}"));
+    }
+    let name = path.file_name().ok_or("That is not a file name")?;
+    let target = prepared_parent(root, path)?.join(name);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&target)
+        .map_err(|e| format!("Could not add {rel}: {e}"))?;
+    file.write_all(bytes)
+        .map_err(|e| format!("Could not add {rel}: {e}"))
 }
 
 pub fn info(root: &Path) -> VaultInfo {
@@ -315,6 +391,19 @@ mod tests {
     }
 
     #[test]
+    fn a_new_note_can_start_a_new_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            write_note(dir.path(), "In/box/a.md", "x", None),
+            Ok(WriteOutcome::Saved)
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("In/box/a.md")).unwrap(),
+            "x"
+        );
+    }
+
+    #[test]
     fn a_deleted_note_is_reported_and_not_recreated() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(
@@ -370,6 +459,85 @@ mod tests {
             0o600
         );
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn renames_and_moves_a_note_creating_its_folder() {
+        let (dir, _) = note("x");
+        rename_note(dir.path(), "a.md", "Deep/er/b.md").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("Deep/er/b.md")).unwrap(),
+            "x"
+        );
+        assert!(!dir.path().join("a.md").exists());
+    }
+
+    #[test]
+    fn a_rename_never_lands_on_another_note() {
+        let (dir, path) = note("mine");
+        std::fs::write(dir.path().join("b.md"), "theirs").unwrap();
+        assert!(rename_note(dir.path(), "a.md", "b.md").is_err());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("b.md")).unwrap(),
+            "theirs"
+        );
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "mine");
+    }
+
+    #[test]
+    fn a_rename_stays_among_the_vaults_notes() {
+        let (dir, _) = note("x");
+        for to in ["../out.md", ".obsidian/a.md", "b.txt", "/tmp/b.md"] {
+            assert!(rename_note(dir.path(), "a.md", to).is_err(), "{to}");
+        }
+        assert!(dir.path().join("a.md").exists());
+    }
+
+    #[test]
+    fn a_rename_refuses_a_folder_that_links_out_of_the_vault() {
+        let (dir, path) = note("x");
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), dir.path().join("away")).unwrap();
+        assert!(rename_note(dir.path(), "a.md", "away/b.md").is_err());
+        assert!(path.exists());
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn an_attachment_is_added_and_never_replaces_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        write_attachment(dir.path(), "Attachments/a.png", b"one").unwrap();
+        assert!(write_attachment(dir.path(), "Attachments/a.png", b"two").is_err());
+        assert_eq!(
+            std::fs::read(dir.path().join("Attachments/a.png")).unwrap(),
+            b"one"
+        );
+    }
+
+    #[test]
+    fn only_images_and_pdfs_can_be_added_inside_the_vault() {
+        let dir = tempfile::tempdir().unwrap();
+        for path in ["a.exe", "a.md", "../a.png", ".obsidian/a.png", "a"] {
+            assert!(write_attachment(dir.path(), path, b"x").is_err(), "{path}");
+        }
+    }
+
+    #[test]
+    fn reads_obsidian_settings_and_copes_without_them() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(settings(dir.path()), VaultSettings::default());
+        std::fs::create_dir(dir.path().join(".obsidian")).unwrap();
+        std::fs::write(
+            dir.path().join(".obsidian/app.json"),
+            r#"{"attachmentFolderPath":"/Files","newFileLocation":"folder","newFileFolderPath":"/In"}"#,
+        )
+        .unwrap();
+        let read = settings(dir.path());
+        assert_eq!(read.attachment_folder, "/Files");
+        assert_eq!(read.new_note_location, "folder");
+        assert_eq!(read.new_note_folder, "/In");
+        std::fs::write(dir.path().join(".obsidian/app.json"), "not json").unwrap();
+        assert_eq!(settings(dir.path()), VaultSettings::default());
     }
 
     #[test]

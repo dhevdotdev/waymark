@@ -30,6 +30,14 @@ export function rememberNote(prefs: PrefStore, root: string, path: string): void
   });
 }
 
+/** Keeps a renamed note in the recent list. */
+export function renameRecent(prefs: PrefStore, root: string, from: string, to: string): void {
+  prefs.update((p) => {
+    const vault = p.vaults[root];
+    if (vault) vault.recent = recentNotes(vault.recent).map((entry) => (entry.path === from ? { ...entry, path: to } : entry));
+  });
+}
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   e.className = cls;

@@ -48,7 +48,8 @@ function template(options: ShellOptions): string {
         <div class="titlebar-lead" data-tauri-drag-region>
           <div class="titlebar-nav">
             <button class="icon-btn" data-act="sidebar" data-tip="Sidebar" data-key="⌘\\" aria-label="Toggle sidebar">${icons.sidebar}</button>
-            <button class="icon-btn" data-act="palette" data-tip="Go to note" data-key="⌘K" aria-label="Go to a note or run a command">${icons.search}</button>
+            <button class="icon-btn" data-side="search" data-tip="Search inside notes" data-key="⌘⇧F" aria-label="Search inside notes">${icons.search}</button>
+            <button class="icon-btn" data-act="new-note" data-tip="New note" data-key="⌘N" aria-label="New note">${icons.newNote}</button>
           </div>
           <div class="titlebar-nav">
             <button class="icon-btn" data-act="back" data-tip="Back" data-key="⌘[" aria-label="Back">${icons.back}</button>
@@ -61,12 +62,6 @@ function template(options: ShellOptions): string {
         </div>
       </header>
       <nav class="sidebar" aria-label="Navigation">
-        <div class="sidebar-head">
-          <div class="seg seg-full" role="tablist" aria-label="Sidebar view">
-            <button class="seg-btn" role="tab" data-side="files" data-tip="Files" data-key="⌘⇧E">Files</button>
-            <button class="seg-btn" role="tab" data-side="search" data-tip="Search inside notes" data-key="⌘⇧F">Search</button>
-          </div>
-        </div>
         <div class="sidebar-inner" data-side-pane="files"></div>
         <div class="sidebar-search" data-side-pane="search" hidden>
           <div class="search-head">
@@ -100,6 +95,7 @@ function template(options: ShellOptions): string {
         </div>
         <div class="status-trail">
           <span class="status-stats" hidden></span>
+          <button class="icon-btn appearance-btn" data-act="appearance" data-tip="Light or dark" aria-label="Switch between light and dark"><span class="when-dark">${icons.sun}</span><span class="when-light">${icons.moon}</span></button>
           <button class="icon-btn" data-act="graph" data-tip="Graph" data-key="⌘G" aria-label="Graph view">${icons.graph}</button>
           <button class="icon-btn" data-act="settings" data-tip="Appearance and sync" data-key="⌘," aria-label="Appearance and sync">${icons.sliders}</button>
         </div>

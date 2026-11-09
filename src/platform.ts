@@ -1,4 +1,4 @@
-import type { VaultSource, WriteOutcome } from "./vault/source";
+import type { VaultSettings, VaultSource, WriteOutcome } from "./vault/source";
 
 export const isDesktop = "__TAURI_INTERNALS__" in window;
 
@@ -58,14 +58,16 @@ export interface VaultInfo {
   isGit: boolean;
 }
 
-type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+type InvokeBody = Record<string, unknown> | Uint8Array;
+type InvokeOptions = { headers: Record<string, string> };
+type Invoke = <T>(cmd: string, args?: InvokeBody, options?: InvokeOptions) => Promise<T>;
 let invokeImpl: Invoke | null = null;
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+async function call<T>(cmd: string, args?: InvokeBody, options?: InvokeOptions): Promise<T> {
   if (!isDesktop) throw new GitError("other", "Available in the desktop app");
   invokeImpl ??= (await import("@tauri-apps/api/core")).invoke as Invoke;
   try {
-    return await invokeImpl<T>(cmd, args);
+    return await invokeImpl<T>(cmd, args, options);
   } catch (err) {
     if (err && typeof err === "object" && "kind" in err) {
       const e = err as { kind: GitErrorKind; message: string };
@@ -140,6 +142,10 @@ export function desktopVaultSource(): VaultSource {
     readText: (path) => call<string>("read_text", { path }),
     readMany: (paths) => call<(string | null)[]>("read_many", { paths }),
     writeNote: (path, text, expected) => call<WriteOutcome>("write_note", { path, text, expected }),
+    renameNote: (from, to) => call<void>("rename_note", { from, to }),
+    trashNote: (path) => call<void>("trash_note", { path }),
+    writeAttachment: (path, bytes) => call<void>("write_attachment", bytes, { headers: { "x-path": encodeURIComponent(path) } }),
+    settings: () => call<VaultSettings>("vault_settings"),
     assetUrl: (path) => `vault://localhost/${path.split("/").map(encodeURIComponent).join("/")}`,
   };
 }

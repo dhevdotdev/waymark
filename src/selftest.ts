@@ -40,6 +40,8 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
   check("a family with no icon is refused", !(await accepted("no-such-family")));
 }
 
+const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 /** Proves the write path and the editor in the packaged app, where CSP and IPC apply. */
 async function checkEditing({ app, reader, vault, check, until }: SelfTestContext): Promise<void> {
   const note = "Selftest edits.md";
@@ -76,6 +78,20 @@ async function checkEditing({ app, reader, vault, check, until }: SelfTestContex
     () => true,
   );
   check("a write outside the vault is refused", refused);
+  const png = Uint8Array.from(atob(TINY_PNG), (c) => c.charCodeAt(0));
+  await vault.source.writeAttachment("Selftest files/dot.png", png);
+  check("an image can be added", (await vault.source.list()).includes("Selftest files/dot.png"));
+  const replaced = await vault.source.writeAttachment("Selftest files/dot.png", png).then(
+    () => true,
+    () => false,
+  );
+  check("an image is never replaced", !replaced);
+  check("Obsidian's settings can be read", typeof (await vault.source.settings()).attachmentFolder === "string");
+  await reader.files.renameTo(note, "Selftest renamed");
+  check("a note can be renamed", (await vault.source.list()).includes("Selftest renamed.md"));
+  check("the open tab follows the rename", reader.current === "Selftest renamed.md", reader.current);
+  await vault.source.trashNote("Selftest renamed.md");
+  check("a note can be moved to the Trash", !(await vault.source.list()).includes("Selftest renamed.md"));
 }
 
 async function runRead(ctx: SelfTestContext): Promise<void> {

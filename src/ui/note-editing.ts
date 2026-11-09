@@ -1,8 +1,10 @@
 import { Draft, type DraftState } from "../vault/draft";
 import type { VaultStore } from "../vault/store";
 import { lineEnding, toggleTask } from "../vault/tasks";
-import type { EditorHandle, EditorStats } from "./editor-view";
+import type { LinkOption } from "./editor-insert";
+import type { EditorHandle } from "./editor-view";
 import type { ShellElements } from "./shell";
+import { StatusStats } from "./status-stats";
 
 export interface EditingHost {
   els: ShellElements;
@@ -14,6 +16,7 @@ export interface EditingHost {
   open: (path: string, newTab: boolean, anchor?: string) => void;
   openUrl: (url: string) => void;
   renderInline: (text: string, path: string) => DocumentFragment;
+  rename: (path: string, name: string) => Promise<boolean>;
 }
 
 interface Session {
@@ -21,10 +24,18 @@ interface Session {
   draft: Draft;
   editor: EditorHandle;
   banner: HTMLElement;
+  heading: HTMLElement;
 }
 
-const WORDS_PER_MINUTE = 230;
 const CLIPBOARD = "clipboard";
+const ATTACHABLE = /\.(png|jpe?g|gif|webp|avif|pdf)$/i;
+const TYPE_EXTENSION: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+const SHOWN_AS_IMAGE = /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i;
 const STATE_LABEL: Record<DraftState["kind"], string> = {
   saved: "Saved",
   unsaved: "Saving…",
@@ -34,10 +45,12 @@ const STATE_LABEL: Record<DraftState["kind"], string> = {
   failed: "Not saved",
 };
 
-function stamp(): string {
+function stamp(compact = false): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const date = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())];
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}`;
+  return compact ? `${date.join("")}${time}${pad(now.getSeconds())}` : `${date.join("-")} ${time}`;
 }
 
 /** Everything that changes a note: clicking a task, and editing one note at a time. */
@@ -46,8 +59,33 @@ export class NoteEditing {
   private opening = false;
   private toggling = false;
   private readonly undoTasks: { path: string; line: number; wrote: string }[] = [];
+  readonly stats: StatusStats;
 
-  constructor(private readonly host: EditingHost) {}
+  constructor(private readonly host: EditingHost) {
+    this.stats = new StatusStats(host.els.statusStats, host.vault, () => host.els.scroller.querySelector(".doc"));
+  }
+
+  get path(): string {
+    return this.session?.path ?? "";
+  }
+
+  /** The note being edited was renamed or moved, so saves follow it. */
+  noteMoved(from: string, to: string): void {
+    if (this.session?.path === from) this.session.path = to;
+  }
+
+  /** Leaves the editor without saving, because the note is being deleted. */
+  discard(): void {
+    this.session?.editor.destroy();
+    this.teardown();
+  }
+
+  private teardown(): void {
+    this.session = null;
+    this.host.els.shell.classList.remove("is-editing");
+    this.stats.hide();
+    this.markMode(false);
+  }
 
   get isOpen(): boolean {
     return this.session !== null;
@@ -67,7 +105,7 @@ export class NoteEditing {
     scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight);
   }
 
-  async open(): Promise<void> {
+  async open(options: { focusTitle?: boolean } = {}): Promise<void> {
     const { vault, els, notePath, toast, incomingCommits } = this.host;
     const path = notePath();
     if (this.session || this.opening || !path) return;
@@ -84,34 +122,50 @@ export class NoteEditing {
       const { scroller } = els;
       const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
       const title = scroller.querySelector(".doc-title")?.textContent ?? vault.index.title(path);
-      const { page, banner, surface } = this.mountPage(title);
-      const draft = new Draft(
-        text,
-        (next, expected) => vault.save(path, next, expected),
-        (state) => this.showState(state),
-      );
-      const editor = createEditor(surface, {
-        text,
-        lineSeparator: separator,
-        onChange: (next) => draft.update(next),
-        onStats: (stats) => this.showStats(stats),
-        openWikilink: (link, newTab) => {
-          const [name, anchor] = link.split("#");
-          const found = vault.index.resolve(name);
-          if (found.kind === "found") this.host.open(found.path, newTab, anchor);
-        },
-        openUrl: this.host.openUrl,
-        renderInline: (cell) => this.host.renderInline(cell, path),
-      });
+      const { page, banner, surface, heading } = this.mountPage(title);
+      const session: Session = {
+        path,
+        banner,
+        heading,
+        draft: new Draft(
+          text,
+          (next, expected) => vault.save(session.path, next, expected),
+          (state) => this.showState(state),
+        ),
+        editor: createEditor(surface, {
+          text,
+          lineSeparator: separator,
+          onChange: (next) => session.draft.update(next),
+          onStats: (stats) => this.stats.editing(stats),
+          openWikilink: (link, newTab) => {
+            const [name, anchor] = link.split("#");
+            const found = vault.index.resolve(name);
+            if (found.kind === "found") this.host.open(found.path, newTab, anchor);
+          },
+          openUrl: this.host.openUrl,
+          renderInline: (cell) => this.host.renderInline(cell, this.session?.path ?? path),
+          assetUrl: (target) => this.assetUrl(target),
+          linkTargets: (embed) => this.linkTargets(embed),
+          headingsOf: (target) => this.headingsOf(target),
+          addFile: (file) => this.addFile(file, session.path),
+          today: () => new Date().toLocaleDateString("en-CA"),
+        }),
+      };
       scroller.replaceChildren(page);
-      this.session = { path, draft, editor, banner };
+      this.session = session;
+      const { draft, editor } = session;
       els.shell.classList.add("is-editing");
       this.showState(draft.state);
       this.markMode(true);
       scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight);
       const box = surface.getBoundingClientRect();
       editor.placeCursorAt(box.left + 8, Math.max(box.top, scroller.getBoundingClientRect().top) + 12);
-      editor.focus();
+      if (options.focusTitle) {
+        heading.focus();
+        getSelection()?.selectAllChildren(heading);
+      } else {
+        editor.focus();
+      }
       if (incomingCommits() > 0) toast("Incoming commits are waiting. Syncing before you edit avoids a conflict.");
     } finally {
       this.opening = false;
@@ -143,10 +197,7 @@ export class NoteEditing {
       );
     }
     session.editor.destroy();
-    this.session = null;
-    this.host.els.shell.classList.remove("is-editing");
-    this.host.els.statusStats.hidden = true;
-    this.markMode(false);
+    this.teardown();
     return true;
   }
 
@@ -217,7 +268,103 @@ export class NoteEditing {
     }
   }
 
-  private mountPage(title: string): { page: HTMLElement; banner: HTMLElement; surface: HTMLElement } {
+  private assetUrl(target: string): string | null {
+    const { vault } = this.host;
+    const found = vault.index.resolve(target, false);
+    return found.kind === "found" && SHOWN_AS_IMAGE.test(found.path) ? vault.source.assetUrl(found.path) : null;
+  }
+
+  private linkTargets(embed: boolean): LinkOption[] {
+    const { index } = this.host.vault;
+    const detail = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : undefined);
+    const notes = index.notes.map((path) => {
+      const label = index.title(path);
+      return { label, target: index.resolve(label).kind === "found" ? label : path.replace(/\.md$/i, ""), detail: detail(path) };
+    });
+    if (!embed) return notes;
+    const files = index.attachments.map((path) => {
+      const label = path.slice(path.lastIndexOf("/") + 1);
+      return { label, target: index.resolve(label, false).kind === "found" ? label : path, detail: detail(path) };
+    });
+    return [...files, ...notes];
+  }
+
+  private headingsOf(target: string): string[] {
+    const { vault } = this.host;
+    const found = vault.index.resolve(target);
+    if (found.kind !== "found") return [];
+    const text = vault.texts.get(found.path) ?? "";
+    return [...text.matchAll(/^#{1,6}[ \t]+(.+?)[ \t]*$/gm)].map((match) => match[1]);
+  }
+
+  /** Saves a pasted or dropped file where Obsidian is set to keep attachments, and returns the embed for it. */
+  private async addFile(file: File, notePath: string): Promise<string | null> {
+    const { vault, toast } = this.host;
+    const pasted = /^image\.\w+$/.test(file.name) || !file.name;
+    const extension = TYPE_EXTENSION[file.type];
+    const name = pasted ? `Pasted image ${stamp(true)}.${extension ?? file.name.split(".").pop()}` : file.name;
+    if (!ATTACHABLE.test(name)) {
+      toast("Only images and PDFs can be added to a note.");
+      return null;
+    }
+    try {
+      const { attachmentFolder } = await vault.source.settings();
+      const folder = this.attachmentFolder(attachmentFolder, notePath);
+      const path = this.unusedFile(folder, name);
+      await vault.source.writeAttachment(path, new Uint8Array(await file.arrayBuffer()));
+      await vault.applyChanges([]);
+      const short = path.slice(path.lastIndexOf("/") + 1);
+      return `![[${vault.index.resolve(short, false).kind === "found" ? short : path}]]`;
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "The file could not be added.");
+      return null;
+    }
+  }
+
+  private attachmentFolder(setting: string, notePath: string): string {
+    const noteFolder = notePath.includes("/") ? notePath.slice(0, notePath.lastIndexOf("/")) : "";
+    if (setting === "./" || setting === ".") return noteFolder;
+    if (setting.startsWith("./")) return [noteFolder, setting.slice(2).replace(/\/+$/, "")].filter(Boolean).join("/");
+    return setting.replace(/^\/+|\/+$/g, "");
+  }
+
+  private unusedFile(folder: string, name: string): string {
+    const { attachments } = this.host.vault.index;
+    const dot = name.lastIndexOf(".");
+    const inFolder = (file: string) => (folder ? `${folder}/${file}` : file);
+    let path = inFolder(name);
+    for (let n = 1; attachments.includes(path); n++) path = inFolder(`${name.slice(0, dot)} ${n}${name.slice(dot)}`);
+    return path;
+  }
+
+  private bindTitle(heading: HTMLElement): void {
+    heading.setAttribute("contenteditable", "plaintext-only");
+    heading.spellcheck = false;
+    let before = heading.textContent ?? "";
+    const commit = async () => {
+      const name = (heading.textContent ?? "").trim();
+      const session = this.session;
+      if (!session || name === before) return;
+      if (await this.host.rename(session.path, name)) before = name;
+      else heading.textContent = before;
+    };
+    heading.addEventListener("focus", () => {
+      before = heading.textContent ?? "";
+    });
+    heading.addEventListener("blur", () => void commit());
+    heading.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.session?.editor.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        heading.textContent = before;
+        this.session?.editor.focus();
+      }
+    });
+  }
+
+  private mountPage(title: string): { page: HTMLElement; banner: HTMLElement; surface: HTMLElement; heading: HTMLElement } {
     const page = document.createElement("article");
     page.className = "doc doc-editing";
     const head = document.createElement("header");
@@ -225,6 +372,7 @@ export class NoteEditing {
     const heading = document.createElement("h1");
     heading.className = "doc-title";
     heading.textContent = title;
+    this.bindTitle(heading);
     head.append(heading);
     const banner = document.createElement("div");
     banner.className = "edit-banner";
@@ -233,7 +381,7 @@ export class NoteEditing {
     const surface = document.createElement("div");
     surface.className = "edit-surface";
     page.append(head, banner, surface);
-    return { page, banner, surface };
+    return { page, banner, surface, heading };
   }
 
   private markMode(editing: boolean): void {
@@ -242,12 +390,6 @@ export class NoteEditing {
       button.classList.toggle("is-on", on);
       button.setAttribute("aria-pressed", String(on));
     }
-  }
-
-  private showStats({ line, column, words }: EditorStats): void {
-    const { statusStats } = this.host.els;
-    statusStats.hidden = false;
-    statusStats.textContent = `Ln ${line}, Col ${column} · ${words} words · ${Math.max(1, Math.round(words / WORDS_PER_MINUTE))} min`;
   }
 
   private showState(state: DraftState): void {

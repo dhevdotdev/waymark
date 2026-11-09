@@ -1,4 +1,4 @@
-import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
@@ -38,10 +38,71 @@ async function writeNote(root: string, body: { path: string; text: string; expec
   const current = await readFile(abs, "utf8").catch(() => null);
   if (current === null && body.expected !== null) return { kind: "missing" };
   if (current !== null && current !== body.expected) return { kind: "changed", current };
+  await mkdir(path.dirname(abs), { recursive: true });
   const temp = `${abs}.waymark-tmp`;
   await writeFile(temp, body.text);
   await rename(temp, abs);
   return { kind: "saved" };
+}
+
+const FILE_ACTIONS = new Set(["/rename", "/trash", "/attachment"]);
+
+function insideVault(root: string, rel: string): string {
+  const abs = path.resolve(root, rel);
+  if (!abs.startsWith(path.resolve(root) + path.sep) || rel.split("/").some((p) => p.startsWith(".")))
+    throw new Error("outside the vault");
+  return abs;
+}
+
+async function respondToFileAction(root: string, url: URL, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.headers["x-waymark"] !== "1") throw new Error("refused");
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const body = Buffer.concat(chunks);
+  if (url.pathname === "/attachment") {
+    const target = insideVault(root, url.searchParams.get("path") ?? "");
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, body, { flag: "wx" });
+  } else if (url.pathname === "/trash") {
+    await unlink(insideVault(root, JSON.parse(body.toString()).path));
+  } else {
+    const { from, to } = JSON.parse(body.toString());
+    const target = insideVault(root, to);
+    await stat(target).then(
+      () => {
+        throw new Error("exists");
+      },
+      () => undefined,
+    );
+    await mkdir(path.dirname(target), { recursive: true });
+    await rename(insideVault(root, from), target);
+  }
+  res.end();
+}
+
+async function respondWithSettings(root: string, res: ServerResponse): Promise<void> {
+  const app = await readFile(path.join(root, ".obsidian/app.json"), "utf8").then(JSON.parse, () => ({}));
+  res.setHeader("content-type", "application/json");
+  res.end(
+    JSON.stringify({
+      attachmentFolder: app.attachmentFolderPath ?? "",
+      newNoteLocation: app.newFileLocation ?? "",
+      newNoteFolder: app.newFileFolderPath ?? "",
+    }),
+  );
+}
+
+async function respondWithFile(root: string, rel: string, res: ServerResponse): Promise<void> {
+  const abs = path.resolve(root, rel);
+  if (!abs.startsWith(path.resolve(root) + path.sep) || rel.split("/").some((p) => p.startsWith("."))) {
+    res.statusCode = 403;
+    res.end();
+    return;
+  }
+  const info = await stat(abs);
+  if (!info.isFile()) throw new Error("not a file");
+  res.setHeader("content-type", MIME[path.extname(abs).toLowerCase()] ?? "application/octet-stream");
+  res.end(await readFile(abs));
 }
 
 async function respondToWrite(root: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -76,22 +137,20 @@ function devVault(root: string | undefined): Plugin {
             res.end(JSON.stringify(await walk(root)));
             return;
           }
+          if (url.pathname === "/settings") {
+            await respondWithSettings(root, res);
+            return;
+          }
+          if (FILE_ACTIONS.has(url.pathname) && req.method === "POST") {
+            await respondToFileAction(root, url, req, res);
+            return;
+          }
           if (url.pathname === "/write" && req.method === "POST") {
             await respondToWrite(root, req, res);
             return;
           }
           if (url.pathname === "/file") {
-            const rel = url.searchParams.get("path") ?? "";
-            const abs = path.resolve(root, rel);
-            if (!abs.startsWith(path.resolve(root) + path.sep) || rel.split("/").some((p) => p.startsWith("."))) {
-              res.statusCode = 403;
-              res.end();
-              return;
-            }
-            const info = await stat(abs);
-            if (!info.isFile()) throw new Error("not a file");
-            res.setHeader("content-type", MIME[path.extname(abs).toLowerCase()] ?? "application/octet-stream");
-            res.end(await readFile(abs));
+            await respondWithFile(root, url.searchParams.get("path") ?? "", res);
             return;
           }
           res.statusCode = 404;

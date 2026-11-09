@@ -354,7 +354,7 @@ check(
 );
 await page.keyboard.type("declination");
 await pause(200);
-await page.click('[data-side="files"]');
+await page.click('[data-side="search"]');
 await pause(120);
 check(
   "Files tab returns to the tree",

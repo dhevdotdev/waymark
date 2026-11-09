@@ -47,6 +47,13 @@ export class Sidebar {
   }
 
   /** Returns to Files. The query and results are kept for the next visit to Search. */
+  /** The toolbar's search button: opens the search pane, or returns to Files if it is already showing. */
+  toggleSearch(): void {
+    const closed = this.els.shell.classList.contains("sidebar-closed");
+    if (this.isSearching && !closed) this.showFiles();
+    else this.showSearch();
+  }
+
   showFiles(): void {
     this.setMode("files");
     this.host.focusReader();
@@ -102,7 +109,7 @@ export class Sidebar {
     for (const button of shell.querySelectorAll<HTMLElement>("[data-side]")) {
       const on = button.dataset.side === this.mode;
       button.classList.toggle("is-on", on);
-      button.setAttribute("aria-selected", String(on));
+      button.setAttribute("aria-pressed", String(on));
     }
     for (const pane of shell.querySelectorAll<HTMLElement>("[data-side-pane]")) pane.hidden = pane.dataset.sidePane !== this.mode;
   }

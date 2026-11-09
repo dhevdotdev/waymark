@@ -9,7 +9,7 @@
     "size": "vite build --logLevel error && node scripts/check-bundle.mjs",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs && node tests/e2e/editing.mjs",
+    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs && node tests/e2e/editing.mjs && node tests/e2e/note-files.mjs",
     "test:sweep": "node tests/e2e/sweep.mjs",
     "test:visual": "node tests/e2e/visual.mjs",
     "install:app": "node scripts/install-app.mjs",
@@ -28,6 +28,7 @@
     "dup": "jscpd src src-tauri/src --min-lines 12 --threshold 3 --reporters console --silent"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/language": "^6.13.1",

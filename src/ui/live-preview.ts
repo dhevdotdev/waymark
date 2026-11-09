@@ -5,6 +5,7 @@ import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
 const WIKILINK = /(?<!!)\[\[([^\]\n|#]*)(#[^\]\n|]*)?(?:\|([^\]\n]*))?\]\]/g;
+const EMBED = /!\[\[([^\]\n|#]+)(?:[|#][^\]\n]*)?\]\]|!\[[^\]\n]*\]\(([^)\s]+)\)/g;
 const HEADING = /^(?:ATX|Setext)Heading(\d)$/;
 const INLINE_STYLE: Record<string, string> = { Emphasis: "cm-em", StrongEmphasis: "cm-strong", Strikethrough: "cm-strike" };
 const HIDDEN_MARK = new Set(["EmphasisMark", "StrikethroughMark"]);
@@ -21,6 +22,26 @@ class BulletWidget extends WidgetType {
     const span = document.createElement("span");
     span.className = "cm-bullet";
     return span;
+  }
+}
+
+class ImageWidget extends WidgetType {
+  constructor(readonly url: string) {
+    super();
+  }
+  eq(other: ImageWidget): boolean {
+    return other.url === this.url;
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const image = document.createElement("img");
+    image.className = "cm-embed-image";
+    image.src = this.url;
+    image.alt = "";
+    image.addEventListener("load", () => view.requestMeasure());
+    return image;
+  }
+  ignoreEvent(): boolean {
+    return false;
   }
 }
 
@@ -55,7 +76,10 @@ class Builder {
   private readonly activeLines = new Set<number>();
   readonly frontmatterEnd: number;
 
-  constructor(private readonly view: EditorView) {
+  constructor(
+    private readonly view: EditorView,
+    private readonly assetUrl: (target: string) => string | null,
+  ) {
     this.state = view.state;
     if (view.hasFocus) {
       for (const range of this.state.selection.ranges) {
@@ -209,18 +233,33 @@ class Builder {
     const { doc } = this.state;
     for (let pos = from; pos <= to; ) {
       const row = doc.lineAt(pos);
-      if (row.from >= this.frontmatterEnd) this.wikilinksIn(row.from, row.text);
+      if (row.from >= this.frontmatterEnd) {
+        this.wikilinksIn(row.from, row.text);
+        this.embedsIn(row.from, row.text);
+      }
       pos = row.to + 1;
     }
   }
 
+  private inCode(pos: number): boolean {
+    for (let n: SyntaxNode | null = syntaxTree(this.state).resolveInner(pos, 1); n; n = n.parent)
+      if (CODE.has(n.name)) return true;
+    return false;
+  }
+
+  private embedsIn(start: number, text: string): void {
+    for (const match of text.matchAll(EMBED)) {
+      const at = start + match.index;
+      if (this.isActive(at) || this.inCode(at + 2)) continue;
+      const url = this.assetUrl(match[1] ?? decodeURI(match[2]));
+      if (url) this.out.push(Decoration.replace({ widget: new ImageWidget(url) }).range(at, at + match[0].length));
+    }
+  }
+
   private wikilinksIn(start: number, text: string): void {
-    const tree = syntaxTree(this.state);
     for (const match of text.matchAll(WIKILINK)) {
       const at = start + match.index;
-      let inCode = false;
-      for (let n: SyntaxNode | null = tree.resolveInner(at + 2, 1); n; n = n.parent) if (CODE.has(n.name)) inCode = true;
-      if (inCode) continue;
+      if (this.inCode(at + 2)) continue;
       const [whole, target, heading = "", alias] = match;
       const end = at + whole.length;
       const shownFrom = alias === undefined ? at + 2 : end - 2 - alias.length;
@@ -235,8 +274,8 @@ class Builder {
   }
 }
 
-function build(view: EditorView): DecorationSet {
-  const builder = new Builder(view);
+function build(view: EditorView, assetUrl: (target: string) => string | null): DecorationSet {
+  const builder = new Builder(view, assetUrl);
   builder.frontmatter();
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(view.state).iterate({ from, to, enter: (node) => builder.node(node) });
@@ -246,18 +285,20 @@ function build(view: EditorView): DecorationSet {
 }
 
 /** Draws Markdown as it will read, showing the syntax only on the lines being edited. The text itself never changes. */
-export const livePreview = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = build(view);
-    }
-    update(update: ViewUpdate): void {
-      const treeMoved = syntaxTree(update.startState) !== syntaxTree(update.state);
-      if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged || treeMoved) {
-        this.decorations = build(update.view);
+export function livePreview(assetUrl: (target: string) => string | null) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = build(view, assetUrl);
       }
-    }
-  },
-  { decorations: (plugin) => plugin.decorations },
-);
+      update(update: ViewUpdate): void {
+        const treeMoved = syntaxTree(update.startState) !== syntaxTree(update.state);
+        if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged || treeMoved) {
+          this.decorations = build(update.view, assetUrl);
+        }
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
