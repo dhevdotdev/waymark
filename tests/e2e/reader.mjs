@@ -397,7 +397,7 @@ const closeControlIsLeading = (root, [button, label]) => {
   const control = box(button);
   const mark = box(`${button} path`);
   const centred = Math.abs(control.left + control.width / 2 - (mark.left + mark.width / 2)) <= 0.5;
-  return control.right <= box(label).left && control.width >= 20 && mark.width >= 6.9 && centred;
+  return control.right <= box(label).left && control.width >= 20 && mark.width >= 5.5 && mark.width <= 6 && centred;
 };
 check(
   "a tab's close control leads its title, centred and full size",

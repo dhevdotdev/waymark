@@ -174,7 +174,7 @@ kbd {
   align-items: center;
   height: 28px;
   min-width: 72px;
-  max-width: 320px;
+  max-width: var(--tab-limit, 320px);
   flex: 0 1 auto;
   padding: 0 12px 0 6px;
   border-radius: var(--r-control);
@@ -193,9 +193,6 @@ kbd {
   width: 1px;
   background: var(--ring);
   transition: opacity var(--t-hover) ease;
-}
-.tabs.is-crowded .tab {
-  flex: 1 1 0;
 }
 .tab-new {
   flex: none;
@@ -247,6 +244,10 @@ kbd {
   opacity: 0;
   flex: none;
   margin-right: 2px;
+}
+.tab-close svg {
+  width: 13px;
+  height: 13px;
 }
 /* One tab is the window's title, not a choice: plain text, no pill. */
 .single-tab .tab {
@@ -899,8 +900,8 @@ kbd {
   inset: -4px;
 }
 .trail-x svg {
-  inline-size: 16px;
-  block-size: 16px;
+  inline-size: 13px;
+  block-size: 13px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
