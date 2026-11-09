@@ -99,11 +99,85 @@ function bindColours(svg: string): string {
 
 const EXPAND_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>`;
 
-/** Renders every pending Mermaid figure under `root` with the current theme. */
+const sourceOf = (figure: HTMLElement) => figure.querySelector(".diagram-source")?.textContent ?? "";
+
+/** Drawn diagrams by source. Colours are theme variables, so one drawing holds for every theme. */
+const drawn = new Map<string, string>();
+const MAX_REMEMBERED = 200;
+
+function remember(source: string, svg: string): void {
+  drawn.set(source, svg);
+  if (drawn.size > MAX_REMEMBERED) drawn.delete(drawn.keys().next().value!);
+}
+
+function place(figure: HTMLElement, svg: string): void {
+  figure.querySelector(".diagram-svg")?.remove();
+  figure.querySelector(".diagram-expand")?.remove();
+  const holder = document.createElement("div");
+  holder.className = "diagram-svg";
+  holder.innerHTML = svg;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "diagram-expand";
+  button.setAttribute("aria-label", "Enlarge diagram");
+  button.innerHTML = EXPAND_ICON;
+  figure.append(holder, button);
+  figure.classList.remove("is-pending", "is-error");
+}
+
+const HEIGHTS_KEY = "waymark.diagramHeights";
+const MAX_HEIGHTS = 1000;
+
+function loadHeights(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(HEIGHTS_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** How tall each diagram last was, kept between launches so its space can be held before it is drawn again. */
+const heights = loadHeights();
+
+function fingerprint(source: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < source.length; i++) hash = Math.imul(hash ^ source.charCodeAt(i), 0x01000193);
+  return `${source.length}:${(hash >>> 0).toString(36)}`;
+}
+
+function rememberHeight(source: string, height: number): void {
+  heights[fingerprint(source)] = Math.round(height);
+  const keys = Object.keys(heights);
+  if (keys.length > MAX_HEIGHTS) delete heights[keys[0]];
+  try {
+    localStorage.setItem(HEIGHTS_KEY, JSON.stringify(heights));
+  } catch {
+    /* Only a convenience: the next view estimates instead. */
+  }
+}
+
+/** Roughly how tall a diagram will be, from its kind and length. Fitted to drawn diagrams, so the page moves less when the real one arrives. */
+function estimateDiagramHeight(source: string): number {
+  const lines = source.trim().split("\n").length;
+  const head = source.trim().split("\n", 1)[0];
+  let height = 250 + 55 * lines;
+  if (/^sequenceDiagram/.test(head)) height = 340 + 7 * lines;
+  else if (/^(?:graph|flowchart)\s+(?:LR|RL)/.test(head)) height = 35 * lines;
+  return Math.min(Math.max(height, 100), 900);
+}
+
+/** Renders every pending Mermaid figure under `root` with the current theme. One seen before is drawn at once. */
 export async function renderDiagrams(root: ParentNode): Promise<void> {
-  const figures = [...root.querySelectorAll<HTMLElement>("figure.diagram[data-diagram=mermaid]")];
+  const figures = [...root.querySelectorAll<HTMLElement>("figure.diagram[data-diagram=mermaid]")].filter((figure) => {
+    const svg = drawn.get(sourceOf(figure));
+    if (svg) place(figure, svg);
+    return !svg;
+  });
   if (!figures.length) return;
-  for (const f of figures) f.classList.add("is-pending");
+  for (const f of figures) {
+    f.classList.add("is-pending");
+    f.style.minBlockSize = `${heights[fingerprint(sourceOf(f))] ?? estimateDiagramHeight(sourceOf(f))}px`;
+  }
   /* Mermaid measures label text while laying out; measuring before the UI face loads clips labels. */
   const [mermaid] = await Promise.all([load(), document.fonts.load('13px "Inter Variable"'), document.fonts.ready]);
   mermaid.initialize({
@@ -115,21 +189,14 @@ export async function renderDiagrams(root: ParentNode): Promise<void> {
     sequence: { mirrorActors: false, actorMargin: 48 },
   });
   for (const figure of figures) {
-    const source = figure.querySelector(".diagram-source")?.textContent ?? "";
+    const source = sourceOf(figure);
     try {
       const { svg } = await mermaid.render(`mmd-${++seq}`, source);
-      figure.querySelector(".diagram-svg")?.remove();
-      figure.querySelector(".diagram-expand")?.remove();
-      const holder = document.createElement("div");
-      holder.className = "diagram-svg";
-      holder.innerHTML = bindColours(svg);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "diagram-expand";
-      button.setAttribute("aria-label", "Enlarge diagram");
-      button.innerHTML = EXPAND_ICON;
-      figure.append(holder, button);
-      figure.classList.remove("is-pending", "is-error");
+      const themed = bindColours(svg);
+      remember(source, themed);
+      place(figure, themed);
+      figure.style.minBlockSize = "";
+      if (figure.isConnected) rememberHeight(source, figure.getBoundingClientRect().height);
     } catch (err) {
       figure.classList.remove("is-pending");
       figure.classList.add("is-error");
@@ -140,5 +207,6 @@ export async function renderDiagrams(root: ParentNode): Promise<void> {
         figure.prepend(note);
       }
     }
+    figure.style.minBlockSize = "";
   }
 }

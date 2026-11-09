@@ -7,7 +7,6 @@ import { renderDiagrams } from "../render/diagrams";
 import { KATEX_OPTIONS } from "../render/markdown";
 
 const PARSE_BUDGET_MS = 200;
-const MAX_DRAWN_DIAGRAMS = 60;
 const DIAGRAM_HEIGHT_GUESS = 260;
 const DISPLAY_MATH = /^ {0,3}\$\$([^$]*?[^\\])\$\$[ \t]*$/gm;
 
@@ -16,14 +15,6 @@ interface Block {
   to: number;
   kind: "diagram" | "math";
   source: string;
-}
-
-/** Scrolling a diagram back into view should not draw it again. */
-const drawn = new Map<string, string>();
-
-function remember(source: string, html: string): void {
-  drawn.set(source, html);
-  if (drawn.size > MAX_DRAWN_DIAGRAMS) drawn.delete(drawn.keys().next().value!);
 }
 
 class DiagramWidget extends WidgetType {
@@ -39,11 +30,6 @@ class DiagramWidget extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const block = document.createElement("div");
     block.className = "cm-preview-block";
-    const saved = drawn.get(this.source);
-    if (saved) {
-      block.innerHTML = saved;
-      return block;
-    }
     const figure = document.createElement("figure");
     figure.className = "diagram";
     figure.dataset.diagram = "mermaid";
@@ -52,10 +38,7 @@ class DiagramWidget extends WidgetType {
     code.textContent = this.source;
     figure.append(code);
     block.append(figure);
-    void renderDiagrams(block).then(() => {
-      if (figure.querySelector(".diagram-svg")) remember(this.source, block.innerHTML);
-      view.requestMeasure();
-    });
+    void renderDiagrams(block).then(() => view.requestMeasure());
     return block;
   }
   ignoreEvent(): boolean {

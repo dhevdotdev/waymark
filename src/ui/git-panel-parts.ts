@@ -112,3 +112,29 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   document.body.append(overlay);
   close.focus({ preventScroll: true });
 }
+
+const SLOW_WORK_MS = 350;
+
+/** Says work is happening, but only once it has taken long enough to notice. Its space is reserved, so nothing moves. */
+export class WorkIndicator {
+  readonly element = el("div", "sync-activity");
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor() {
+    this.element.setAttribute("aria-live", "polite");
+    this.element.append(el("span", "spinner"), el("span"));
+  }
+
+  start(label: string, onSlow: () => void): void {
+    this.element.lastElementChild!.textContent = `${label}…`;
+    this.timer = setTimeout(() => {
+      this.element.classList.add("is-on");
+      onSlow();
+    }, SLOW_WORK_MS);
+  }
+
+  stop(): void {
+    clearTimeout(this.timer);
+    this.element.classList.remove("is-on");
+  }
+}

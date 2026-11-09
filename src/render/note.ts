@@ -2,6 +2,7 @@ import { parseFrontmatter } from "../vault/frontmatter";
 import type { VaultIndex } from "../vault/index";
 import { stripComments } from "./comments";
 import type { Highlighter } from "./highlight";
+import { reserveImageSpace } from "./image-sizes";
 import { createMarkdown, type RenderEnv } from "./markdown";
 import { sanitize } from "./sanitize";
 
@@ -56,7 +57,9 @@ export async function renderNote(
     const start = Number(list.getAttribute("start"));
     if (Number.isInteger(start)) list.style.setProperty("--list-start", String(start - 1));
   }
-  return { fragment, headings: env.headings, frontmatter: data, ms: performance.now() - t0 - grammarMs, grammarMs };
+  const ms = performance.now() - t0 - grammarMs;
+  await reserveImageSpace(fragment);
+  return { fragment, headings: env.headings, frontmatter: data, ms, grammarMs };
 }
 
 /** One table cell or similar scrap of Markdown, sanitised like a whole note. */

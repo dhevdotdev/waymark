@@ -157,6 +157,14 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
     img.src = url;
     await until(() => img.complete, 4000);
     log(`asset img ${img.naturalWidth}x${img.naturalHeight}`);
+    const picture = "Selftest picture.md";
+    await vault.save(picture, `![[${sample}]]\n`, null);
+    await until(() => vault.index.notes.includes(picture));
+    await app.open(picture);
+    await until(() => document.querySelector(".doc img.is-sized") !== null, 3000);
+    check("an image has its size before it is shown", document.querySelector(".doc img.is-sized") !== null);
+    await vault.source.trashNote(picture);
+    await vault.applyChanges([]);
   }
   const failures: string[] = [];
   const times: number[] = [];
@@ -276,6 +284,18 @@ async function runCommit({ panel, vault, check, until }: SelfTestContext): Promi
   const saved = await vault.save("Written here.md", "# Written here\n", null);
   check("the note is saved", saved.kind === "saved", saved);
   await panel.refresh();
+  panel.open();
+  await until(() => [...document.querySelectorAll(".sync-sheet .link-btn")].some((b) => b.textContent === "Stage all"));
+  const tabsAt = () => Math.round(document.querySelector(".sync-sheet .seg")?.getBoundingClientRect().top ?? -1);
+  const seen = new Set([tabsAt()]);
+  [...document.querySelectorAll<HTMLElement>(".sync-sheet .link-btn")].find((b) => b.textContent === "Stage all")?.click();
+  while (panel.state.kind === "busy") {
+    seen.add(tabsAt());
+    await new Promise((frame) => requestAnimationFrame(frame));
+  }
+  seen.add(tabsAt());
+  check("staging moves nothing in the sync panel", seen.size === 1, [...seen]);
+  panel.close();
   await panel.commitAndSync("From Waymark");
   const after = await git.status();
   check("commit and sync leaves nothing pending", after.ahead === 0 && after.behind === 0 && after.files.length === 0, after);

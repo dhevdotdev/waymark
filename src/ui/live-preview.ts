@@ -3,6 +3,7 @@ import { type EditorState, type Range, StateEffect } from "@codemirror/state";
 import { Decoration, type DecorationSet, type EditorView, ViewPlugin, type ViewUpdate, WidgetType } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import type { CodeToken } from "../render/highlight";
+import { applyImageSize, knownImageSize } from "../render/image-sizes";
 import { MathWidget } from "./editor-blocks";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
@@ -52,6 +53,8 @@ class ImageWidget extends WidgetType {
     image.className = "cm-embed-image";
     image.src = this.url;
     image.alt = "";
+    const size = knownImageSize(this.url);
+    if (size) applyImageSize(image, size);
     image.addEventListener("load", () => view.requestMeasure());
     return image;
   }

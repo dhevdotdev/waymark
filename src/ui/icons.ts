@@ -26,7 +26,7 @@ export const icons = {
     `<path d="M13.75 7.5v-1a1 1 0 0 0-1-1H7.6L6.1 3.5H3.25a1 1 0 0 0-1 1v7.25a1 1 0 0 0 1 1h4.5"/><path d="M11.75 9.25v4.5M9.5 11.5H14"/>`,
   ),
   more: svg(`<circle cx="3.5" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="12.5" cy="8" r=".6"/>`),
-  collapse: svg(`<path d="M2.5 8h11"/><path d="m5.5 2.5 2.5 2.5 2.5-2.5"/><path d="m5.5 13.5 2.5-2.5 2.5 2.5"/>`),
+  collapse: svg(`<path d="M3.5 8h9"/><path d="m6 3.25 2 2 2-2"/><path d="m6 12.75 2-2 2 2"/>`),
   sun: svg(
     `<circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/>`,
   ),

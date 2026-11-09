@@ -394,7 +394,7 @@ kbd {
   align-items: center;
   gap: 2px;
   inline-size: var(--sidebar-w);
-  padding: 0 12px 6px;
+  padding: 0 8px 6px 11px;
   transition:
     opacity var(--t-slide) ease,
     translate var(--t-slide) var(--ease-in-out);
@@ -402,6 +402,11 @@ kbd {
 .files-actions[hidden],
 .row-actions[hidden] {
   display: none;
+}
+.files-actions .icon-btn svg {
+  inline-size: 14px;
+  block-size: 14px;
+  stroke-width: 1.5;
 }
 .files-actions-end {
   margin-inline-start: auto;

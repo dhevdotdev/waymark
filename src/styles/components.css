@@ -953,7 +953,28 @@
 .sync-sheet:focus-visible {
   outline: none;
 }
+.sync-activity {
+  position: absolute;
+  inset-block-start: 40px;
+  inset-inline-end: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-hover) ease;
+}
+.sync-activity.is-on {
+  opacity: 1;
+}
+.sync-sheet.is-working :is(.sync-actions, .commit-actions) .btn {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .sync-head {
+  position: relative;
   display: flex;
   align-items: start;
   gap: 8px;
@@ -1070,15 +1091,6 @@
   background: var(--ok);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 20%, transparent);
 }
-.sync-busy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 0.75rem;
-  color: var(--ink-2);
-}
-
 .notice {
   margin: 0 18px 12px;
   padding: 12px 14px;
@@ -1466,6 +1478,14 @@
 
 /* ---------- Empty states ---------- */
 
+@keyframes late-in {
+  from {
+    opacity: 0;
+  }
+}
+.is-late {
+  animation: late-in var(--t-hover) ease 350ms backwards;
+}
 .empty-state {
   padding: 18px 10px;
   color: var(--ink-3);

@@ -493,15 +493,16 @@ try {
   await pause(120);
   check("closing the menu clears the row", (await page.locator(".has-actions").count()) === 0);
   const headerLine = await page.evaluate(() => {
+    const centre = (r) => r.left + r.width / 2;
     const first = document.querySelector(".files-actions .icon-btn svg").getBoundingClientRect();
     const end = document.querySelector(".files-actions-end svg").getBoundingClientRect();
+    const forward = document.querySelector('.titlebar [data-act="forward"] svg').getBoundingClientRect();
     const rowIcon = document.querySelector(".nav-item .tree-icon").getBoundingClientRect();
-    const count = document.querySelector(".tree-head .tree-count").getBoundingClientRect();
-    return { left: first.left - rowIcon.left, right: end.right - count.right };
+    return { left: first.left - rowIcon.left, right: centre(end) - centre(forward), size: first.width - rowIcon.width };
   });
   check(
-    "the top row lines up with the tree",
-    Math.abs(headerLine.left) <= 1 && Math.abs(headerLine.right) <= 1,
+    "the top row lines up with the tree and the bar above",
+    Math.abs(headerLine.left) <= 0.5 && Math.abs(headerLine.right) <= 0.5 && headerLine.size === 0,
     JSON.stringify(headerLine),
   );
   await page.mouse.move(0, 0);
@@ -628,6 +629,53 @@ try {
   check("every unwrapped row has the same width, so tints line up", diffGeometry.widths === 1);
   check("line numbers stay put while scrolling sideways", diffGeometry.moved < 1, String(diffGeometry.moved));
   check("the wrap choice is remembered", diffGeometry.saved === false);
+
+  const heightsWhileOpening = (note) =>
+    page.evaluate(async (path) => {
+      const reader = window.waymark.reader;
+      const heights = [];
+      let sampling = true;
+      const sample = () => {
+        const doc = document.querySelector(".doc");
+        if (reader.current === path && doc) heights.push(Math.round(doc.getBoundingClientRect().height));
+        if (sampling) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+      await reader.open(path);
+      await new Promise((done) => setTimeout(done, 900));
+      sampling = false;
+      return [...new Set(heights)];
+    }, note);
+  await writeFile(
+    file("Tall.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="600" height="900" fill="teal"/></svg>',
+  );
+  await writeFile(file("Picture.md"), "# Picture\n\n![[Tall.svg]]\n\nBelow it.\n");
+  await writeFile(file("Small picture.md"), "# Small\n\n![[Tall.svg|300]]\n");
+  await writeFile(file("Chart.md"), "# Chart\n\n```mermaid\ngraph TD; A-->B; B-->C; C-->D;\n```\n\nBelow it.\n");
+  await openNote("Writing");
+  await page.reload();
+  await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
+  await pause(500);
+  const pictureHeights = await heightsWhileOpening("Picture.md");
+  check("an image never moves the page as it loads", pictureHeights.length === 1, pictureHeights.join());
+  await page.evaluate(() => window.waymark.reader.open("Small picture.md"));
+  await pause(300);
+  check(
+    "a size written on an image is honoured",
+    Math.round(await page.locator(".doc img").evaluate((img) => img.getBoundingClientRect().width)) === 300,
+  );
+  await page.evaluate(() => window.waymark.reader.open("Chart.md"));
+  await page.waitForSelector(".doc .diagram-svg svg", { timeout: 15000 });
+  await page.evaluate(() => window.waymark.reader.open("Writing.md"));
+  await pause(200);
+  const chartHeights = await heightsWhileOpening("Chart.md");
+  check("a diagram seen before never moves the page", chartHeights.length === 1, chartHeights.join());
+  await page.reload();
+  await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
+  await pause(500);
+  const afterRestart = await heightsWhileOpening("Chart.md");
+  check("nor does it after the app restarts", afterRestart.length === 1, afterRestart.join());
 
   check("Obsidian's settings are never touched", (await disk(".obsidian/app.json")) === obsidianBefore);
   check("nothing threw", errors.length === 0, errors[0]);

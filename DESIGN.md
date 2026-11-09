@@ -11,6 +11,7 @@ Waymark is a client for an Obsidian vault kept in Git, and reading comes first. 
 5. **Impose no organisation.** Waymark has opinions about how notes look, and none about how they are arranged. It shows the folders on disk and renders Markdown as written. No filename, folder name, heading or frontmatter key has special meaning, except `aliases`, which is how Obsidian links resolve. Frontmatter appears in the Info pane exactly as written.
 6. **Give every kind of thing one home.** Files live in the left tree. The note's location and reading time sit above it, in the pane head. The outline sits on the right edge of the reading pane. Links and properties live in the inspector, with the local graph pinned below them. Vault state, Git and whole-vault views live in the status bar. The note body holds only the note, and the sidebar column sets where tabs begin.
 7. **Fail visibly and safely.** Waymark never resolves a missing link or an ambiguous name by guessing. A missing link is dashed and muted. A name shared by several files is flagged, and Waymark lists the candidates. A diagram that does not parse shows its error above the readable source. A remote image becomes a labelled placeholder and is not fetched.
+8. **Nothing moves because work finished.** Loading never pushes content. Space is held for what is coming, and quick work shows no loader at all. A loader appears only after 350 ms, in a spot reserved for it.
 
 ## Navigation
 

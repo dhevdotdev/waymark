@@ -1,7 +1,7 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import type { PrefStore } from "../prefs";
 import { renderDiff } from "./diff";
-import { EXPLAIN, el, openSheet, relative, remoteName } from "./git-panel-parts";
+import { EXPLAIN, el, openSheet, relative, remoteName, WorkIndicator } from "./git-panel-parts";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
 
@@ -39,6 +39,7 @@ export class GitPanel {
   private commits: Commit[] = [];
   private busy = false;
   private message: string | null = null;
+  private readonly work = new WorkIndicator();
 
   constructor(private host: GitHost) {}
 
@@ -67,8 +68,10 @@ export class GitPanel {
     this.busy = true;
     const before = this.status;
     this.state = { kind: "busy", label };
-    this.host.onStatus(this.status, this.state);
-    if (this.root) this.render();
+    this.work.start(label, () => {
+      this.root?.classList.add("is-working");
+      this.host.onStatus(this.status, this.state);
+    });
     try {
       const now = await op();
       this.status = now;
@@ -86,6 +89,8 @@ export class GitPanel {
       return false;
     } finally {
       this.busy = false;
+      this.work.stop();
+      this.root?.classList.remove("is-working");
       this.host.onStatus(this.status, this.state);
       if (this.root) this.render();
     }
@@ -253,7 +258,7 @@ export class GitPanel {
     close.setAttribute("aria-label", "Close");
     close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
     close.onclick = () => this.close();
-    head.append(close);
+    head.append(this.work.element, close);
     root.append(head);
 
     if (!st?.isRepo) {
@@ -318,11 +323,6 @@ export class GitPanel {
       st.behind ? "Sync first" : undefined,
     );
     summary.append(actions);
-    if (this.state.kind === "busy") {
-      const busy = el("div", "sync-busy");
-      busy.append(el("span", "spinner"), el("span", "", `${this.state.label}…`));
-      summary.append(busy);
-    }
     root.append(summary);
 
     if (this.state.kind === "error") root.append(this.explain(this.state.error));
@@ -562,7 +562,7 @@ export class GitPanel {
       body.append(scope);
     }
     if (!this.commits.length) {
-      body.append(el("div", "empty-state", "Loading history…"));
+      body.append(el("div", "empty-state is-late", "Loading history…"));
       return;
     }
     const list = el("ol", "commit-list");

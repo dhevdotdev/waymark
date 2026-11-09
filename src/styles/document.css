@@ -741,6 +741,13 @@ button.callout-title:focus-visible {
   max-width: 100%;
   height: auto;
 }
+.doc img.is-sized {
+  inline-size: min(100%, var(--iw));
+  aspect-ratio: var(--ir);
+}
+.doc img.embed-image.is-sized {
+  inline-size: min(100%, var(--iw), calc(min(80vh, 900px) * var(--ir)));
+}
 .doc p:has(> .embed-image:only-child) {
   grid-column: wide;
   text-align: center;
