@@ -142,28 +142,30 @@ describe("trail", () => {
     expect(here(t)).toBe("a");
   });
 
-  it("records a link to a note already on the map as a cross link", () => {
+  it("moves to a note already on another branch without adding anything to the map", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.back();
     t.follow(note("c"));
+    const shape = t.layout();
     t.follow(note("b"));
     expect(t.size).toBe(3);
-    expect(t.crossLinks()).toHaveLength(1);
+    expect(t.layout()).toEqual(shape);
     expect(here(t)).toBe("b");
+    expect(t.save()).not.toHaveProperty("links");
   });
 
-  it("records a cycle back to an earlier note and does not repeat it", () => {
+  it("moves back to an earlier note without repeating it", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("c"));
     t.follow(note("a"));
     t.follow(note("b"));
     expect(t.size).toBe(3);
-    expect(t.crossLinks()).toHaveLength(1);
+    expect(here(t)).toBe("b");
   });
 
-  it("walks Back and Forward through the stops actually made, across cross links", () => {
+  it("walks Back and Forward through the stops actually made", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("c"));
@@ -177,27 +179,25 @@ describe("trail", () => {
     expect(here(t)).toBe("a");
   });
 
-  it("keeps a note that is still linked from somewhere else when its branch is removed", () => {
+  it("removes a branch with everything beyond it, even a note reached another way", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("c"));
     t.select(t.layout()[0].id);
     t.follow(note("d"));
     t.follow(note("c"));
-    const b = t.layout()[1].id;
-    t.remove(b);
-    expect(t.size).toBe(3);
-    expect(here(t)).toBe("c");
-    expect(t.crossLinks()).toHaveLength(0);
+    t.remove(t.layout()[1].id);
+    expect(t.size).toBe(2);
+    expect(here(t)).toBe("a");
   });
 
-  it("restores cross links and stops, and rebuilds stops for trails saved without them", () => {
+  it("restores stops, ignores old saved links, and rebuilds stops for trails saved without them", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("a"));
     const saved = JSON.parse(JSON.stringify(t.save())) as Record<string, unknown>;
-    const restored = Trail.restore(saved, () => true)!;
-    expect(restored.crossLinks()).toHaveLength(1);
+    const restored = Trail.restore({ ...saved, links: [{ from: 2, to: 1 }] }, () => true)!;
+    expect(restored.save()).not.toHaveProperty("links");
     restored.back();
     expect(here(restored)).toBe("b");
     const older = Trail.restore(

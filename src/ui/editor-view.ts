@@ -11,7 +11,8 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
-import { livePreview } from "./live-preview";
+import { frontmatterEnd, livePreview } from "./live-preview";
+import { tableEditor } from "./table-editor";
 
 const External = Annotation.define<boolean>();
 
@@ -28,6 +29,7 @@ export interface EditorOptions {
   onStats: (stats: EditorStats) => void;
   openWikilink: (target: string, newTab: boolean) => void;
   openUrl: (url: string) => void;
+  renderInline: (text: string) => DocumentFragment;
 }
 
 export interface EditorHandle {
@@ -201,6 +203,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
         livePreview,
+        tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
         search({ top: true }),
         bubbleField,
         bubbleButtons,

@@ -26,6 +26,7 @@ Every state has a visible way in and a visible way out.
 - Task boxes sit where the bullet would be and toggle the task in the file. ⌘Z undoes the last one. Done items are dimmed, not struck through, so they stay easy to read.
 - Read and Edit are a switch at the right of the pane head, because two modes need to be visible. ⌘E flips between them, and reading stays the default.
 - Editing keeps the reading column and type. Syntax appears only on the line being edited, a tick means the disk has it, and the status bar shows line, column and word count.
+- A table in the editor is a real table. Each cell is typed into directly and written back to just that cell's text in the file, and Tab, Enter and the arrows move between cells. Edit as text is there for the odd table that needs it.
 - With the inspector closed, a dash per heading sits on the right edge. Hovering opens the titles. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.
 - Selecting text while editing offers a small formatting bubble. It never appears without a selection.
@@ -35,7 +36,7 @@ Every state has a visible way in and a visible way out.
 
 ## Trails
 
-Each tab keeps a map of where following links has taken it, drawn under the tabs once it has more than one note. Following a link grows a branch from the current note, and a second link from the same note opens a new row. Clicking any note on the map moves that tab there and leaves the map intact. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
+Each tab keeps a map of where following links has taken it, drawn under the tabs once it has more than one note. Following a link grows a branch from the current note, and a second link from the same note opens a new row. Clicking any note on the map moves that tab there and leaves the map intact. A link to a note already on the map moves there too, and draws nothing, because a line back would break the tree the map is drawn as. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
 
 ## Graph
 

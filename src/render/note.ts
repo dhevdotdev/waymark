@@ -58,3 +58,15 @@ export async function renderNote(
   }
   return { fragment, headings: env.headings, frontmatter: data, ms: performance.now() - t0 - grammarMs, grammarMs };
 }
+
+/** One table cell or similar scrap of Markdown, sanitised like a whole note. */
+export function renderInlineMarkdown(source: string, path: string, deps: RenderContext): DocumentFragment {
+  const env: RenderEnv = {
+    index: deps.index,
+    currentPath: path,
+    assetUrl: deps.assetUrl,
+    highlight: deps.highlighter.highlight,
+    headings: [],
+  };
+  return sanitize(md.renderInline(source, env as never));
+}

@@ -2,7 +2,7 @@ import { isDesktop, native } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { renderDiagrams } from "../render/diagrams";
 import type { Highlighter } from "../render/highlight";
-import { type RenderContext, renderNote } from "../render/note";
+import { type RenderContext, renderInlineMarkdown, renderNote } from "../render/note";
 import type { Scheme } from "../themes";
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
@@ -140,6 +140,7 @@ export class Reader {
       incomingCommits: () => this.sync.panel.status?.behind ?? 0,
       open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
       openUrl: (url) => void native.openExternal(url),
+      renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
     });
 
     this.sync = new SyncController({
@@ -603,7 +604,7 @@ export class Reader {
       const view = trail.view(placement.id)!;
       return { ...placement, label: this.viewLabel(view), isGraph: view.kind === "graph" };
     });
-    this.trailMap.render(this.tab.id, entries, trail.current.id, trail.pathToCurrent(), trail.crossLinks());
+    this.trailMap.render(this.tab.id, entries, trail.current.id, trail.pathToCurrent());
   }
 
   private saveScroll(): void {

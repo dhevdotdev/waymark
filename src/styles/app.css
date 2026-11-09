@@ -800,15 +800,6 @@ kbd {
 .trail-lines path.is-on-path {
   stroke: var(--accent);
 }
-.trail-lines path.is-cross {
-  stroke: var(--ink-4);
-}
-.trail-lines path.is-arc {
-  stroke-dasharray: 2 3;
-}
-.trail-lines path.is-near {
-  stroke: var(--accent);
-}
 .trail-node {
   --trail-ink: var(--ink-3);
   position: absolute;

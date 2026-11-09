@@ -11,15 +11,8 @@ export interface TrailNode {
   collapsed: boolean;
 }
 
-/** A link followed to a note already on the map, which is what turns a trail from a tree into a graph. */
-export interface CrossLink {
-  from: number;
-  to: number;
-}
-
 export interface SavedTrail {
   nodes: TrailNode[];
-  links: CrossLink[];
   root: number;
   current: number;
   /** Every stop in the order it was made, which is what Back and Forward walk. */
@@ -66,31 +59,18 @@ function isTrailNode(value: unknown): value is TrailNode {
   );
 }
 
-function isCrossLink(value: unknown): value is CrossLink {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "from" in value &&
-    typeof value.from === "number" &&
-    "to" in value &&
-    typeof value.to === "number"
-  );
-}
-
 /**
  * The map of where one tab has been. Following a link grows a branch from the
  * current note; going elsewhere starts a new trail, and Back can still return
- * to the old one. A note appears once per trail, so following a link to a note
- * already on the map moves there and records the extra link. The first route
- * to each note gives the layout; every other link is a cross link. Back and
- * Forward retrace the stops actually made, whatever shape the map has.
+ * to the old one. A note appears once per trail, so a link to a note already
+ * on the map simply moves there. Back and Forward retrace the stops actually
+ * made, whatever shape the map has.
  */
 export class Trail {
   private nodes = new Map<number, TrailNode>();
   private root: number;
   private cur: number;
   private nextId = 1;
-  private links: CrossLink[] = [];
   private visits: number[];
   private position = 0;
   private before: SavedTrail[] = [];
@@ -111,7 +91,7 @@ export class Trail {
     for (const node of value.nodes) {
       if (isTrailNode(node) && exists(node.view)) saved.set(node.id, node);
     }
-    /* A note reattached by remove() can precede its parent, so reachability is decided after every node is known. */
+    /* Saved order is not guaranteed to put a parent first, so reachability is decided after every node is known. */
     const reachesRoot = (node: TrailNode): boolean => {
       const seen = new Set<number>();
       for (
@@ -138,9 +118,6 @@ export class Trail {
     if (typeof value.root !== "number" || !trail.nodes.has(value.root)) return null;
     trail.root = value.root;
     trail.cur = typeof value.current === "number" && trail.nodes.has(value.current) ? value.current : value.root;
-    if ("links" in value && Array.isArray(value.links)) {
-      trail.links = value.links.filter(isCrossLink).filter((l) => trail.nodes.has(l.from) && trail.nodes.has(l.to));
-    }
     const visits =
       "visits" in value && Array.isArray(value.visits)
         ? value.visits.filter((v): v is number => typeof v === "number" && trail.nodes.has(v))
@@ -170,7 +147,6 @@ export class Trail {
   private snapshot(): SavedTrail {
     return {
       nodes: [...this.nodes.values()].map((n) => ({ ...n })),
-      links: this.links.map((l) => ({ ...l })),
       root: this.root,
       current: this.cur,
       visits: [...this.visits],
@@ -180,7 +156,6 @@ export class Trail {
 
   private load(saved: SavedTrail): void {
     this.nodes = new Map(saved.nodes.map((n) => [n.id, { ...n }]));
-    this.links = saved.links.map((l) => ({ ...l }));
     this.root = saved.root;
     this.cur = saved.current;
     this.visits = [...saved.visits];
@@ -198,7 +173,6 @@ export class Trail {
 
   private startFresh(view: View, scroll = 0): void {
     this.nodes = new Map();
-    this.links = [];
     this.root = this.cur = this.add(view, null, scroll).id;
     this.visits = [this.cur];
     this.position = 0;
@@ -236,13 +210,7 @@ export class Trail {
   follow(view: View): void {
     if (this.fillBlank(view)) return;
     const existing = this.find(view);
-    if (!existing) {
-      this.visit(this.add(view, this.cur).id);
-    } else if (existing.id !== this.cur) {
-      const known = existing.parent === this.cur || this.links.some((l) => l.from === this.cur && l.to === existing.id);
-      if (!known) this.links.push({ from: this.cur, to: existing.id });
-      this.visit(existing.id);
-    }
+    this.visit(existing ? existing.id : this.add(view, this.cur).id);
     this.after = [];
   }
 
@@ -316,26 +284,6 @@ export class Trail {
       });
     };
     collect(id);
-    /* A note also linked from somewhere that stays keeps its place, reattached to that link. */
-    for (let rescued = true; rescued; ) {
-      rescued = false;
-      for (const link of this.links) {
-        if (link.to === id || !doomed.has(link.to) || doomed.has(link.from)) continue;
-        this.nodes.get(link.to)!.parent = link.from;
-        const free = (n: number) => {
-          doomed.delete(n);
-          this.childrenOf(n)
-            .filter((c) => doomed.has(c.id))
-            .forEach((c) => {
-              free(c.id);
-            });
-        };
-        free(link.to);
-        this.links = this.links.filter((l) => l !== link);
-        rescued = true;
-        break;
-      }
-    }
     const alive = (n: number) => !doomed.has(n);
     const earlier = this.visits.slice(0, this.position + 1).filter(alive);
     const later = this.visits.slice(this.position + 1).filter(alive);
@@ -345,7 +293,6 @@ export class Trail {
     }
     this.visits = [...earlier, ...later].filter((v, i, all) => v !== all[i - 1]);
     this.position = earlier.filter((v, i, all) => v !== all[i - 1]).length - 1;
-    this.links = this.links.filter((l) => alive(l.from) && alive(l.to));
     for (const n of doomed) this.nodes.delete(n);
   }
 
@@ -382,10 +329,6 @@ export class Trail {
   /** Ids from the start of the trail to the current note. */
   pathToCurrent(): Set<number> {
     return new Set(this.routeToCurrent());
-  }
-
-  crossLinks(): CrossLink[] {
-    return this.links.map((l) => ({ ...l }));
   }
 
   view(id: number): View | undefined {

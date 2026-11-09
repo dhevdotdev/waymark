@@ -18,8 +18,6 @@
 
 **Trail**: the map of where one tab has been. It is a branching graph, not a list. Following a link grows it. Jumping from the tree or the palette starts a new one.
 
-**Cross link**: a line on the trail between two stops that are already on it, drawn when a link leads back somewhere visited.
-
 **Stop**: one place on a trail.
 
 **Inspector**: the right panel, holding Outline, Links and Info. Also called the rail in code.

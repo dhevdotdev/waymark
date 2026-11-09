@@ -43,6 +43,11 @@ class TaskWidget extends WidgetType {
   }
 }
 
+export function frontmatterEnd(state: EditorState): number {
+  const head = state.doc.sliceString(0, Math.min(state.doc.length, 20_000));
+  return FRONTMATTER.exec(head)?.[0].length ?? 0;
+}
+
 /** A note is shown as plain text in the file, so every position here is the real one. */
 class Builder {
   readonly out: Range<Decoration>[] = [];
@@ -58,8 +63,7 @@ class Builder {
         for (let n = this.state.doc.lineAt(range.from).number; n <= last; n++) this.activeLines.add(n);
       }
     }
-    const head = this.state.doc.sliceString(0, Math.min(this.state.doc.length, 20_000));
-    this.frontmatterEnd = FRONTMATTER.exec(head)?.[0].length ?? 0;
+    this.frontmatterEnd = frontmatterEnd(this.state);
   }
 
   private isActive(pos: number): boolean {

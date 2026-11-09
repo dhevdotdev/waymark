@@ -503,7 +503,7 @@ check(
   (await page.locator(".trail-node").count()) === 2 &&
     (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").first().textContent()),
 );
-check("the link back is drawn on the map", (await page.locator(".trail-lines path.is-cross").count()) === 1);
+check("a link back adds no line to the map", (await page.locator(".trail-lines path").count()) === 2);
 await page.keyboard.press("Meta+[");
 await pause(450);
 check(

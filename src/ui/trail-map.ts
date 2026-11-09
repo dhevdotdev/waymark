@@ -1,4 +1,4 @@
-import type { CrossLink, Placement } from "../vault/trail";
+import type { Placement } from "../vault/trail";
 import { icons } from "./icons";
 
 export interface TrailEntry extends Placement {
@@ -8,48 +8,12 @@ export interface TrailEntry extends Placement {
 
 const ROW = 32;
 const GAP = 26;
-/** Room above the first row for a link that arcs back along it. */
-const ARC_ROOM = 14;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 interface Box {
   x: number;
   y: number;
   width: number;
-}
-
-function stroke(svg: SVGSVGElement, d: string, extra: string[], touching: boolean): void {
-  const path = document.createElementNS(SVG_NS, "path");
-  path.setAttribute("d", d);
-  path.classList.add(...extra);
-  path.classList.toggle("is-near", touching);
-  svg.append(path);
-}
-
-function drawCrossLink(svg: SVGSVGElement, from: Box, to: Box, isReturn: boolean, touching: boolean): void {
-  if (isReturn) {
-    /* A link straight back to the note before it: the existing line simply points both ways. */
-    const x = to.x + to.width + 8,
-      y = to.y + ROW / 2;
-    stroke(svg, `M${x + 4} ${y - 3.5}L${x} ${y}L${x + 4} ${y + 3.5}`, ["is-cross"], touching);
-    return;
-  }
-  const fx = from.x + from.width / 2,
-    tx = to.x + to.width / 2;
-  const inset = 3;
-  if (from.y === to.y) {
-    const y = from.y + inset;
-    stroke(svg, `M${fx} ${y}C${fx} ${y - 16} ${tx} ${y - 16} ${tx} ${y}`, ["is-cross", "is-arc"], touching);
-    stroke(svg, `M${tx - 3.5} ${y - 4}L${tx} ${y}L${tx + 3.5} ${y - 4}`, ["is-cross"], touching);
-  } else {
-    const down = to.y > from.y;
-    const y1 = down ? from.y + ROW - inset : from.y + inset;
-    const y2 = down ? to.y + inset : to.y + ROW - inset;
-    const bend = (y2 - y1) / 2;
-    stroke(svg, `M${fx} ${y1}C${fx} ${y1 + bend} ${tx} ${y2 - bend} ${tx} ${y2}`, ["is-cross", "is-arc"], touching);
-    const dir = down ? -4 : 4;
-    stroke(svg, `M${tx - 3.5} ${y2 + dir}L${tx} ${y2}L${tx + 3.5} ${y2 + dir}`, ["is-cross"], touching);
-  }
 }
 
 /** Draws one tab's trail: notes laid out left to right, with branches stepping down. */
@@ -97,7 +61,7 @@ export class TrailMap {
     });
   }
 
-  render(tabId: number, entries: TrailEntry[], current: number, onPath: Set<number>, cross: CrossLink[]): void {
+  render(tabId: number, entries: TrailEntry[], current: number, onPath: Set<number>): void {
     if (tabId !== this.tabId) {
       this.seen = new Set(entries.map((e) => e.id));
       this.tabId = tabId;
@@ -109,23 +73,13 @@ export class TrailMap {
     this.inner.append(svg);
 
     const elements = this.buildNodes(entries, current, onPath);
-    const byId = new Map(entries.map((e) => [e.id, e]));
-    const isReturn = (l: CrossLink) => byId.get(l.from)?.parent === l.to;
-    const top = cross.some((l) => !isReturn(l) && byId.get(l.from)?.row === byId.get(l.to)?.row && byId.get(l.from)?.row === 0)
-      ? ARC_ROOM
-      : 0;
-    const box = this.placeNodes(entries, elements, top, svg);
+    const box = this.placeNodes(entries, elements, svg);
 
     for (const entry of entries) {
       if (entry.parent !== null) this.drawBranchLine(svg, box.get(entry.parent)!, box.get(entry.id)!, entry, onPath);
     }
     for (const entry of entries) {
       if (entry.branches >= 2) this.addFold(entry, box.get(entry.id)!);
-    }
-    for (const link of cross) {
-      const from = box.get(link.from);
-      const to = box.get(link.to);
-      if (from && to) drawCrossLink(svg, from, to, isReturn(link), link.from === current || link.to === current);
     }
 
     this.seen = new Set(entries.map((e) => e.id));
@@ -163,12 +117,7 @@ export class TrailMap {
   }
 
   /** Positions every node, sizes the canvas to fit and returns each node's box. */
-  private placeNodes(
-    entries: TrailEntry[],
-    elements: Map<number, HTMLElement>,
-    top: number,
-    svg: SVGSVGElement,
-  ): Map<number, Box> {
+  private placeNodes(entries: TrailEntry[], elements: Map<number, HTMLElement>, svg: SVGSVGElement): Map<number, Box> {
     const box = new Map<number, Box>();
     let width = 0,
       height = 0;
@@ -176,7 +125,7 @@ export class TrailMap {
       const el = elements.get(entry.id)!;
       const parent = entry.parent === null ? undefined : box.get(entry.parent);
       const x = parent ? parent.x + parent.width + GAP : 0;
-      const y = top + entry.row * ROW;
+      const y = entry.row * ROW;
       const w = el.offsetWidth;
       const label = el.querySelector<HTMLElement>(".trail-name span")!;
       if (label.scrollWidth <= label.clientWidth) delete el.querySelector<HTMLElement>(".trail-name")!.dataset.tip;

@@ -119,6 +119,37 @@
 .doc-editing .cm-hr {
   background: linear-gradient(var(--rule), var(--rule)) center / 100% 1px no-repeat;
 }
+.cm-table-widget {
+  position: relative;
+  padding-block: 0.4em;
+  white-space: normal;
+}
+.cm-table-widget .table-wrap {
+  margin: 0;
+}
+.cm-table-widget :is(th, td) {
+  min-width: 4em;
+  outline: none;
+  cursor: text;
+  white-space: pre-wrap;
+}
+.cm-table-widget th:empty {
+  padding: 0.5em 0.75em;
+}
+.cm-table-widget :is(th, td):focus {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  border-radius: var(--r-chip);
+}
+.cm-table-tools {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-end: 0;
+  z-index: 2;
+  display: none;
+}
+.cm-table-widget:focus-within .cm-table-tools {
+  display: flex;
+}
 .doc-editing .cm-table-line {
   font-family: var(--font-mono);
   font-size: 13px;

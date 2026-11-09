@@ -13,6 +13,7 @@ export interface EditingHost {
   incomingCommits: () => number;
   open: (path: string, newTab: boolean, anchor?: string) => void;
   openUrl: (url: string) => void;
+  renderInline: (text: string, path: string) => DocumentFragment;
 }
 
 interface Session {
@@ -100,6 +101,7 @@ export class NoteEditing {
           if (found.kind === "found") this.host.open(found.path, newTab, anchor);
         },
         openUrl: this.host.openUrl,
+        renderInline: (cell) => this.host.renderInline(cell, path),
       });
       scroller.replaceChildren(page);
       this.session = { path, draft, editor, banner };

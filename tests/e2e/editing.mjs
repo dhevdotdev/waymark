@@ -33,6 +33,19 @@ const code = "- [ ] not a task";
 
 Last line.
 `;
+const TABLE = `# Table
+
+| Name  |   Age | Note |
+|:------|------:|---|
+| Ada   |    36 | **bold** |
+| Grace | 85 | with \\| pipe |
+
+> | q | w |
+> |---|---|
+> | 1 | 2 |
+
+After.
+`;
 const CRLF = "# Windows\r\n\r\nfirst line\r\nsecond line\r\n";
 
 /* CodeMirror binds undo to the platform's own modifier, and CI runs on Linux. */
@@ -45,6 +58,7 @@ await writeFile(file("Tasks.md"), TASKS);
 await writeFile(file("Conflict.md"), "# Conflict\n\nbase text\n");
 await writeFile(file("Both.md"), "# Both\n\nbase text\n");
 await writeFile(file("Crlf.md"), CRLF);
+await writeFile(file("Table.md"), TABLE);
 await writeFile(file("Mixed.md"), "one\r\ntwo\nthree\r\n");
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -309,6 +323,88 @@ try {
   await page.locator(".start-row", { hasText: "Tasks" }).first().click();
   await pause(500);
   check("a recent note fills the tab", (await page.textContent(".tab.is-active .tab-title")).startsWith("Tasks"));
+  await openNote("Table");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-table-widget");
+  await pause(300);
+  const cell = (row, column) => page.locator(`.cm-table-widget [data-row="${row}"][data-column="${column}"]`);
+  const activeCell = () => page.evaluate(() => `${document.activeElement.dataset.row},${document.activeElement.dataset.column}`);
+  const content = () => page.locator(".cm-content").textContent();
+  check("a table is shown as a table", (await page.locator(".cm-table-widget table").count()) === 1);
+  check("its pipes are not on show", !(await content()).includes("|:------|"));
+  check("opening a table writes nothing", (await disk("Table.md")) === TABLE);
+  check("cells show formatting", (await page.locator(".cm-table-widget td strong").textContent()) === "bold");
+  check("an escaped pipe reads as a pipe", (await cell(2, 2).textContent()) === "with | pipe");
+  check("alignment is kept", (await cell(1, 1).evaluate((c) => c.style.textAlign)) === "right");
+  check("a quoted table stays as text", (await page.locator(".cm-table-line").count()) === 3);
+
+  await cell(1, 0).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("x");
+  await saved();
+  await pause(150);
+  check("typing in a cell changes only that cell", (await disk("Table.md")) === TABLE.replace("| Ada   |", "| Adax   |"));
+  check("the cell keeps focus while saving", (await activeCell()) === "1,0");
+  await page.keyboard.press("Tab");
+  check("Tab moves to the next cell", (await activeCell()) === "1,1");
+  await page.keyboard.press("Tab");
+  check("a focused cell shows its Markdown", (await cell(1, 2).textContent()) === "**bold**");
+  check("the cell it left shows formatted text again", (await cell(1, 0).textContent()) === "Adax");
+  await page.keyboard.press("Shift+Tab");
+  check("Shift+Tab moves back", (await activeCell()) === "1,1");
+  await page.keyboard.press("Enter");
+  check("Enter moves down", (await activeCell()) === "2,1");
+  await page.keyboard.press("ArrowUp");
+  check("the arrows move between rows", (await activeCell()) === "1,1");
+
+  await cell(2, 2).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("|z");
+  await saved();
+  await pause(150);
+  check("a typed pipe is escaped in the file", (await disk("Table.md")).includes("with \\| pipe\\|z |"));
+  await page.keyboard.press("Meta+z");
+  await saved();
+  await pause(150);
+  check("undo works inside a cell", !(await disk("Table.md")).includes("z |"));
+  await page.keyboard.press("Tab");
+  await pause(250);
+  check(
+    "Tab on the last cell adds a row",
+    (await page.locator(".cm-table-widget tr").count()) === 4 && (await activeCell()) === "3,0",
+  );
+  await page.keyboard.type("new");
+  await saved();
+  await pause(150);
+  const withRow = await disk("Table.md");
+  check("the new row is in the file, right under the table", /\| Grace .*\n\| new \|\s+\|\s+\|\n\n> /.test(withRow));
+  const beforeColumn = withRow;
+  await page.locator('.cm-table-tools button:has-text("Add column")').click();
+  await pause(600);
+  check("a column can be added", (await page.locator(".cm-table-widget th").count()) === 4);
+  check("the delimiter row grows too", (await disk("Table.md")).includes("|:------| --- |"));
+  check("focus follows into the new column", (await activeCell()) === "3,1");
+  await page.locator('.cm-table-tools button:has-text("Delete column")').click();
+  await pause(600);
+  check("a column can be deleted, leaving the file as it was", (await disk("Table.md")) === beforeColumn);
+  await cell(3, 0).click();
+  await page.locator('.cm-table-tools button:has-text("Delete row")').click();
+  await pause(600);
+  check(
+    "a row can be deleted",
+    (await page.locator(".cm-table-widget tr").count()) === 3 && !(await disk("Table.md")).includes("| new |"),
+  );
+  await cell(1, 0).click();
+  await page.locator('.cm-table-tools button:has-text("Edit as text")').click();
+  await pause(250);
+  check("a table can be edited as text", (await content()).includes("|:------|"));
+  await page.locator(".cm-line", { hasText: "After." }).click();
+  await pause(250);
+  check("it goes back to a table when you leave it", (await page.locator(".cm-table-widget table").count()) === 1);
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc-title");
+  await pause(300);
+  check("reading shows the edited table", (await page.locator(".doc table").first().textContent()).includes("Adax"));
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, error.message.split("\n").slice(0, 3).join(" "));

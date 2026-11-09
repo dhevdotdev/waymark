@@ -66,19 +66,23 @@ describe("sanitizer blocks remote loads by itself", () => {
 });
 
 describe("trail restore", () => {
-  it("keeps a note that removing another reattached to a later stop", () => {
-    const trail = new Trail(note("a"));
-    trail.follow(note("b"));
-    const b = trail.current.id;
-    trail.follow(note("c"));
-    const a = [...trail.layout()][0].id;
-    trail.select(a);
-    trail.follow(note("d"));
-    trail.follow(note("c"));
-    trail.remove(b);
-    const saved = JSON.parse(JSON.stringify(trail.save()));
+  it("keeps a note whose parent is saved after it", () => {
+    const stop = (id: number, path: string, parent: number | null) => ({
+      id,
+      view: note(path),
+      parent,
+      scroll: 0,
+      collapsed: false,
+    });
+    const saved = {
+      nodes: [stop(1, "a", null), stop(3, "c", 4), stop(4, "d", 1)],
+      root: 1,
+      current: 3,
+      visits: [1, 4, 3],
+      position: 2,
+    };
     const restored = Trail.restore(saved, () => true)!;
-    expect(restored.size).toBe(trail.size);
+    expect(restored.size).toBe(3);
     expect(
       restored
         .views()
