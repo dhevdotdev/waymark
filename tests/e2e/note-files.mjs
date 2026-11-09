@@ -25,6 +25,7 @@ await writeFile(file("Source.md"), SOURCE);
 await writeFile(file("Target.md"), TARGET);
 await writeFile(file("Mover.md"), "moves\n");
 await writeFile(file("Doomed.md"), "going\n");
+await writeFile(file("Linker.md"), "[[Doomed]]\n");
 await writeFile(file("Writing.md"), "# Writing\n\nFirst line here.\n");
 mkdirSync(file("Trips/Later"), { recursive: true });
 mkdirSync(file("Scrap"));
@@ -146,9 +147,9 @@ try {
   await pause(150);
   check(
     "a bad name is explained and nothing happens",
-    (await page.locator(".prompt-note.is-problem").isVisible()) && existsSync(file("Target.md")),
+    (await page.locator(".tree-name-input.is-problem").isVisible()) && existsSync(file("Target.md")),
   );
-  await page.fill(".prompt input", "Renamed");
+  await page.fill(".tree-name-input", "Renamed");
   await page.keyboard.press("Enter");
   await pause(600);
   check("renaming moves the file", existsSync(file("Renamed.md")) && !existsSync(file("Target.md")));
@@ -341,15 +342,15 @@ try {
   await page.waitForSelector(".cm-content");
   await pause(200);
   await folderMenu("Trips", "Rename");
-  await page.fill(".prompt input", "Scrap");
+  await page.fill(".tree-name-input", "Scrap");
   await page.keyboard.press("Enter");
   await pause(100);
-  check("a folder cannot take the name of another", await page.locator(".prompt-note.is-problem").isVisible());
-  await page.fill(".prompt input", "a/b");
+  check("a folder cannot take the name of another", await page.locator(".tree-name-input.is-problem").isVisible());
+  await page.fill(".tree-name-input", "a/b");
   await page.keyboard.press("Enter");
   await pause(100);
-  check("a folder name with a slash is refused", await page.locator(".prompt-note.is-problem").isVisible());
-  await page.fill(".prompt input", "Journeys");
+  check("a folder name with a slash is refused", await page.locator(".tree-name-input.is-problem").isVisible());
+  await page.fill(".tree-name-input", "Journeys");
   await page.keyboard.press("Enter");
   await pause(900);
   check(
@@ -399,6 +400,133 @@ try {
   check("the folder is removed", !existsSync(file("Scrap")));
   check("nothing outside it was touched", existsSync(file("Refers.md")) && (await disk("Refers.md")).includes("[[One]]"));
   check("the tab showing it goes blank", (await page.locator(".doc-title").count()) === 0);
+
+  await openNote("Home");
+  const hover = async (selector) => {
+    await page.mouse.move(0, 0);
+    await page.locator(selector).hover();
+    await pause(80);
+  };
+  const strip = () => page.locator(".row-actions:not([hidden]) .row-action");
+  check(
+    "the file-actions row has new note, new folder and collapse",
+    (await page.locator(".files-actions .icon-btn").count()) === 3,
+  );
+  check("new note left the title bar", (await page.locator('.titlebar [data-act="new-note"]').count()) === 0);
+  await hover('.nav-item[data-path="Writing.md"]');
+  check("hovering a note offers rename and trash", (await strip().count()) === 2);
+  await hover('.tree-head[data-folder="Journeys"]');
+  check("hovering a folder offers four actions", (await strip().count()) === 4);
+  const inRow = await page.evaluate(() => {
+    const row = document.querySelector('.tree-head[data-folder="Journeys"]').getBoundingClientRect();
+    const box = document.querySelector(".row-actions").getBoundingClientRect();
+    return box.top >= row.top - 1 && box.bottom <= row.bottom + 1 && box.right < row.right;
+  });
+  check("the actions sit on the row, clear of the count", inRow);
+
+  await page.locator('.tree-head[data-folder="Journeys"]').click({ button: "right" });
+  await pause(100);
+  check("the folder menu offers a new folder", await page.locator('.context-item:has-text("New folder here")').isVisible());
+  await page.keyboard.press("Escape");
+  await pause(100);
+
+  await page.click('[data-act="new-folder"]');
+  await pause(100);
+  await page.keyboard.press("Escape");
+  await pause(100);
+  check("escaping a new folder leaves no row behind", (await page.locator(".tree-name-input").count()) === 0);
+  await page.click('[data-act="new-folder"]');
+  await pause(100);
+  await page.keyboard.type("Journeys");
+  await page.keyboard.press("Enter");
+  await pause(100);
+  check("a new folder cannot reuse a name", await page.locator(".tree-name-input.is-problem").isVisible());
+  await page.fill(".tree-name-input", "Fresh ideas");
+  await page.keyboard.press("Enter");
+  await pause(700);
+  check("a new folder is created with a first note", existsSync(file("Fresh ideas/Untitled.md")));
+  check("and that note is ready to name", await page.locator(".cm-content, .doc-editing").first().isVisible());
+  await page.keyboard.press("Escape");
+  await page.locator('.tree-head[data-folder="Journeys"]').hover();
+  await pause(80);
+  await strip().nth(1).click();
+  await pause(150);
+  await page.keyboard.type("Nested");
+  await page.keyboard.press("Enter");
+  await pause(700);
+  check("a folder can be made inside a folder", existsSync(file("Journeys/Nested/Untitled.md")));
+
+  await openNote("Writing");
+  await page.keyboard.press("F2");
+  await pause(150);
+  check("F2 renames the open note in place", await page.locator(".tree-name-input").isVisible());
+  await page.keyboard.press("Escape");
+  await pause(150);
+  check("escaping keeps the name", existsSync(file("Writing.md")) && (await page.locator(".tree-name-input").count()) === 0);
+
+  await hover('.nav-item[data-path="Mover.md"]');
+  await strip().nth(0).click();
+  await pause(120);
+  await page.keyboard.type("Moved on");
+  await page.locator(".doc-title, .start-page").first().click();
+  await pause(600);
+  check("clicking away accepts a rename", existsSync(file("Moved on.md")) && !existsSync(file("Mover.md")));
+  await hover('.nav-item[data-path="Moved on.md"]');
+  await strip().nth(1).click();
+  await pause(500);
+  check(
+    "a note nothing links to goes without a dialog",
+    !existsSync(file("Moved on.md")) && (await page.locator(".prompt").count()) === 0,
+  );
+
+  await page.click('[data-act="collapse-folders"]');
+  await pause(350);
+  check("collapse closes every folder", (await page.locator(".tree-folder.is-open").count()) === 0);
+
+  await writeFile(file("Plans.md"), "## One\n- [ ] a\n- [ ] b\n\n## Two\n- [x] c\n- [ ] d\n- [x] e\n");
+  await openNote("Plans");
+  await page.keyboard.press("Meta+t");
+  await pause(400);
+  check(
+    "the new tab shows a count for each to-do list",
+    (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" ") === "0/2 2/3",
+    (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" "),
+  );
+
+  const diffGeometry = await page.evaluate(async () => {
+    const { renderDiff } = await import(/* @vite-ignore */ `${location.origin}/src/ui/diff.ts`);
+    const long = "x".repeat(900);
+    const text = `diff --git a/a.md b/a.md\n--- a/a.md\n+++ b/a.md\n@@ -1,2 +1,3 @@\n ${long}\n-short\n+also short\n+${long}y\n`;
+    let saved = null;
+    const host = document.createElement("div");
+    host.style.cssText =
+      "position:fixed;left:40px;top:40px;width:700px;height:400px;overflow:auto;background:var(--paper);z-index:9999";
+    const view = renderDiff(text, {
+      wrapped: true,
+      onWrapChange: (on) => {
+        saved = on;
+      },
+    });
+    host.append(view);
+    document.body.append(host);
+    const hunk = view.querySelector(".diff-hunk");
+    const lines = () => [...view.querySelectorAll(".diff-line")];
+    const wrappedFits = hunk.scrollWidth <= hunk.clientWidth;
+    const wrappedTall = lines()[0].getBoundingClientRect().height > 40;
+    view.querySelector(".diff-wrap").click();
+    const scrolls = hunk.scrollWidth > hunk.clientWidth;
+    const widths = new Set(lines().map((l) => Math.round(l.getBoundingClientRect().width)));
+    const noBefore = lines()[2].querySelector(".diff-no").getBoundingClientRect().left;
+    hunk.scrollLeft = 400;
+    const noAfter = lines()[2].querySelector(".diff-no").getBoundingClientRect().left;
+    host.remove();
+    return { wrappedFits, wrappedTall, scrolls, widths: widths.size, moved: Math.abs(noBefore - noAfter), saved };
+  });
+  check("wrapped lines stay inside the pane", diffGeometry.wrappedFits && diffGeometry.wrappedTall, JSON.stringify(diffGeometry));
+  check("unwrapped lines scroll sideways", diffGeometry.scrolls);
+  check("every unwrapped row has the same width, so tints line up", diffGeometry.widths === 1);
+  check("line numbers stay put while scrolling sideways", diffGeometry.moved < 1, String(diffGeometry.moved));
+  check("the wrap choice is remembered", diffGeometry.saved === false);
 
   check("Obsidian's settings are never touched", (await disk(".obsidian/app.json")) === obsidianBefore);
   check("nothing threw", errors.length === 0, errors[0]);

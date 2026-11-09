@@ -154,7 +154,7 @@ export class Reader {
       root: deps.root,
       workspace: this.workspace,
       editing: this.editing,
-      folderRenamed: (from, to) => this.sidebar.tree.folderRenamed(from, to),
+      tree: this.sidebar.tree,
       toast,
       notePath: () => this.notePath,
       open: (path, newTab) => this.open(path, { newTab, focus: true }),

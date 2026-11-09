@@ -1,6 +1,6 @@
 import type { PrefStore } from "../prefs";
 import type { VaultStore } from "../vault/store";
-import { taskProgress } from "../vault/tasks";
+import { type TaskList, taskLists } from "../vault/tasks";
 import { relative } from "./git-panel-parts";
 import { icons } from "./icons";
 
@@ -45,6 +45,24 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, tex
   return e;
 }
 
+const LISTS_SHOWN = 3;
+
+/** One count per to-do list, and a bar for the note as a whole. */
+function taskSummary(lists: TaskList[]): HTMLElement {
+  const done = lists.reduce((sum, list) => sum + list.done, 0);
+  const total = lists.reduce((sum, list) => sum + list.total, 0);
+  const summary = element("span", "start-progress");
+  summary.title = `${lists.length} ${lists.length === 1 ? "to-do list" : "to-do lists"}, ${done} of ${total} done`;
+  for (const list of lists.slice(0, LISTS_SHOWN)) summary.append(element("span", "start-count", `${list.done}/${list.total}`));
+  if (lists.length > LISTS_SHOWN) summary.append(element("span", "start-count", `+${lists.length - LISTS_SHOWN}`));
+  const bar = element("span", "start-bar");
+  const fill = element("span", "start-fill");
+  fill.style.inlineSize = `${Math.round((done / total) * 100)}%`;
+  bar.append(fill);
+  summary.append(bar);
+  return summary;
+}
+
 function recentRow(vault: VaultStore, path: string, at: number): HTMLElement {
   const row = element("a", "wikilink-plain start-row");
   row.href = "#";
@@ -53,16 +71,8 @@ function recentRow(vault: VaultStore, path: string, at: number): HTMLElement {
   const icon = element("span", "start-icon");
   icon.innerHTML = icons.note;
   row.append(icon, title);
-  const { done, total } = taskProgress(vault.texts.get(path) ?? "");
-  if (total) {
-    const progress = element("span", "start-progress");
-    const bar = element("span", "start-bar");
-    const fill = element("span", "start-fill");
-    fill.style.inlineSize = `${Math.round((done / total) * 100)}%`;
-    bar.append(fill);
-    progress.append(element("span", "start-count", `${done}/${total}`), bar);
-    row.append(progress);
-  }
+  const lists = taskLists(vault.texts.get(path) ?? "");
+  if (lists.length) row.append(taskSummary(lists));
   row.append(element("span", "start-when", relative(at)));
   return row;
 }

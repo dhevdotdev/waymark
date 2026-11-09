@@ -44,6 +44,11 @@ export class FileTree {
     this.onChange();
   }
 
+  collapseAll(): void {
+    for (const path of [...this.opened]) this.setOpen(path, false);
+    this.onChange();
+  }
+
   /** Keeps a renamed folder, and the folders inside it, as open as they were. */
   folderRenamed(from: string, to: string): void {
     for (const path of [...this.opened]) {

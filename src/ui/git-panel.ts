@@ -1,10 +1,12 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
+import type { PrefStore } from "../prefs";
 import { renderDiff } from "./diff";
 import { EXPLAIN, el, openSheet, relative, remoteName } from "./git-panel-parts";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
 
 export interface GitHost {
+  prefs: PrefStore;
   /** Saves any note being edited. False means the user still has to choose what to keep. */
   flushEdits(): Promise<boolean>;
   onVisible?: (open: boolean) => void;
@@ -580,10 +582,26 @@ export class GitPanel {
     body.append(list);
   }
 
+  private diffView(text: string, emptyMessage?: string): HTMLElement {
+    const { prefs } = this.host;
+    return renderDiff(text, {
+      emptyMessage,
+      wrapped: prefs.value.diffWrap,
+      onWrapChange: (wrapped) =>
+        prefs.update((p) => {
+          p.diffWrap = wrapped;
+        }),
+    });
+  }
+
   async showWorktreeDiff(f: FileChange, staged: boolean): Promise<void> {
     try {
       const text = await git.diff(f.path, staged, f.unstaged === "?" && !staged);
-      openSheet(`${f.path}`, staged ? "Staged changes" : f.unstaged === "?" ? "New file" : "Unstaged changes", renderDiff(text));
+      openSheet(
+        `${f.path}`,
+        staged ? "Staged changes" : f.unstaged === "?" ? "New file" : "Unstaged changes",
+        this.diffView(text),
+      );
     } catch (err) {
       this.host.toast((err as Error).message);
     }
@@ -609,16 +627,12 @@ export class GitPanel {
           const head = this.status?.head;
           if (!head) return;
           const d = await git.diffRevs(c.sha, head, path);
-          openSheet(
-            this.host.title(path),
-            `${c.short} → current`,
-            renderDiff(d, { emptyMessage: "Identical to the current version." }),
-          );
+          openSheet(this.host.title(path), `${c.short} → current`, this.diffView(d, "Identical to the current version."));
         };
         bar.append(read, cmp);
         content.append(bar);
       }
-      content.append(renderDiff(text, { emptyMessage: "This commit changed no file contents." }));
+      content.append(this.diffView(text, "This commit changed no file contents."));
       openSheet(c.subject || c.short, `${c.author} · ${new Date(c.date).toLocaleString()} · ${c.short}`, content);
     } catch (err) {
       this.host.toast((err as Error).message);

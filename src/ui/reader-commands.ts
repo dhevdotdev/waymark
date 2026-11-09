@@ -46,12 +46,17 @@ export function readerCommands(r: Reader): Command[] {
       run: () => void r.editing.toggle(),
     },
     { id: "new-note", label: "New note", keys: ["mod+n"], hint: "⌘N", inField: true, run: () => void r.files.newNote() },
+    { id: "new-folder", label: "New folder", run: () => void r.files.newFolder() },
+    { id: "collapse-folders", label: "Collapse all folders", run: () => r.sidebar.tree.collapseAll() },
     {
       id: "rename-note",
       label: "Rename this note",
       keywords: "title",
+      keys: ["f2"],
+      hint: "F2",
+      inField: true,
       needsNote: true,
-      run: () => void r.files.promptRename(r.current),
+      run: () => void r.files.startRename(r.current),
     },
     { id: "move-note", label: "Move this note", keywords: "folder", needsNote: true, run: () => r.files.promptMove(r.current) },
     {

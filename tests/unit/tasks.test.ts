@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineEnding, taskProgress, toggleTask } from "../../src/vault/tasks";
+import { lineEnding, taskLists, toggleTask } from "../../src/vault/tasks";
 
 describe("toggleTask", () => {
   it("flips only the marker on that line", () => {
@@ -29,10 +29,32 @@ describe("toggleTask", () => {
   });
 });
 
-describe("taskProgress", () => {
-  it("counts tasks and ignores fenced examples", () => {
-    expect(taskProgress("- [x] a\n- [ ] b\n```\n- [ ] not one\n```\n* [X] c")).toEqual({ done: 2, total: 3 });
-    expect(taskProgress("~~~\n```\n- [ ] inside\n~~~\n- [ ] after")).toEqual({ done: 0, total: 1 });
+describe("taskLists", () => {
+  const one = (done: number, total: number) => ({ done, total });
+
+  it("counts done and open tasks and ignores fenced code", () => {
+    expect(taskLists("- [x] a\n- [ ] b\n  ```\n  - [ ] not one\n  ```\n* [X] c")).toEqual([one(2, 3)]);
+    expect(taskLists("~~~\n```\n- [ ] inside\n~~~\n- [ ] after")).toEqual([one(0, 1)]);
+  });
+
+  it("gives each list under its own heading its own count", () => {
+    expect(taskLists("## One\n- [ ] a\n- [ ] b\n\n## Two\n- [x] c\n- [ ] d\n- [x] e\n")).toEqual([one(0, 2), one(2, 3)]);
+  });
+
+  it("separates lists split by a paragraph or a code block", () => {
+    expect(taskLists("- [ ] a\n\nSome words.\n\n- [x] b\n\n```\nx\n```\n\n- [ ] c")).toEqual([one(0, 1), one(1, 1), one(0, 1)]);
+  });
+
+  it("keeps blank lines, nesting, wrapped text and plain bullets inside one list", () => {
+    expect(taskLists("- [ ] a\n\n- [x] b\n  - [ ] nested\n  more about it\n- plain\n- [ ] c")).toEqual([one(1, 4)]);
+  });
+
+  it("counts tasks in quotes", () => {
+    expect(taskLists("> - [x] a\n> - [ ] b")).toEqual([one(1, 2)]);
+  });
+
+  it("has nothing to say about a note with no tasks", () => {
+    expect(taskLists("# Just words\n\n- a bullet")).toEqual([]);
   });
 });
 

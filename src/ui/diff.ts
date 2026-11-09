@@ -114,7 +114,31 @@ function emphasise(a: string, b: string): [DocumentFragment, DocumentFragment] {
   return [build(a, start, endA), build(b, start, endB)];
 }
 
-export function renderDiff(text: string, opts: { emptyMessage?: string } = {}): HTMLElement {
+export interface DiffOptions {
+  emptyMessage?: string;
+  wrapped: boolean;
+  onWrapChange: (wrapped: boolean) => void;
+}
+
+function wrapToggle(root: HTMLElement, opts: DiffOptions): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "diff-wrap";
+  button.textContent = "Wrap lines";
+  const show = (wrapped: boolean) => {
+    root.classList.toggle("is-wrapped", wrapped);
+    button.setAttribute("aria-pressed", String(wrapped));
+  };
+  show(opts.wrapped);
+  button.addEventListener("click", () => {
+    const wrapped = !root.classList.contains("is-wrapped");
+    show(wrapped);
+    opts.onWrapChange(wrapped);
+  });
+  return button;
+}
+
+export function renderDiff(text: string, opts: DiffOptions): HTMLElement {
   const root = document.createElement("div");
   root.className = "diff";
   const files = parseDiff(text);
@@ -125,7 +149,8 @@ export function renderDiff(text: string, opts: { emptyMessage?: string } = {}): 
     root.append(empty);
     return root;
   }
-  for (const f of files) {
+  const toggle = wrapToggle(root, opts);
+  files.forEach((f, fileIndex) => {
     const section = document.createElement("section");
     section.className = "diff-file";
     const head = document.createElement("header");
@@ -140,6 +165,7 @@ export function renderDiff(text: string, opts: { emptyMessage?: string } = {}): 
     badge.className = `diff-badge is-${f.status}`;
     badge.textContent = f.status;
     head.append(badge, name, stat);
+    if (fileIndex === 0) head.append(toggle);
     section.append(head);
     if (f.status === "binary") {
       const p = document.createElement("p");
@@ -156,21 +182,24 @@ export function renderDiff(text: string, opts: { emptyMessage?: string } = {}): 
         hh.textContent = h.header;
         table.append(hh);
       }
+      const rows = document.createElement("div");
+      rows.className = "diff-rows";
+      table.append(rows);
       for (let i = 0; i < h.lines.length; i++) {
         const line = h.lines[i];
         const next = h.lines[i + 1];
         if (line.kind === "del" && next?.kind === "add" && h.lines[i + 2]?.kind !== "add" && h.lines[i - 1]?.kind !== "del") {
           const [a, b] = emphasise(line.text, next.text);
-          table.append(row(line, a), row(next, b));
+          rows.append(row(line, a), row(next, b));
           i++;
           continue;
         }
-        table.append(row(line));
+        rows.append(row(line));
       }
       section.append(table);
     }
     root.append(section);
-  }
+  });
   return root;
 }
 

@@ -25,6 +25,7 @@ export interface Prefs {
   rail: boolean;
   railPane: "links" | "info";
   sidebarWidth: number;
+  diffWrap: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -41,6 +42,7 @@ const DEFAULTS: Prefs = {
   rail: true,
   railPane: "links",
   sidebarWidth: 268,
+  diffWrap: true,
 };
 
 const LOCAL_KEY = "waymark.prefs";

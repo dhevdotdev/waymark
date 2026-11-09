@@ -37,6 +37,8 @@ These are product promises. Do not trade them for convenience.
 
 `ARCHITECTURE.md` maps the modules and how data moves. Read it before changing more than one module. `DESIGN.md` records the visual and interaction decisions, so read it before changing the UI. `GLOSSARY.md` defines the words used here. `docs/runbook.md` covers diagnosing a broken build or a failing check.
 
+Regexes that scan whole notes must not use lookbehind. The macOS system WebKit runs them without its JIT, and Playwright's WebKit hides the cost.
+
 `pnpm arch` enforces layering and a 650-line file budget. Add a new top-level source folder to `LAYERS` in `scripts/check-architecture.mjs`.
 
 ## Working here

@@ -3,7 +3,8 @@ import { isAttachmentTarget, localTarget, MARKDOWN_DESTINATION, MARKDOWN_TITLE, 
 
 const CODE = /^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$|`[^`\n]*`/gm;
 const WIKILINK = /!?\[\[([^\]|#\n]*)(?:#[^\]|\n]*)?(?:\|[^\]\n]*)?\]\]/g;
-const MARKDOWN_LINK = new RegExp(String.raw`(?<!!\[[^\]\n]*)\]\(${MARKDOWN_DESTINATION}${MARKDOWN_TITLE}\)`, "g");
+/* No lookbehind: the system WebKit runs that form without its JIT, which took seconds across a vault. Images fall out as attachments. */
+const MARKDOWN_LINK = new RegExp(String.raw`\]\(${MARKDOWN_DESTINATION}${MARKDOWN_TITLE}\)`, "g");
 
 /** Outgoing and incoming note links, rebuilt per note as files change. */
 export class LinkGraph {

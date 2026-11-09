@@ -4,9 +4,13 @@ import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
 import type { VaultStore } from "../vault/store";
 import type { Workspace } from "../vault/workspace";
 import { showContextMenu } from "./context-menu";
+import type { FileTree } from "./file-tree";
+import { icons } from "./icons";
+import { nameInPlace } from "./inline-name";
 import type { NoteEditing } from "./note-editing";
 import { Palette, type PaletteItem } from "./palette";
 import { confirmAction, promptText } from "./prompts";
+import { type RowAction, RowActions } from "./row-actions";
 import { renameRecent } from "./start-page";
 
 export interface NoteFilesHost {
@@ -16,7 +20,7 @@ export interface NoteFilesHost {
   root: string;
   workspace: Workspace;
   editing: NoteEditing;
-  folderRenamed: (from: string, to: string) => void;
+  tree: FileTree;
   toast: (message: string) => void;
   notePath: () => string;
   open: (path: string, newTab?: boolean) => Promise<void>;
@@ -51,6 +55,7 @@ export class NoteFiles {
       { placeholder: "Move to a folder, or type a new one", compact: true },
     );
     host.sidebar.addEventListener("contextmenu", (e) => this.onContextMenu(e));
+    new RowActions(host.sidebar, (row) => this.rowActions(row));
   }
 
   async newNote(folder?: string): Promise<void> {
@@ -68,16 +73,25 @@ export class NoteFiles {
     }
   }
 
-  async promptRename(path: string): Promise<void> {
-    const links = this.host.vault.links.backlinks(path).length;
-    const name = await promptText({
+  async startRename(path: string): Promise<void> {
+    const name = await this.askName(this.visibleRow(`.nav-item[data-path="${CSS.escape(path)}"]`), {
       title: "Rename note",
       value: nameOf(path),
-      action: "Rename",
-      hint: links ? `${plural(links, "note")} linking here will be updated.` : "",
-      validate: (value) => this.renameProblem(path, value),
+      problem: (value) => this.renameProblem(path, value),
     });
     if (name !== null) await this.renameTo(path, name);
+  }
+
+  /** A folder appears once it holds a note, because the tree lists notes and Git keeps no empty folders. */
+  async newFolder(parent = ""): Promise<void> {
+    const row = this.newFolderRow(parent);
+    const name = await this.askName(row, {
+      title: "New folder",
+      value: "",
+      problem: (value) => this.folderNameProblem(value, parent, ""),
+    });
+    row?.remove();
+    if (name !== null) await this.newNote(inFolder(parent, name));
   }
 
   /** Renames a note in place. Reports the problem and returns false if the name cannot be used. */
@@ -98,14 +112,13 @@ export class NoteFiles {
   async remove(path: string): Promise<void> {
     const { vault, editing, workspace, toast, redraw } = this.host;
     const links = vault.links.backlinks(path).length;
-    const confirmed = await confirmAction({
-      title: `Move “${nameOf(path)}” to the Trash?`,
-      body: links
-        ? `${plural(links, "note")} link here, and those links will stop working.`
-        : "You can put it back from the Trash in Finder.",
-      action: "Move to Trash",
-    });
-    if (!confirmed) return;
+    const breaksLinks = () =>
+      confirmAction({
+        title: `Move “${nameOf(path)}” to the Trash?`,
+        body: `${plural(links, "note")} link here, and those links will stop working.`,
+        action: "Move to Trash",
+      });
+    if (links && !(await breaksLinks())) return;
     const beingEdited = editing.path === path;
     if (beingEdited) {
       await editing.flush();
@@ -125,16 +138,13 @@ export class NoteFiles {
     toast("Moved to the Trash");
   }
 
-  async promptRenameFolder(folder: string): Promise<void> {
-    const notes = this.host.vault.index.notes.filter((note) => isInside(folder, note)).length;
-    const name = await promptText({
+  async startRenameFolder(folder: string): Promise<void> {
+    const name = await this.askName(this.visibleRow(`.tree-head[data-folder="${CSS.escape(folder)}"]`), {
       title: "Rename folder",
       value: folderName(folder),
-      action: "Rename",
-      hint: `${plural(notes, "note")} inside. Links to them will be updated.`,
-      validate: (value) => this.folderNameProblem(folder, value),
+      problem: (value) => this.folderNameProblem(value, folderOf(folder), folder),
     });
-    if (name !== null && name !== folderName(folder)) await this.renameFolder(folder, inFolder(folderOf(folder), name));
+    if (name !== null) await this.renameFolder(folder, inFolder(folderOf(folder), name));
   }
 
   async removeFolder(folder: string): Promise<void> {
@@ -199,14 +209,48 @@ export class NoteFiles {
     return clash ? "A note with that name is already in this folder." : null;
   }
 
-  private folderNameProblem(folder: string, name: string): string | null {
+  private folderNameProblem(name: string, parent: string, current: string): string | null {
     const problem = nameProblem(name);
     if (problem) return problem;
     const { notes, attachments } = this.host.vault.index;
-    const next = inFolder(folderOf(folder), name).toLowerCase();
-    if (next === folder.toLowerCase()) return null;
+    const next = inFolder(parent, name).toLowerCase();
+    if (next === current.toLowerCase()) return null;
     const clash = [...notes, ...attachments].some((file) => file.toLowerCase().startsWith(`${next}/`));
     return clash ? "A folder with that name is already here." : null;
+  }
+
+  private get treeIsVisible(): boolean {
+    return !this.host.sidebar.hidden && !this.host.sidebar.closest(".sidebar-closed");
+  }
+
+  /** A row the user can see and type on, or null if it is hidden in a closed folder or sidebar. */
+  private visibleRow(selector: string): HTMLElement | null {
+    const row = this.host.sidebar.querySelector<HTMLElement>(selector);
+    return this.treeIsVisible && !row?.parentElement?.closest(".tree-folder:not(.is-open)") ? row : null;
+  }
+
+  private askName(row: HTMLElement | null, ask: { title: string; value: string; problem: (value: string) => string | null }) {
+    const { title, value, problem } = ask;
+    if (row) return nameInPlace(row, { value, label: title, problem, toast: this.host.toast });
+    return promptText({ title, value, action: "OK", validate: problem });
+  }
+
+  /** A blank row at the top of the folder, to type the new folder's name on. */
+  private newFolderRow(parent: string): HTMLElement | null {
+    if (!this.treeIsVisible) return null;
+    if (parent) this.host.tree.focusFolder(parent);
+    const head = parent ? this.host.sidebar.querySelector(`.tree-head[data-folder="${CSS.escape(parent)}"]`) : null;
+    const list = head
+      ? head.parentElement?.querySelector(":scope > .tree-body .tree-inner")
+      : this.host.sidebar.querySelector(".tree");
+    if (!list) return null;
+    const row = document.createElement("div");
+    row.className = "nav-item";
+    row.style.setProperty("--d", String(parent ? parent.split("/").length - 1 : 0));
+    row.innerHTML = icons.folder.replace("<svg", '<svg class="tree-icon"');
+    list.prepend(row);
+    row.scrollIntoView({ block: "nearest" });
+    return row;
   }
 
   renameFolder(from: string, to: string): Promise<boolean> {
@@ -216,7 +260,7 @@ export class NoteFiles {
     );
     return this.relocate(moved, async () => {
       await this.host.vault.source.renameFolder(from, to);
-      this.host.folderRenamed(from, to);
+      this.host.tree.folderRenamed(from, to);
     });
   }
 
@@ -317,28 +361,52 @@ export class NoteFiles {
     return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
   }
 
+  private rowActions(row: HTMLElement): RowAction[] {
+    const folder = row.dataset.folder;
+    if (folder !== undefined) {
+      return [
+        { label: "New note here", icon: icons.newNote, run: () => void this.newNote(folder) },
+        { label: "New folder here", icon: icons.newFolder, run: () => void this.newFolder(folder) },
+        { label: "Rename", icon: icons.rename, run: () => void this.startRenameFolder(folder) },
+        { label: "Move to Trash", icon: icons.trash, run: () => void this.removeFolder(folder) },
+      ];
+    }
+    const path = row.dataset.path!;
+    return [
+      { label: "Rename", icon: icons.rename, run: () => void this.startRename(path) },
+      { label: "Move to Trash", icon: icons.trash, run: () => void this.remove(path) },
+    ];
+  }
+
   private onContextMenu(e: MouseEvent): void {
     const target = e.target as HTMLElement;
     const note = target.closest<HTMLElement>(".nav-item[data-path]");
-    const folder = target.closest<HTMLElement>(".tree-head[data-folder]");
-    if (!note && !folder) return;
+    const folder = target.closest<HTMLElement>(".tree-head[data-folder]")?.dataset.folder;
     e.preventDefault();
-    if (folder) {
-      const path = folder.dataset.folder!;
+    const reveal = (path: string) => (isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : []);
+    if (folder !== undefined) {
       showContextMenu(e.clientX, e.clientY, [
-        { label: "New note here", run: () => void this.newNote(path) },
-        { label: "Rename…", run: () => void this.promptRenameFolder(path) },
-        ...(isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : []),
-        { label: "Move to Trash", run: () => void this.removeFolder(path) },
+        { label: "New note here", run: () => void this.newNote(folder) },
+        { label: "New folder here…", run: () => void this.newFolder(folder) },
+        { label: "Rename…", run: () => void this.startRenameFolder(folder) },
+        ...reveal(folder),
+        { label: "Move to Trash", run: () => void this.removeFolder(folder) },
       ]);
       return;
     }
-    const path = note!.dataset.path!;
+    if (!note) {
+      showContextMenu(e.clientX, e.clientY, [
+        { label: "New note", run: () => void this.newNote() },
+        { label: "New folder…", run: () => void this.newFolder() },
+      ]);
+      return;
+    }
+    const path = note.dataset.path!;
     showContextMenu(e.clientX, e.clientY, [
       { label: "Open in new tab", run: () => void this.host.open(path, true) },
-      { label: "Rename…", run: () => void this.promptRename(path) },
+      { label: "Rename…", run: () => void this.startRename(path) },
       { label: "Move to…", run: () => this.promptMove(path) },
-      ...(isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : []),
+      ...reveal(path),
       { label: "Move to Trash", run: () => void this.remove(path) },
     ]);
   }

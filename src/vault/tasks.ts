@@ -1,4 +1,5 @@
 const TASK_LINE = /^((?:[ \t]*>)*[ \t]*(?:[-*+]|\d+[.)])[ \t]+\[)([ xX])(\])/;
+const LIST_ITEM = /^(?:[ \t]*>)*[ \t]*(?:[-*+]|\d+[.)])[ \t]/;
 const FENCE = /^ {0,3}(```|~~~)/;
 
 /** Flips the task on a line of the note. Null means that line is not a task, so nothing should be written. */
@@ -17,24 +18,41 @@ export function toggleTask(text: string, line: number): string | null {
   return `${text.slice(0, at)}${match[2] === " " ? "x" : " "}${text.slice(at + 1)}`;
 }
 
-/** How many tasks a note has and how many are done, ignoring anything inside fenced code. */
-export function taskProgress(text: string): { done: number; total: number } {
-  let done = 0;
-  let total = 0;
+export interface TaskList {
+  done: number;
+  total: number;
+}
+
+/**
+ * Each to-do list in a note, in order, ignoring fenced code. Blank lines,
+ * indented text and plain bullets stay inside a list. Anything else between
+ * two tasks, such as a heading or paragraph, starts a new one.
+ */
+export function taskLists(text: string): TaskList[] {
+  const lists: TaskList[] = [];
+  let current: TaskList | null = null;
   let fence: string | null = null;
   for (const line of text.split("\n")) {
     const marker = FENCE.exec(line)?.[1] ?? null;
     if (marker && (fence === null || fence === marker)) {
       fence = fence === null ? marker : null;
+      if (!/^\s/.test(line)) current = null;
       continue;
     }
     if (fence !== null) continue;
     const match = TASK_LINE.exec(line);
-    if (!match) continue;
-    total++;
-    if (match[2] !== " ") done++;
+    if (match) {
+      if (!current) {
+        current = { done: 0, total: 0 };
+        lists.push(current);
+      }
+      current.total++;
+      if (match[2] !== " ") current.done++;
+    } else if (line.trim() && !/^\s/.test(line) && !LIST_ITEM.test(line)) {
+      current = null;
+    }
   }
-  return { done, total };
+  return lists;
 }
 
 /** The line ending to keep when editing, or null when a file mixes them and could not be saved unchanged. */

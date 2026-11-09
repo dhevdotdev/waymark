@@ -11,7 +11,7 @@ export interface SyncControllerDeps {
   els: Pick<ShellElements, "sync" | "branch">;
   prefs: PrefStore;
   root: string;
-  panelHost: Omit<GitHost, "lastSync" | "setLastSync" | "onVisible" | "onStatus">;
+  panelHost: Omit<GitHost, "prefs" | "lastSync" | "setLastSync" | "onVisible" | "onStatus">;
   onStatusChanged: () => void;
 }
 
@@ -25,6 +25,7 @@ export class SyncController {
     const { els, prefs, root, panelHost } = deps;
     this.panel = new GitPanel({
       ...panelHost,
+      prefs,
       lastSync: () => prefs.value.vaults[root]?.lastSync ?? null,
       setLastSync: (at) =>
         prefs.update((p) => {

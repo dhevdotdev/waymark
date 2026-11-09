@@ -49,7 +49,6 @@ function template(options: ShellOptions): string {
           <div class="titlebar-nav">
             <button class="icon-btn" data-act="sidebar" data-tip="Sidebar" data-key="⌘\\" aria-label="Toggle sidebar">${icons.sidebar}</button>
             <button class="icon-btn" data-side="search" data-tip="Search inside notes" data-key="⌘⇧F" aria-label="Search inside notes">${icons.search}</button>
-            <button class="icon-btn" data-act="new-note" data-tip="New note" data-key="⌘N" aria-label="New note">${icons.newNote}</button>
           </div>
           <div class="titlebar-nav">
             <button class="icon-btn" data-act="back" data-tip="Back" data-key="⌘[" aria-label="Back">${icons.back}</button>
@@ -62,6 +61,11 @@ function template(options: ShellOptions): string {
         </div>
       </header>
       <nav class="sidebar" aria-label="Navigation">
+        <div class="files-actions" data-side-pane="files">
+          <button class="icon-btn" data-act="new-note" data-tip="New note" data-key="⌘N" aria-label="New note">${icons.newNote}</button>
+          <button class="icon-btn" data-act="new-folder" data-tip="New folder" aria-label="New folder">${icons.newFolder}</button>
+          <button class="icon-btn files-actions-end" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
+        </div>
         <div class="sidebar-inner" data-side-pane="files"></div>
         <div class="sidebar-search" data-side-pane="search" hidden>
           <div class="search-head">

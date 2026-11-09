@@ -82,6 +82,7 @@ kbd {
 }
 .shell.no-anim,
 .shell.no-anim .sidebar-inner,
+.shell.no-anim .files-actions,
 .shell.no-anim .sidebar-search {
   transition: none;
 }
@@ -387,6 +388,77 @@ kbd {
   flex-direction: column;
   box-shadow: inset -1px 0 var(--rule);
 }
+.files-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  inline-size: var(--sidebar-w);
+  padding: 0 14px 6px;
+  transition:
+    opacity var(--t-slide) ease,
+    translate var(--t-slide) var(--ease-in-out);
+}
+.files-actions[hidden],
+.row-actions[hidden] {
+  display: none;
+}
+.files-actions-end {
+  margin-inline-start: auto;
+}
+.row-actions {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-inline: 2px;
+  border-radius: var(--r-control);
+  background: var(--row-hover);
+}
+.row-action {
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  appearance: none;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: none;
+  color: var(--chrome-ink-3);
+  cursor: default;
+}
+.row-action svg {
+  inline-size: 14px;
+  block-size: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.row-action:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.nav-item.is-naming {
+  background: var(--row-hover);
+}
+.tree-name-input {
+  flex: 1;
+  min-inline-size: 0;
+  block-size: 22px;
+  padding-inline: 4px;
+  border: 0;
+  border-radius: var(--r-chip);
+  outline: 1px solid var(--accent);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.tree-name-input.is-problem {
+  outline-color: var(--danger);
+}
 .sidebar-inner {
   flex: 1;
   min-height: 0;
@@ -399,7 +471,7 @@ kbd {
     opacity var(--t-slide) ease,
     translate var(--t-slide) var(--ease-in-out);
 }
-.shell.sidebar-closed :is(.sidebar-inner, .sidebar-search) {
+.shell.sidebar-closed :is(.sidebar-inner, .sidebar-search, .files-actions) {
   opacity: 0;
   translate: -12px 0;
   pointer-events: none;
