@@ -88,6 +88,12 @@ function signingIdentity() {
   const password = readFileSync(PASSWORD_FILE, "utf8");
   if (!existsSync(KEYCHAIN)) createIdentity(password);
   run("security", "unlock-keychain", "-p", password, KEYCHAIN);
+  /* codesign looks for identities on the search list, even when told which keychain to use. */
+  const listed = run("security", "list-keychains", "-d", "user")
+    .split("\n")
+    .map((entry) => entry.trim().replace(/"/g, ""))
+    .filter(Boolean);
+  if (!listed.includes(KEYCHAIN)) run("security", "list-keychains", "-d", "user", "-s", ...listed, KEYCHAIN);
   const certificate = run("security", "find-certificate", "-c", IDENTITY, "-Z", KEYCHAIN);
   return /SHA-1 hash: ([0-9A-F]+)/.exec(certificate)[1];
 }

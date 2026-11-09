@@ -35,6 +35,9 @@ Last line.
 `;
 const CRLF = "# Windows\r\n\r\nfirst line\r\nsecond line\r\n";
 
+/* CodeMirror binds undo to the platform's own modifier, and CI runs on Linux. */
+const EDITOR_UNDO = process.platform === "darwin" ? "Meta+z" : "Control+z";
+
 const app = await serveFixture();
 const file = (name) => path.join(app.vault, name);
 const disk = (name) => readFile(file(name), "utf8");
@@ -161,7 +164,7 @@ try {
   await saved();
   await pause(600);
   check("a task can be clicked while editing", (await disk("Tasks.md")).includes("- [x] alpha"));
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(EDITOR_UNDO);
   await saved();
   await pause(600);
   check("undo works in the editor", (await disk("Tasks.md")).includes("- [ ] alpha"));
