@@ -264,7 +264,10 @@ async fn trash_note(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
 
 /// Takes the file as a raw body, because an image sent as JSON would be several times its size.
 #[tauri::command]
-fn write_attachment(vault: State<'_, Vault>, request: tauri::ipc::Request<'_>) -> CmdResult<()> {
+async fn write_attachment(
+    vault: State<'_, Vault>,
+    request: tauri::ipc::Request<'_>,
+) -> CmdResult<()> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err(plain_err("Expected the file's bytes"));
     };
@@ -278,10 +281,14 @@ fn write_attachment(vault: State<'_, Vault>, request: tauri::ipc::Request<'_>) -
                 .into_owned()
         })
         .ok_or_else(|| plain_err("No file name was given"))?;
+    let bytes = bytes.clone();
     let root = vault.root().map_err(plain_err)?;
     let gate = vault.write_gate();
-    let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
-    vault::write_attachment(&root, &path, bytes).map_err(plain_err)
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        vault::write_attachment(&root, &path, &bytes).map_err(plain_err)
+    })
+    .await
 }
 
 /// Called once the frontend has saved anything pending, so quitting can finish.

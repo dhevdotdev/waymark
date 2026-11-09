@@ -212,6 +212,19 @@ fn prepared_parent(root: &Path, rel: &Path) -> Result<PathBuf, String> {
     let Some(parent) = rel.parent().filter(|p| !p.as_os_str().is_empty()) else {
         return root.canonicalize().map_err(|e| e.to_string());
     };
+    let mut existing = parent;
+    while !root.join(existing).exists() {
+        match existing.parent() {
+            Some(up) if !up.as_os_str().is_empty() => existing = up,
+            _ => {
+                existing = Path::new("");
+                break;
+            }
+        }
+    }
+    if !existing.as_os_str().is_empty() {
+        resolve_in(root, &existing.to_string_lossy())?;
+    }
     std::fs::create_dir_all(root.join(parent)).map_err(|e| e.to_string())?;
     resolve_in(root, &parent.to_string_lossy())
 }
@@ -501,6 +514,16 @@ mod tests {
         assert!(rename_note(dir.path(), "a.md", "away/b.md").is_err());
         assert!(path.exists());
         assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn no_folder_is_created_through_a_link_out_of_the_vault() {
+        let (dir, path) = note("x");
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), dir.path().join("away")).unwrap();
+        assert!(rename_note(dir.path(), "a.md", "away/new/b.md").is_err());
+        assert!(!outside.path().join("new").exists());
+        assert!(path.exists());
     }
 
     #[test]

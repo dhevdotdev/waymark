@@ -74,6 +74,10 @@ export class NoteEditing {
     if (this.session?.path === from) this.session.path = to;
   }
 
+  setFrozen(frozen: boolean): void {
+    this.session?.editor.setFrozen(frozen);
+  }
+
   /** Leaves the editor without saving, because the note is being deleted. */
   discard(): void {
     this.session?.editor.destroy();

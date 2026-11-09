@@ -1,6 +1,6 @@
 const NOTE_EXT = /\.md$/i;
 const ANY_LINK =
-  /^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$|`[^`\n]*`|(!?\[\[)((?:[^\]|#\n\\]|\\(?!\|))*)([^\]\n]*\]\])|(\]\()([^)\s]+\.md)(\))/gim;
+  /^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?(?:^ {0,3}\1[ \t]*$|(?![\s\S]))|`[^`\n]*`|(!?\[\[)((?:[^\]|#\n\\]|\\(?!\|))*)([^\]\n]*\]\])|(\]\()([^)\s]+\.md)(\))/gim;
 
 const fold = (s: string) => s.normalize("NFC").toLowerCase();
 const stem = (path: string) => path.replace(NOTE_EXT, "");
@@ -19,13 +19,21 @@ function pointsAt(target: string, path: string): boolean {
  * code as they were. A link written with a folder keeps one, and a bare link
  * gains one only if its name would otherwise match several notes.
  */
-export function rewriteLinks(text: string, from: string, to: string, nameIsUnique: boolean): string {
+export function rewriteLinks(
+  text: string,
+  from: string,
+  to: string,
+  nameIsUnique: boolean,
+  resolvesToNote: (target: string) => boolean = () => true,
+): string {
   const newTarget = (old: string) => (old.includes("/") || !nameIsUnique ? stem(to) : baseName(stem(to)));
   return text.replace(ANY_LINK, (match, _fence, open, target, rest, mdOpen, mdTarget, mdClose) => {
-    if (open !== undefined && pointsAt(target, from)) return `${open}${newTarget(target.trim())}${rest}`;
+    if (open !== undefined && pointsAt(target, from) && resolvesToNote(target.trim()))
+      return `${open}${newTarget(target.trim())}${rest}`;
     if (mdOpen !== undefined) {
       const decoded = decodeURI(mdTarget);
-      if (pointsAt(decoded, from)) return `${mdOpen}${encodeURI(`${newTarget(decoded)}.md`)}${mdClose}`;
+      if (pointsAt(decoded, from) && resolvesToNote(decoded))
+        return `${mdOpen}${encodeURI(`${newTarget(decoded)}.md`)}${mdClose}`;
     }
     return match;
   });

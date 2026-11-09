@@ -45,6 +45,17 @@ describe("rewriteLinks", () => {
     expect(rename("| [[Old\\|label]] |")).toBe("| [[New\\|label]] |");
   });
 
+  it("leaves a link alone when it really means a different note of the same name", () => {
+    const meansTheRenamedNote = (target: string) => target === "A/Old";
+    expect(rewriteLinks("[[A/Old]] and [[Old]]", "A/Old.md", "A/New.md", true, meansTheRenamedNote)).toBe(
+      "[[A/New]] and [[Old]]",
+    );
+  });
+
+  it("leaves links inside a code fence that never closes", () => {
+    expect(rename("[[Old]]\n\n```\n[[Old]]\n")).toBe("[[New]]\n\n```\n[[Old]]\n");
+  });
+
   it("leaves everything else byte for byte", () => {
     expect(rename("a\r\n[[Old]]\r\n\tb  \r\n")).toBe("a\r\n[[New]]\r\n\tb  \r\n");
   });

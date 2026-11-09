@@ -6,7 +6,7 @@ import {
   startCompletion,
 } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
-import { EditorSelection, type EditorState, type Extension } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { focusTableAt } from "./table-editor";
 
@@ -62,16 +62,48 @@ function insertBlock(
   return from + (before ? 1 : 0);
 }
 
+const holdPlace = StateEffect.define<{ id: number; pos: number }>();
+const releasePlace = StateEffect.define<number>();
+let nextPlace = 0;
+
+/** Places waiting for a file to finish saving, kept correct as the note is typed in meanwhile. */
+const heldPlaces = StateField.define<Map<number, number>>({
+  create: () => new Map(),
+  update(places, tr) {
+    const next = new Map([...places].map(([id, pos]) => [id, tr.changes.mapPos(pos, 1)]));
+    for (const effect of tr.effects) {
+      if (effect.is(holdPlace)) next.set(effect.value.id, effect.value.pos);
+      if (effect.is(releasePlace)) next.delete(effect.value);
+    }
+    return next;
+  },
+});
+
+/** Saves files and embeds them at `at`, following that spot if the note changes while they save. */
+function insertFiles(view: EditorView, files: File[], at: number, options: InsertOptions): void {
+  const id = nextPlace++;
+  view.dispatch({ effects: holdPlace.of({ id, pos: at }) });
+  void (async () => {
+    for (const file of files) {
+      const embed = await options.addFile(file);
+      const pos = view.state.field(heldPlaces).get(id);
+      if (embed && pos !== undefined) view.dispatch({ changes: { from: pos, insert: embed } });
+    }
+    view.dispatch({ effects: releasePlace.of(id) });
+  })();
+}
+
 function pickFile(view: EditorView, from: number, to: number, options: InsertOptions): void {
+  view.dispatch({ changes: { from, to } });
+  const id = nextPlace++;
+  view.dispatch({ effects: holdPlace.of({ id, pos: from }) });
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*,application/pdf";
   input.addEventListener("change", () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    void options.addFile(file).then((embed) => {
-      if (embed) view.dispatch({ changes: { from, to, insert: embed }, selection: { anchor: from + embed.length } });
-    });
+    const pos = view.state.field(heldPlaces).get(id) ?? from;
+    view.dispatch({ effects: releasePlace.of(id) });
+    if (input.files?.[0]) insertFiles(view, [input.files[0]], pos, options);
   });
   input.click();
 }
@@ -92,6 +124,9 @@ const BLOCKS: [label: string, keywords: string, apply: Apply][] = [
   ["Numbered list", "ol ordered", lineStart("1. ")],
   ["Task", "todo checkbox", lineStart("- [ ] ")],
   ["Quote", "blockquote", lineStart("> ")],
+];
+
+const WHOLE_LINE: [label: string, keywords: string, apply: Apply][] = [
   [
     "Table",
     "grid rows columns",
@@ -147,7 +182,8 @@ function slashSource(options: InsertOptions) {
     if (inCode(state, slash)) return null;
     const row = state.doc.lineAt(slash);
     const atStart = state.sliceDoc(row.from, slash).trim() === "";
-    const items = [...(atStart ? BLOCKS : []), ...INLINE];
+    const restBlank = state.sliceDoc(context.pos, row.to).trim() === "";
+    const items = [...(atStart ? BLOCKS : []), ...(atStart && restBlank ? WHOLE_LINE : []), ...INLINE];
     const entry = ([label, keywords, apply]: (typeof BLOCKS)[number], position: number): Completion => ({
       label: `${label} ${keywords}`,
       displayLabel: label,
@@ -198,18 +234,6 @@ function linkSource(options: InsertOptions) {
   };
 }
 
-function insertFiles(view: EditorView, files: File[], at: number, options: InsertOptions): void {
-  void (async () => {
-    let pos = at;
-    for (const file of files) {
-      const embed = await options.addFile(file);
-      if (!embed) continue;
-      view.dispatch({ changes: { from: pos, insert: embed }, selection: { anchor: pos + embed.length } });
-      pos += embed.length;
-    }
-  })();
-}
-
 const URL_ONLY = /^https?:\/\/\S+$/;
 
 function fileHandlers(options: InsertOptions): Extension {
@@ -249,6 +273,7 @@ function fileHandlers(options: InsertOptions): Extension {
 export function editorInsert(options: InsertOptions): Extension {
   return [
     autocompletion({ override: [slashSource(options), linkSource(options)], icons: false, selectOnOpen: true }),
+    heldPlaces,
     fileHandlers(options),
   ];
 }

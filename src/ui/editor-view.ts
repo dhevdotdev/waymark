@@ -201,6 +201,7 @@ function stats(state: EditorState): EditorStats {
 
 export function createEditor(parent: HTMLElement, options: EditorOptions): EditorHandle {
   const editable = new Compartment();
+  let focusedBeforeFreeze = false;
   const frozenState = (frozen: boolean): Extension => [EditorState.readOnly.of(frozen), EditorView.editable.of(!frozen)];
   const view = new EditorView({
     parent,
@@ -263,7 +264,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       const pos = view.posAtCoords({ x, y }, false);
       view.dispatch({ selection: { anchor: pos } });
     },
-    setFrozen: (frozen) => view.dispatch({ effects: editable.reconfigure(frozenState(frozen)) }),
+    setFrozen(frozen) {
+      if (frozen) focusedBeforeFreeze = view.hasFocus;
+      view.dispatch({ effects: editable.reconfigure(frozenState(frozen)) });
+      if (!frozen && focusedBeforeFreeze) view.focus();
+    },
     destroy: () => view.destroy(),
   };
 }

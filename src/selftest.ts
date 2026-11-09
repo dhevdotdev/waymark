@@ -92,6 +92,7 @@ async function checkEditing({ app, reader, vault, check, until }: SelfTestContex
   check("the open tab follows the rename", reader.current === "Selftest renamed.md", reader.current);
   await vault.source.trashNote("Selftest renamed.md");
   check("a note can be moved to the Trash", !(await vault.source.list()).includes("Selftest renamed.md"));
+  await vault.applyChanges([]);
 }
 
 async function runRead(ctx: SelfTestContext): Promise<void> {

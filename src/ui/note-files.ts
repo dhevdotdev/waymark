@@ -23,6 +23,12 @@ export interface NoteFilesHost {
   redraw: () => Promise<void>;
 }
 
+interface LinkUpdate {
+  path: string;
+  text: string;
+  next: string;
+}
+
 const UNTITLED = "Untitled";
 const folderOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
@@ -33,6 +39,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export class NoteFiles {
   private readonly folderPicker: Palette;
   private moving = "";
+  private moveRunning = false;
 
   constructor(private readonly host: NoteFilesHost) {
     this.folderPicker = new Palette(
@@ -77,8 +84,7 @@ export class NoteFiles {
       this.host.toast(problem);
       return false;
     }
-    if (name !== nameOf(path)) await this.move(path, inFolder(folderOf(path), `${name}.md`));
-    return true;
+    return name === nameOf(path) || this.move(path, inFolder(folderOf(path), `${name}.md`));
   }
 
   promptMove(path: string): void {
@@ -97,13 +103,19 @@ export class NoteFiles {
       action: "Move to Trash",
     });
     if (!confirmed) return;
-    if (editing.path === path) editing.discard();
+    const beingEdited = editing.path === path;
+    if (beingEdited) {
+      await editing.flush();
+      editing.setFrozen(true);
+    }
     try {
       await vault.source.trashNote(path);
     } catch (error) {
+      editing.setFrozen(false);
       toast(error instanceof Error ? error.message : "The note could not be moved to the Trash.");
       return;
     }
+    if (beingEdited) editing.discard();
     await vault.applyChanges([]);
     workspace.forgetNote(path);
     await redraw();
@@ -137,56 +149,72 @@ export class NoteFiles {
     return clash ? "A note with that name is already in this folder." : null;
   }
 
-  /** Moves the file, then updates every note that links to it. Each update states the text it expects, like any save. */
-  private async move(from: string, to: string): Promise<void> {
-    const { vault, workspace, prefs, root, editing, toast, redraw } = this.host;
+  /**
+   * Moves the file, then updates every note that links to it. The new text is
+   * worked out first, while links still resolve as they did, and each update
+   * states the text it expects, like any save.
+   */
+  private async move(from: string, to: string): Promise<boolean> {
+    const { editing, toast } = this.host;
+    if (this.moveRunning) return false;
     if (!(await editing.flush())) {
       toast("Choose what to keep in the note you are editing first.");
-      return;
+      return false;
     }
-    const linking = [...new Set([...vault.links.backlinks(from), from])];
+    this.moveRunning = true;
+    editing.setFrozen(true);
     try {
-      await vault.source.renameNote(from, to);
+      return await this.moveAndRelink(from, to);
     } catch (error) {
       toast(error instanceof Error ? error.message : "The note could not be moved.");
-      return;
+      return false;
+    } finally {
+      this.moveRunning = false;
+      editing.setFrozen(false);
     }
+  }
+
+  private async moveAndRelink(from: string, to: string): Promise<boolean> {
+    const { vault, workspace, prefs, root, editing, toast, redraw } = this.host;
+    const planned = await this.planLinkUpdates(from, to);
+    await vault.source.renameNote(from, to);
+    editing.noteMoved(from, to);
     await vault.applyChanges([to]);
     workspace.replaceNote(from, to);
     renameRecent(prefs, root, from, to);
-    editing.noteMoved(from, to);
-    const updated = await this.updateLinks(
-      linking.map((path) => (path === from ? to : path)),
-      from,
-      to,
-    );
+    const { count, failed } = await this.applyLinkUpdates(planned, from, to);
     await editing.vaultChanged();
     await redraw();
-    toast(
-      updated.failed
-        ? `Moved, but ${plural(updated.failed, "note")} could not be updated.`
-        : updated.count
-          ? `Updated links in ${plural(updated.count, "note")}`
-          : "Moved",
-    );
+    if (failed) toast(`Moved, but ${plural(failed, "note")} could not be updated.`);
+    else toast(count ? `Updated links in ${plural(count, "note")}` : "Moved");
+    return true;
   }
 
-  private async updateLinks(paths: string[], from: string, to: string): Promise<{ count: number; failed: number }> {
+  private async planLinkUpdates(from: string, to: string): Promise<LinkUpdate[]> {
     const { vault } = this.host;
-    const unique = vault.index.resolve(nameOf(to)).kind === "found";
+    const newName = nameOf(to).toLowerCase();
+    const unique = !vault.index.notes.some((note) => note !== from && nameOf(note).toLowerCase() === newName);
+    const resolves = (target: string) => {
+      const found = vault.index.resolve(target);
+      return found.kind === "found" && found.path === from;
+    };
+    const updates: LinkUpdate[] = [];
+    for (const path of new Set([...vault.links.backlinks(from), from])) {
+      const text = await vault.read(path);
+      const next = rewriteLinks(text, from, to, unique, resolves);
+      if (next !== text) updates.push({ path, text, next });
+    }
+    return updates;
+  }
+
+  private async applyLinkUpdates(updates: LinkUpdate[], from: string, to: string): Promise<{ count: number; failed: number }> {
+    const { vault } = this.host;
     let count = 0;
     let failed = 0;
-    for (const path of paths) {
-      try {
-        const text = await vault.read(path);
-        const next = rewriteLinks(text, from, to, unique);
-        if (next === text) continue;
-        const outcome = await vault.save(path, next, text);
-        if (outcome.kind === "saved") count++;
-        else failed++;
-      } catch {
-        failed++;
-      }
+    for (const { path, text, next } of updates) {
+      const outcome = await vault.save(path === from ? to : path, next, text).catch(() => null);
+      if (outcome?.kind === "saved") count++;
+      else failed++;
     }
     return { count, failed };
   }

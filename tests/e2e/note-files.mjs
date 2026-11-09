@@ -222,6 +222,17 @@ try {
   await page.keyboard.press("Enter");
   await page.keyboard.type("todo");
   await saved();
+  await page.keyboard.press("Home");
+  await page.keyboard.type("/");
+  await pause(300);
+  check(
+    "blocks that need a whole line are not offered above existing text",
+    !(await page.locator(".cm-tooltip-autocomplete li").allTextContents()).some((o) => o.startsWith("Code block")),
+  );
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("End");
+  await saved();
   await pause(150);
   check("Task inserts a task", (await disk("Writing.md")).includes("- [ ] todo"));
   await addLine();
