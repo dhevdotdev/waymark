@@ -66,12 +66,13 @@ class TableWidget extends WidgetType {
 
   /** Keeps the same DOM while the table's shape holds, so typing in a cell never loses focus. */
   updateDOM(dom: HTMLElement): boolean {
-    const { rows } = parseTable(this.lines);
+    const { rows, align } = parseTable(this.lines);
     const cells = cellsIn(dom);
     if (cells.length !== rows.length * rows[0].length || dom.querySelectorAll("tr").length !== rows.length) return false;
     for (const cell of cells) {
       const { row, column } = position(cell);
       const text = rows[row][column];
+      cell.style.textAlign = align[column];
       if (cell.dataset.source === text) continue;
       cell.dataset.source = text;
       this.showCell(cell);
@@ -192,10 +193,7 @@ class TableWidget extends WidgetType {
   private focusCell(root: HTMLElement, row: number, column: number): void {
     const cell = root.querySelector<HTMLElement>(`[data-row="${row}"][data-column="${column}"]`);
     if (!cell) return;
-    if (cell !== document.activeElement) {
-      cell.textContent = cell.dataset.source ?? "";
-      cell.focus();
-    }
+    cell.focus();
     caretToEnd(cell);
   }
 
@@ -255,7 +253,6 @@ class TableWidget extends WidgetType {
     }
     if (cell === document.activeElement) return;
     e.preventDefault();
-    cell.textContent = cell.dataset.source ?? "";
     cell.focus();
     const at = document.caretRangeFromPoint(e.clientX, e.clientY);
     if (at && cell.contains(at.startContainer)) {
@@ -271,6 +268,13 @@ class TableWidget extends WidgetType {
     root.addEventListener("mousedown", (e) => {
       const cell = cellOf(e);
       if (cell) this.openOnClick(cell, e);
+    });
+    /* However a cell gets focus, it must show its Markdown before anything is typed, or typing would flatten the markup. */
+    root.addEventListener("focusin", (e) => {
+      const cell = cellOf(e);
+      if (!cell) return;
+      cell.textContent = cell.dataset.source ?? "";
+      caretToEnd(cell);
     });
     root.addEventListener("focusout", (e) => {
       const cell = cellOf(e);
@@ -313,7 +317,7 @@ function findTables(state: EditorState, frontmatterEnd: number): TableRange[] {
 export function tableEditor(options: TableEditorOptions): Extension {
   const locate = (view: EditorView, root: HTMLElement): TableRange | null => {
     const from = view.posAtDOM(root);
-    return view.state.field(field).tables.find((table) => table.from === from) ?? null;
+    return view.state.field(field).tables.find((table) => from >= table.from && from <= table.to) ?? null;
   };
   const compute = (state: EditorState, raw: number | null): FieldValue => {
     const tables = findTables(state, options.frontmatterEnd(state));
@@ -331,7 +335,7 @@ export function tableEditor(options: TableEditorOptions): Extension {
     if (value.raw === null) return null;
     const raw = tr.changes.mapPos(value.raw);
     const table = value.tables.find((t) => t.from === value.raw);
-    const end = table ? tr.changes.mapPos(table.to) : raw;
+    const end = table ? tr.changes.mapPos(table.to, 1) : raw;
     const head = tr.state.selection.main.head;
     return head >= raw && head <= end ? raw : null;
   };

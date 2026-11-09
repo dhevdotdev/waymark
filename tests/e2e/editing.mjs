@@ -357,6 +357,20 @@ try {
   await page.keyboard.press("ArrowUp");
   check("the arrows move between rows", (await activeCell()) === "1,1");
 
+  await cell(1, 0).click();
+  await pause(50);
+  await page.evaluate(() => document.activeElement.blur());
+  await pause(100);
+  await cell(1, 2).focus();
+  await pause(100);
+  await page.keyboard.type("!");
+  await saved();
+  await pause(150);
+  check("a cell reached without clicking keeps its formatting", (await disk("Table.md")).includes("| **bold**! |"));
+  await page.keyboard.press("Backspace");
+  await saved();
+  await pause(150);
+
   await cell(2, 2).click();
   await page.keyboard.press("End");
   await page.keyboard.type("|z");

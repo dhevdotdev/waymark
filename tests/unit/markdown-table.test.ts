@@ -42,6 +42,19 @@ describe("setCell", () => {
     expect(setCell(TABLE, 2, 2, text)).toEqual(TABLE);
   });
 
+  it("keeps the next cell apart when the text ends in a backslash", () => {
+    const next = setCell(["|b|c|", "|---|---|"], 0, 0, "a\\");
+    expect(parseTable(next).rows[0]).toEqual(["a\\", "c"]);
+  });
+
+  it("reads a pipe after a double backslash the way the renderer does", () => {
+    expect(parseTable(["| a\\\\| b |", "|---|"]).rows[0]).toEqual(["a\\| b"]);
+  });
+
+  it("adds a missing cell without rewriting the rest of the row", () => {
+    expect(setCell(["a | b | c", "--|--|--", "1  |  2"], 1, 2, "3")[2]).toBe("1  |  2 | 3 |");
+  });
+
   it("fills an empty cell", () => {
     expect(setCell(["| a |  |", "|---|---|"], 0, 1, "b")[0]).toBe("| a | b |");
     expect(setCell(["|a||", "|---|---|"], 0, 1, "b")[0]).toBe("|a| b |");

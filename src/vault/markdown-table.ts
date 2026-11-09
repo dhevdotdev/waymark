@@ -15,8 +15,7 @@ export interface ParsedTable {
 function segments(line: string): Segment[] {
   const pipes: number[] = [];
   for (let i = 0; i < line.length; i++) {
-    if (line[i] === "\\") i++;
-    else if (line[i] === "|") pipes.push(i);
+    if (line[i] === "|" && line[i - 1] !== "\\") pipes.push(i);
   }
   const start = Math.max(0, line.search(/\S/));
   const end = line.trimEnd().length;
@@ -57,12 +56,13 @@ export function parseTable(lines: string[]): ParsedTable {
   return { rows, align };
 }
 
-/** A row with too few cells is the one case that has to be rewritten to give the new cell somewhere to go. */
+/** Gives a short row the empty cells it lacks, leaving the cells it has exactly as written. */
 function withCells(line: string, count: number): string {
-  const cells = cellsOf(line);
-  if (cells.length >= count) return line;
-  const padded = [...cells.map((c) => c.trim()), ...Array<string>(count - cells.length).fill("")];
-  return `| ${padded.join(" | ")} |`;
+  const missing = count - cellsOf(line).length;
+  if (missing <= 0) return line;
+  const row = line.trimEnd();
+  const closed = row.endsWith("|") && !row.endsWith("\\|");
+  return `${closed ? row : `${row} |`}${"  |".repeat(missing)}`;
 }
 
 const replaced = (lines: string[], at: number, line: string) => lines.map((l, i) => (i === at ? line : l));
@@ -72,7 +72,8 @@ export function setCell(lines: string[], row: number, column: number, text: stri
   const line = withCells(lines[at], column + 1);
   const { from, to } = segments(line)[column];
   const raw = line.slice(from, to);
-  const value = encode(text);
+  /* A pipe straight after a backslash would count as escaped and merge this cell with the next. */
+  const value = encode(text).replace(/\\$/, "\\ ");
   if (!raw.trim()) return replaced(lines, at, `${line.slice(0, from)} ${value} ${line.slice(to)}`);
   const start = from + (raw.length - raw.trimStart().length);
   return replaced(lines, at, line.slice(0, start) + value + line.slice(from + raw.trimEnd().length));
