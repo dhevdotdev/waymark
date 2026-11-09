@@ -22,6 +22,7 @@ Every state has a visible way in and a visible way out.
 - A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
 - The palette keeps one height while typing, and headings appear only before a query, so results never jump.
 - The Dock icon follows the theme family while Waymark runs, recoloured from one artwork by `scripts/theme-icons.mjs`. macOS shows the bundled Catppuccin icon whenever the app is closed.
+- Sync opens as a centred sheet at one fixed size, like a diff. It is a separate task, so it does not slide out of the panel that describes the current note.
 - Task boxes sit where the bullet would be and toggle the task in the file. ⌘Z undoes the last one. Done items are dimmed, not struck through, so they stay easy to read.
 - Read and Edit are a switch at the right of the pane head, because two modes need to be visible. ⌘E flips between them, and reading stays the default.
 - Editing keeps the reading column and type. Syntax appears only on the line being edited, a tick means the disk has it, and the status bar shows line, column and word count.
@@ -56,7 +57,7 @@ The note body is a CSS grid, and grid items never collapse margins. Every gap is
 | Geometry | Measure 37rem, wide extra 5rem, gutter 2.5rem (1.25rem below 640px) |
 | Space | 4px base: 4, 8, 12, 16, 24, 32, 48, 72 |
 | Radii by role | Control 6, block 10, floating surface 12 |
-| Motion | One curve family with no overshoot. Ease-out `cubic-bezier(.23,1,.32,1)` for enter and exit, ease-in-out for travel. Hover 150ms, press 160ms at scale .97, menus 200ms, sidebar 240ms, sheets 250ms, toasts 400ms, sync drawer 420ms. Exits are faster than entries. Reduce Motion zeroes travel distances and keeps fades. |
+| Motion | One curve family with no overshoot. Ease-out `cubic-bezier(.23,1,.32,1)` for enter and exit, ease-in-out for travel. Hover 150ms, press 160ms at scale .97, menus 200ms, sidebar 240ms, sheets 250ms, toasts 400ms. Exits are faster than entries. Reduce Motion zeroes travel distances and keeps fades. |
 | Themes | Four families, each with a light and a dark variant: Catppuccin (Latte/Mocha), Rosé Pine (Dawn/Moon), Gruvbox and Everforest. Each supplies a palette, a sheet colour and an accent, and code highlighting follows the same family. Light sheets are lifted toward white for long reading. |
 
 ## Critique log for the reading checkpoint

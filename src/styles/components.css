@@ -595,6 +595,7 @@
 }
 
 .sheet-overlay,
+.sync-overlay,
 .lightbox {
   display: grid;
   place-items: center;
@@ -603,6 +604,7 @@
   animation: fade-in var(--t-modal) var(--ease-out);
 }
 .sheet-overlay.is-leaving,
+.sync-overlay.is-leaving,
 .lightbox.is-leaving {
   animation: fade-out var(--t-exit) ease forwards;
 }
@@ -936,51 +938,38 @@
   }
 }
 
-.drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  width: min(400px, 100%);
+.sync-sheet {
+  width: min(640px, 100%);
+  height: min(680px, 100%);
   display: flex;
   flex-direction: column;
   background: var(--paper);
-  box-shadow: var(--shadow-drawer);
-  animation: drawer-in var(--t-drawer) var(--ease-drawer);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: sheet-in var(--t-modal) var(--ease-out);
 }
-.drawer.is-leaving {
-  animation: drawer-out 180ms var(--ease-out) forwards;
+.sync-sheet:focus,
+.sync-sheet:focus-visible {
+  outline: none;
 }
-@keyframes drawer-in {
-  from {
-    translate: var(--drawer-shift) 0;
-    opacity: 0;
-  }
-}
-@keyframes drawer-out {
-  to {
-    translate: var(--drawer-shift) 0;
-    opacity: 0;
-  }
-}
-.drawer-head {
+.sync-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 12px 4px 18px;
 }
-.drawer-title {
+.sync-title {
   font-size: 0.875rem;
   font-weight: 650;
 }
-.drawer-body {
+.sync-body {
   flex: 1;
   overflow-y: auto;
   padding: 4px 12px 24px;
   scrollbar-width: thin;
 }
-.git-drawer .seg {
+.sync-sheet .seg {
   margin: 4px 18px 10px;
   align-self: flex-start;
 }
@@ -1232,6 +1221,10 @@
   display: grid;
   gap: 8px;
   padding: 6px;
+}
+.commit-actions {
+  display: flex;
+  gap: 8px;
 }
 .commit-box textarea {
   resize: none;

@@ -175,7 +175,7 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
 }
 
 async function runGit(ctx: SelfTestContext, played: string[]): Promise<void> {
-  const { panel, vault, check, until } = ctx;
+  const { panel, vault, check, until, wait } = ctx;
   await panel.refresh();
   check("status before fetch shows nothing incoming", panel.status?.behind === 0, panel.status?.branch);
   await panel.fetch(true);
@@ -189,6 +189,18 @@ async function runGit(ctx: SelfTestContext, played: string[]): Promise<void> {
   check("watcher re-reads the updated note", vault.texts.get("Welcome.md")?.includes("updated remotely") ?? false);
   check("open note re-rendered", document.querySelector(".doc")?.textContent?.includes("updated remotely") ?? false);
   check("incoming changes play the incoming cue", played.includes("incoming"), played);
+  panel.open();
+  await wait(300);
+  const sheet = document.querySelector(".sync-sheet")?.getBoundingClientRect();
+  const centred = sheet
+    ? Math.abs(sheet.left + sheet.width / 2 - innerWidth / 2) <= 2 &&
+      Math.abs(sheet.top + sheet.height / 2 - innerHeight / 2) <= 2
+    : false;
+  check("the sync sheet opens in the centre of the window", centred, sheet);
+  check("the sync sheet is not part of the reading pane", !document.querySelector(".reader .sync-sheet"));
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  await wait(300);
+  check("Escape closes the sync sheet", !panel.isOpen && !document.querySelector(".sync-overlay"));
 }
 
 async function runCommit({ panel, vault, check, until }: SelfTestContext): Promise<void> {
@@ -219,12 +231,12 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
   check("titlebar explains the state", label === (mode === "diverged" ? "Diverged" : "Blocked"), label);
   panel.open();
   await wait(400);
-  const notice = document.querySelector(".git-drawer .notice strong")?.textContent;
+  const notice = document.querySelector(".sync-sheet .notice strong")?.textContent;
   check("sync panel explains the problem", !!notice, notice);
   check(
     "panel offers the external route",
-    !!document.querySelector(".git-drawer .notice-actions .btn"),
-    document.querySelector(".git-drawer .notice-actions .btn")?.textContent,
+    !!document.querySelector(".sync-sheet .notice-actions .btn"),
+    document.querySelector(".sync-sheet .notice-actions .btn")?.textContent,
   );
   if (mode === "blocked") {
     reader.inspector.setPane("info");

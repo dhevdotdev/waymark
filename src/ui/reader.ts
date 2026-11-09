@@ -415,9 +415,9 @@ export class Reader {
   private handleEscape(inField: boolean): void {
     const { shell } = this.els;
     if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover")) return;
-    if (this.find.isOpen) this.find.close();
+    if (this.sync.panel.isOpen) this.sync.panel.close();
+    else if (this.find.isOpen) this.find.close();
     else if (!this.workspace.isEmpty && this.onGraph && !inField) this.leaveGraph();
-    else if (this.sync.panel.isOpen) this.sync.panel.close();
     else if (shell.matches(".sidebar-peek, .rail-peek")) shell.classList.remove("sidebar-peek", "rail-peek");
     else if (this.sidebar.isSearching && !inField) this.sidebar.showFiles();
     else if (this.onBlank && !inField) this.dismissBlank();

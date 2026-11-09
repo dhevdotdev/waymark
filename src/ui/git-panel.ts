@@ -19,6 +19,8 @@ export interface GitHost {
 
 export type SyncState = { kind: "idle" } | { kind: "busy"; label: string } | { kind: "error"; error: GitError };
 
+const SHEET_EXIT_MS = 180;
+
 /**
  * The sync panel: remote, branch, pending changes and history. Every write
  * (stage, commit, push, update) is an explicit button press.
@@ -27,6 +29,8 @@ export class GitPanel {
   status: GitStatus | null = null;
   state: SyncState = { kind: "idle" };
   private root: HTMLElement | null = null;
+  private overlay: HTMLElement | null = null;
+  private returnFocus: Element | null = null;
   private tab: "changes" | "history" = "changes";
   private historyPath: string | null = null;
   private commits: Commit[] = [];
@@ -202,17 +206,22 @@ export class GitPanel {
       this.commits = [];
     }
     if (!this.root) {
-      const root = el("aside", "drawer git-drawer");
+      const overlay = el("div", "overlay sync-overlay");
+      const root = el("section", "sync-sheet");
+      root.setAttribute("role", "dialog");
+      root.setAttribute("aria-modal", "true");
       root.setAttribute("aria-label", "Sync and history");
-      document.querySelector(".reader")!.append(root);
+      root.tabIndex = -1;
+      overlay.append(root);
+      overlay.addEventListener("pointerdown", (e) => {
+        if (e.target === overlay) this.close();
+      });
+      this.returnFocus = document.activeElement;
+      document.body.append(overlay);
+      this.overlay = overlay;
       this.root = root;
       this.host.onVisible?.(true);
-      root.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          this.close();
-        }
-      });
+      root.focus({ preventScroll: true });
     }
     this.render();
     void this.refresh();
@@ -220,13 +229,14 @@ export class GitPanel {
   }
 
   close(): void {
-    const root = this.root;
-    if (!root) return;
+    const overlay = this.overlay;
+    if (!overlay) return;
+    this.overlay = null;
     this.root = null;
     this.host.onVisible?.(false);
-    root.classList.add("is-leaving");
-    root.addEventListener("animationend", () => root.remove(), { once: true });
-    setTimeout(() => root.remove(), 260);
+    overlay.classList.add("is-leaving");
+    setTimeout(() => overlay.remove(), SHEET_EXIT_MS);
+    if (this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
   }
 
   private render(): void {
@@ -234,8 +244,8 @@ export class GitPanel {
     const st = this.status;
     root.replaceChildren();
 
-    const head = el("header", "drawer-head");
-    const title = el("div", "drawer-title");
+    const head = el("header", "sync-head");
+    const title = el("div", "sync-title");
     title.append(el("span", "", "Sync"));
     const close = el("button", "icon-btn");
     close.setAttribute("aria-label", "Close");
@@ -291,7 +301,13 @@ export class GitPanel {
       actions.append(b);
       return b;
     };
-    btn("Sync", true, true, () => void this.sync(), "Fetch, then apply incoming commits when that is a fast-forward");
+    btn(
+      "Sync",
+      st.files.length === 0,
+      true,
+      () => void this.sync(),
+      "Fetch, then apply incoming commits when that is a fast-forward",
+    );
     btn(
       `Push${st.ahead ? ` ${st.ahead}` : ""}`,
       false,
@@ -331,7 +347,7 @@ export class GitPanel {
     }
     root.append(tabs);
 
-    const body = el("div", "drawer-body");
+    const body = el("div", "sync-body");
     root.append(body);
     if (this.tab === "changes") this.renderChanges(body, st);
     else this.renderHistory(body);
