@@ -817,6 +817,7 @@ kbd {
   margin-block-start: 2px;
   padding-inline-start: 4px;
   border-radius: var(--r-control);
+  background: var(--fill);
   color: var(--trail-ink);
   transition:
     background-color var(--t-hover) ease,
@@ -824,6 +825,7 @@ kbd {
 }
 .trail-node.is-on-path {
   --trail-ink: var(--accent);
+  background: color-mix(in oklab, var(--accent) 5%, var(--paper));
 }
 .trail-node.is-current {
   background: color-mix(in oklab, var(--accent) 14%, var(--paper));
@@ -873,6 +875,7 @@ kbd {
   }
   .trail-node.is-on-path:not(.is-current):hover {
     --trail-ink: var(--accent);
+    background: color-mix(in oklab, var(--accent) 12%, var(--paper));
   }
 }
 .trail-x {

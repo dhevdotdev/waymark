@@ -416,6 +416,14 @@ check(
     .first()
     .evaluate((e) => getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width >= 18),
 );
+await page.mouse.move(2, 450);
+await pause(250);
+check(
+  "every stop away from the current note has its own pill around the remove button",
+  await page
+    .locator(".trail-node:not(.is-current)")
+    .evaluateAll((nodes) => nodes.length > 0 && nodes.every((n) => getComputedStyle(n).backgroundColor !== "rgba(0, 0, 0, 0)")),
+);
 const foldButton = page.locator(".trail-fold").first();
 await foldButton.click();
 await pause(150);
