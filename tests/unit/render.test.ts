@@ -72,3 +72,42 @@ describe("ordered lists", () => {
     expect(list.style.getPropertyValue("--list-start")).toBe("2");
   });
 });
+
+describe("task lists", () => {
+  it("draws open and done items and removes the typed brackets", async () => {
+    const { div } = await render("- [ ] open\n- [x] done\n- [X] loud\n- plain");
+    const items = [...div.querySelectorAll("li")];
+    expect(items.map((li) => li.textContent?.trim())).toEqual(["open", "done", "loud", "plain"]);
+    expect(items.map((li) => li.querySelector(".task-box")?.getAttribute("aria-checked") ?? null)).toEqual([
+      "false",
+      "true",
+      "true",
+      null,
+    ]);
+    expect(items.map((li) => li.className)).toEqual(["task", "task is-done", "task is-done", ""]);
+  });
+
+  it("stays read-only, with no form control in the note", async () => {
+    const { div } = await render("- [ ] open");
+    expect(div.querySelector("input")).toBeNull();
+    expect(div.querySelector(".task-box")?.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("keeps a wikilink right after the marker", async () => {
+    const { div } = await render("- [ ] [[A]] then more");
+    expect(div.querySelector("li .wikilink")?.textContent).toBe("A");
+    expect(div.querySelector("li")?.textContent?.trim()).toBe("A then more");
+  });
+
+  it("works in a loose list", async () => {
+    const { div } = await render("- [x] first\n\n- [ ] second");
+    expect([...div.querySelectorAll("li > p > .task-box")]).toHaveLength(2);
+  });
+
+  it("leaves brackets alone anywhere but the start of an item", async () => {
+    const { div } = await render("- a [ ] b\n- [x](https://example.com)\n\n[ ] paragraph");
+    expect(div.querySelector(".task-box")).toBeNull();
+    expect(div.textContent).toContain("a [ ] b");
+    expect(div.textContent).toContain("[ ] paragraph");
+  });
+});

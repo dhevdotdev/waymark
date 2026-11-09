@@ -1,4 +1,6 @@
 // Cases the main flow never reaches: an empty vault, hostile note content and a very long title.
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { webkit } from "playwright";
 import { serveFixture } from "./serve.mjs";
 
@@ -116,6 +118,29 @@ await withApp({}, async (page, app, { errors }) => {
     roomy.every((t) => (t.text <= t.shown || t.width >= 319) && t.width <= t.text + 41),
     JSON.stringify(roomy),
   );
+});
+
+await withApp({}, async (page, app, { errors }) => {
+  await writeFile(path.join(app.vault, "Tasks.md"), "- [ ] open item\n- [x] done item\n- plain item\n\n1. [ ] numbered item\n");
+  await page.goto(`${app.url}?note=Tasks`);
+  await page.waitForSelector(".doc .task-box");
+  const items = await page.$$eval(".doc ul > li", (lis) =>
+    lis.map((li) => {
+      const text = document.createRange();
+      text.selectNodeContents(li.lastChild);
+      return { left: Math.round(text.getBoundingClientRect().left), bullet: getComputedStyle(li, "::before").content };
+    }),
+  );
+  check(
+    "a task has a box instead of a bullet",
+    items[0].bullet === "none" && items[1].bullet === "none" && items[2].bullet !== "none",
+  );
+  check("task text lines up with bullet text", new Set(items.map((i) => i.left)).size === 1, JSON.stringify(items));
+  check("the typed brackets are gone", !(await page.textContent(".doc")).includes("[ ]"));
+  const box = await page.locator(".doc ol .task-box").boundingBox();
+  const number = await page.locator(".doc ol li").evaluate((li) => li.getBoundingClientRect().left);
+  check("a numbered task keeps its number clear of the box", box.x >= number, `${box.x} ${number}`);
+  check("nothing throws on a task list", errors.length === 0, errors[0]);
 });
 
 await browser.close();

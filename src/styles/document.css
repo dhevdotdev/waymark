@@ -145,6 +145,45 @@
   background: none;
   box-shadow: inset 0 0 0 1px var(--ink-4);
 }
+.doc ul > li.task::before,
+.doc ul > li.task > p:first-child::before {
+  content: none;
+}
+/* Takes the bullet's place: the negative margin cancels its width, so task text lines up with bullet text. */
+.task-box {
+  position: relative;
+  display: inline-block;
+  inline-size: 0.85em;
+  block-size: 0.85em;
+  margin-inline: -1.3em 0.45em;
+  vertical-align: -0.09em;
+  border-radius: 0.22em;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+}
+.doc ol > li.task .task-box {
+  margin-inline: 0 0.45em;
+}
+.task-box[aria-checked="true"] {
+  background: var(--accent);
+  box-shadow: none;
+}
+.task-box[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.12em;
+  inset-inline-start: 0.29em;
+  inline-size: 0.24em;
+  block-size: 0.46em;
+  border: solid var(--paper);
+  border-width: 0 1.6px 1.6px 0;
+  rotate: 45deg;
+}
+.doc li.task.is-done {
+  color: var(--ink-3);
+}
+.doc li.task.is-done li {
+  color: var(--ink);
+}
 .doc ol {
   counter-reset: item var(--list-start, 0);
 }

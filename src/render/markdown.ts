@@ -30,6 +30,7 @@ const CALLOUT_ALIASES: Record<string, string> = {
   cite: "quote",
 };
 
+const TASK_MARKER = /^\[([ xX])\](?:\s+|$)/;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
 export function createMarkdown(): MarkdownIt {
@@ -42,8 +43,11 @@ export function createMarkdown(): MarkdownIt {
   });
   md.inline.ruler.before("link", "wikilink", wikilinkRule);
   md.core.ruler.after("block", "callouts", calloutRule);
+  md.core.ruler.after("inline", "task_lists", taskListRule);
   md.core.ruler.push("heading_ids", headingRule);
 
+  md.renderer.rules.task_box = (tokens, i) =>
+    `<span class="task-box" role="checkbox" aria-checked="${tokens[i].meta?.done === true}" aria-disabled="true"></span>`;
   md.renderer.rules.wikilink = (tokens, i, _opts, env) => renderWikilink(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.fence = (tokens, i, _opts, env) => renderFence(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.blockquote_open = (tokens, i, opts, _env, self) => {
@@ -104,6 +108,23 @@ interface Callout {
   label: string;
   title: string;
   fold: "" | "+" | "-";
+}
+
+/** Task items. The box only shows state, because Waymark never writes to a note. */
+function taskListRule(state: StateCore): void {
+  state.tokens.forEach((item, i) => {
+    if (item.type !== "list_item_open" || state.tokens[i + 1]?.type !== "paragraph_open") return;
+    const children = state.tokens[i + 2]?.children;
+    const first = children?.[0];
+    const marker = first?.type === "text" ? TASK_MARKER.exec(first.content) : null;
+    if (!children || !first || !marker) return;
+    const done = marker[1] !== " ";
+    first.content = first.content.slice(marker[0].length);
+    const box = new state.Token("task_box", "", 0);
+    box.meta = { done };
+    children.unshift(box);
+    item.attrJoin("class", done ? "task is-done" : "task");
+  });
 }
 
 function calloutRule(state: StateCore): void {
