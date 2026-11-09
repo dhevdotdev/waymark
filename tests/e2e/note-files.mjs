@@ -413,16 +413,87 @@ try {
     (await page.locator(".files-actions .icon-btn").count()) === 3,
   );
   check("new note left the title bar", (await page.locator('.titlebar [data-act="new-note"]').count()) === 0);
+  const moreMenu = async (selector, item) => {
+    await hover(selector);
+    await strip().last().click();
+    await pause(120);
+    await page.locator(`.context-item:has-text("${item}")`).click();
+    await pause(150);
+  };
   await hover('.nav-item[data-path="Writing.md"]');
-  check("hovering a note offers rename and trash", (await strip().count()) === 2);
+  check("hovering a note shows only its menu button", (await strip().count()) === 1);
   await hover('.tree-head[data-folder="Journeys"]');
-  check("hovering a folder offers four actions", (await strip().count()) === 4);
-  const inRow = await page.evaluate(() => {
+  check("hovering a folder shows add and menu buttons", (await strip().count()) === 2);
+  check(
+    "they take the place of the count",
+    await page
+      .locator('.tree-head[data-folder="Journeys"] .tree-count')
+      .evaluate((count) => getComputedStyle(count).visibility === "hidden"),
+  );
+  const onRow = await page.evaluate(() => {
     const row = document.querySelector('.tree-head[data-folder="Journeys"]').getBoundingClientRect();
     const box = document.querySelector(".row-actions").getBoundingClientRect();
-    return box.top >= row.top - 1 && box.bottom <= row.bottom + 1 && box.right < row.right;
+    return box.top >= row.top - 1 && box.bottom <= row.bottom + 1 && box.right < row.right && box.left > row.left + row.width / 2;
   });
-  check("the actions sit on the row, clear of the count", inRow);
+  check("the buttons sit at the row's end, leaving its middle clickable", onRow);
+  check(
+    "there is no box behind them",
+    await page.locator(".row-actions").evaluate((box) => getComputedStyle(box).backgroundColor === "rgba(0, 0, 0, 0)"),
+  );
+  const headBackground = () =>
+    page.locator('.tree-head[data-folder="Journeys"]').evaluate((row) => getComputedStyle(row).backgroundColor);
+  await pause(250);
+  const tinted = await headBackground();
+  await strip().last().hover();
+  await pause(250);
+  check(
+    "the row stays marked with the pointer on a button",
+    (await headBackground()) === tinted && tinted !== "rgba(0, 0, 0, 0)",
+    tinted,
+  );
+  await strip().last().click();
+  await pause(350);
+  const menuPlacement = await page.evaluate(() => {
+    const button = document.querySelector(".row-actions .row-action:last-child").getBoundingClientRect();
+    const menu = document.querySelector(".context-menu").getBoundingClientRect();
+    return Math.abs(menu.right - button.right) <= 1 && menu.top >= button.bottom;
+  });
+  check("the menu opens under its button, aligned to it", menuPlacement);
+  check(
+    "the menu has the folder actions",
+    (await page.locator(".context-item").allTextContents()).join().includes("New folder here"),
+  );
+  await page.mouse.move(700, 500);
+  await pause(120);
+  check("the row stays marked while its menu is open", await page.locator(".row-actions:not([hidden])").isVisible());
+  await page.keyboard.press("Escape");
+  await pause(120);
+  check("closing the menu clears the row", (await page.locator(".has-actions").count()) === 0);
+  const headerLine = await page.evaluate(() => {
+    const first = document.querySelector(".files-actions .icon-btn svg").getBoundingClientRect();
+    const end = document.querySelector(".files-actions-end svg").getBoundingClientRect();
+    const rowIcon = document.querySelector(".nav-item .tree-icon").getBoundingClientRect();
+    const count = document.querySelector(".tree-head .tree-count").getBoundingClientRect();
+    return { left: first.left - rowIcon.left, right: end.right - count.right };
+  });
+  check(
+    "the top row lines up with the tree",
+    Math.abs(headerLine.left) <= 1 && Math.abs(headerLine.right) <= 1,
+    JSON.stringify(headerLine),
+  );
+  await page.mouse.move(0, 0);
+  await pause(80);
+  await page.keyboard.press("Shift");
+  await page.locator('.tree-head[data-folder="Journeys"]').focus();
+  await pause(100);
+  check("keyboard focus on a row shows its buttons", (await strip().count()) === 2);
+  check(
+    "and they come next in tab order",
+    await page.evaluate(() => document.activeElement.nextElementSibling === document.querySelector(".row-actions")),
+  );
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => document.activeElement.blur());
+  await pause(80);
   const offCentre = await page.$$eval(".row-actions .row-action", (buttons) =>
     Math.max(
       ...buttons.map((button) => {
@@ -460,10 +531,7 @@ try {
   check("a new folder is created with a first note", existsSync(file("Fresh ideas/Untitled.md")));
   check("and that note is ready to name", await page.locator(".cm-content, .doc-editing").first().isVisible());
   await page.keyboard.press("Escape");
-  await page.locator('.tree-head[data-folder="Journeys"]').hover();
-  await pause(80);
-  await strip().nth(1).click();
-  await pause(150);
+  await moreMenu('.tree-head[data-folder="Journeys"]', "New folder here");
   await page.keyboard.type("Nested");
   await page.keyboard.press("Enter");
   await pause(700);
@@ -477,16 +545,13 @@ try {
   await pause(150);
   check("escaping keeps the name", existsSync(file("Writing.md")) && (await page.locator(".tree-name-input").count()) === 0);
 
-  await hover('.nav-item[data-path="Mover.md"]');
-  await strip().nth(0).click();
-  await pause(120);
+  await moreMenu('.nav-item[data-path="Mover.md"]', "Rename");
   await page.keyboard.type("Moved on");
   await page.locator(".doc-title, .start-page").first().click();
   await pause(600);
   check("clicking away accepts a rename", existsSync(file("Moved on.md")) && !existsSync(file("Mover.md")));
-  await hover('.nav-item[data-path="Moved on.md"]');
-  await strip().nth(1).click();
-  await pause(500);
+  await moreMenu('.nav-item[data-path="Moved on.md"]', "Move to Trash");
+  await pause(350);
   check(
     "a note nothing links to goes without a dialog",
     !existsSync(file("Moved on.md")) && (await page.locator(".prompt").count()) === 0,

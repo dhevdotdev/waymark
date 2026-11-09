@@ -693,6 +693,10 @@ button.task-box:focus-visible {
   min-inline-size: 170px;
   padding: 4px;
 }
+.context-line {
+  margin: 4px 6px;
+  border-block-start: 1px solid var(--rule);
+}
 .context-item {
   appearance: none;
   border: 0;

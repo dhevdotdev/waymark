@@ -3,7 +3,7 @@ import type { PrefStore } from "../prefs";
 import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
 import type { VaultStore } from "../vault/store";
 import type { Workspace } from "../vault/workspace";
-import { showContextMenu } from "./context-menu";
+import { type MenuItem, showContextMenu } from "./context-menu";
 import type { FileTree } from "./file-tree";
 import { icons } from "./icons";
 import { nameInPlace } from "./inline-name";
@@ -35,6 +35,7 @@ interface LinkUpdate {
 }
 
 const UNTITLED = "Untitled";
+const MENU_GAP = 4;
 const folderOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
 const inFolder = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
@@ -47,6 +48,7 @@ export class NoteFiles {
   private readonly folderPicker: Palette;
   private moving = "";
   private moveRunning = false;
+  private readonly rows: RowActions;
 
   constructor(private readonly host: NoteFilesHost) {
     this.folderPicker = new Palette(
@@ -55,7 +57,7 @@ export class NoteFiles {
       { placeholder: "Move to a folder, or type a new one", compact: true },
     );
     host.sidebar.addEventListener("contextmenu", (e) => this.onContextMenu(e));
-    new RowActions(host.sidebar, (row) => this.rowActions(row));
+    this.rows = new RowActions(host.sidebar, (row) => this.rowActions(row));
   }
 
   async newNote(folder?: string): Promise<void> {
@@ -363,18 +365,42 @@ export class NoteFiles {
 
   private rowActions(row: HTMLElement): RowAction[] {
     const folder = row.dataset.folder;
-    if (folder !== undefined) {
-      return [
-        { label: "New note here", icon: icons.newNote, run: () => void this.newNote(folder) },
-        { label: "New folder here", icon: icons.newFolder, run: () => void this.newFolder(folder) },
-        { label: "Rename", icon: icons.rename, run: () => void this.startRenameFolder(folder) },
-        { label: "Move to Trash", icon: icons.trash, run: () => void this.removeFolder(folder) },
-      ];
-    }
-    const path = row.dataset.path!;
+    const more = (items: MenuItem[]): RowAction => ({
+      label: "More",
+      icon: icons.more,
+      run: (button) => this.openRowMenu(button, items),
+    });
+    if (folder === undefined) return [more(this.noteMenu(row.dataset.path!))];
+    return [{ label: "New note here", icon: icons.plus, run: () => void this.newNote(folder) }, more(this.folderMenu(folder))];
+  }
+
+  private openRowMenu(button: HTMLElement, items: MenuItem[]): void {
+    const { right, bottom } = button.getBoundingClientRect();
+    this.rows.pin();
+    showContextMenu(right, bottom + MENU_GAP, items, { alignEnd: true, onClose: () => this.rows.release() });
+  }
+
+  private reveal(path: string): MenuItem[] {
+    return isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : [];
+  }
+
+  private folderMenu(folder: string): MenuItem[] {
     return [
-      { label: "Rename", icon: icons.rename, run: () => void this.startRename(path) },
-      { label: "Move to Trash", icon: icons.trash, run: () => void this.remove(path) },
+      { label: "New note here", run: () => void this.newNote(folder) },
+      { label: "New folder here…", run: () => void this.newFolder(folder) },
+      { label: "Rename…", startsGroup: true, run: () => void this.startRenameFolder(folder) },
+      ...this.reveal(folder),
+      { label: "Move to Trash", run: () => void this.removeFolder(folder) },
+    ];
+  }
+
+  private noteMenu(path: string): MenuItem[] {
+    return [
+      { label: "Open in new tab", run: () => void this.host.open(path, true) },
+      { label: "Rename…", run: () => void this.startRename(path) },
+      { label: "Move to…", run: () => this.promptMove(path) },
+      ...this.reveal(path),
+      { label: "Move to Trash", startsGroup: true, run: () => void this.remove(path) },
     ];
   }
 
@@ -383,31 +409,11 @@ export class NoteFiles {
     const note = target.closest<HTMLElement>(".nav-item[data-path]");
     const folder = target.closest<HTMLElement>(".tree-head[data-folder]")?.dataset.folder;
     e.preventDefault();
-    const reveal = (path: string) => (isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : []);
-    if (folder !== undefined) {
-      showContextMenu(e.clientX, e.clientY, [
-        { label: "New note here", run: () => void this.newNote(folder) },
-        { label: "New folder here…", run: () => void this.newFolder(folder) },
-        { label: "Rename…", run: () => void this.startRenameFolder(folder) },
-        ...reveal(folder),
-        { label: "Move to Trash", run: () => void this.removeFolder(folder) },
-      ]);
-      return;
-    }
-    if (!note) {
-      showContextMenu(e.clientX, e.clientY, [
-        { label: "New note", run: () => void this.newNote() },
-        { label: "New folder…", run: () => void this.newFolder() },
-      ]);
-      return;
-    }
-    const path = note.dataset.path!;
-    showContextMenu(e.clientX, e.clientY, [
-      { label: "Open in new tab", run: () => void this.host.open(path, true) },
-      { label: "Rename…", run: () => void this.startRename(path) },
-      { label: "Move to…", run: () => this.promptMove(path) },
-      ...reveal(path),
-      { label: "Move to Trash", run: () => void this.remove(path) },
-    ]);
+    const blank: MenuItem[] = [
+      { label: "New note", run: () => void this.newNote() },
+      { label: "New folder…", run: () => void this.newFolder() },
+    ];
+    const items = folder !== undefined ? this.folderMenu(folder) : note ? this.noteMenu(note.dataset.path!) : blank;
+    showContextMenu(e.clientX, e.clientY, items);
   }
 }

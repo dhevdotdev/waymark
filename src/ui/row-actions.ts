@@ -1,50 +1,73 @@
 export interface RowAction {
   label: string;
   icon: string;
-  run: () => void;
+  run: (button: HTMLElement) => void;
 }
 
 const ROWS = ".nav-item[data-path], .tree-head[data-folder]";
-const NOTE_INSET = 4;
-const FOLDER_INSET = 26;
+const INSET = 3;
 
-/** One strip of buttons that follows the pointer over the file tree, so hundreds of rows carry no buttons of their own. */
+/** The buttons on the file tree row under the pointer or keyboard, kept as one set so hundreds of rows carry none of their own. */
 export class RowActions {
   private readonly strip = document.createElement("div");
   private row: HTMLElement | null = null;
+  private pinned = false;
 
   constructor(
-    private readonly tree: HTMLElement,
+    tree: HTMLElement,
     private readonly actionsFor: (row: HTMLElement) => RowAction[],
   ) {
-    const sidebar = tree.parentElement!;
     this.strip.className = "row-actions";
     this.strip.hidden = true;
-    sidebar.append(this.strip);
-    tree.addEventListener("mouseover", (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>(ROWS);
-      if (row) this.show(row);
-      else this.hide();
+    tree.addEventListener("mouseover", (e) => this.onPointer(e.target as HTMLElement));
+    tree.addEventListener("focusin", (e) => this.onFocus(e.target as HTMLElement));
+    tree.addEventListener("focusout", (e) => {
+      if (!this.strip.contains(e.relatedTarget as Node | null)) this.hide();
     });
     tree.addEventListener("scroll", () => this.hide(), { passive: true });
-    sidebar.addEventListener("mouseleave", () => this.hide());
+    tree.parentElement!.addEventListener("mouseleave", () => this.hide());
+  }
+
+  /** Keeps the row marked while a menu opened from it is showing. */
+  pin(): void {
+    this.pinned = true;
+  }
+
+  release(): void {
+    this.pinned = false;
+    this.hide();
+  }
+
+  private onPointer(target: HTMLElement): void {
+    if (this.pinned || this.strip.contains(target)) return;
+    const row = target.closest<HTMLElement>(ROWS);
+    if (row) this.show(row);
+    else this.hide();
+  }
+
+  private onFocus(target: HTMLElement): void {
+    if (!this.pinned && target.matches(ROWS) && target.matches(":focus-visible")) this.show(target);
   }
 
   private show(row: HTMLElement): void {
     if (row === this.row && !this.strip.hidden) return;
+    this.row?.classList.remove("has-actions");
     this.row = row;
+    row.classList.add("has-actions");
     this.strip.replaceChildren(...this.actionsFor(row).map((action) => this.button(action)));
-    const box = this.tree.parentElement!.getBoundingClientRect();
-    const rect = row.getBoundingClientRect();
-    const inset = row.dataset.folder === undefined ? NOTE_INSET : FOLDER_INSET;
-    this.strip.style.insetBlockStart = `${rect.top - box.top}px`;
-    this.strip.style.insetInlineEnd = `${box.right - rect.right + inset}px`;
-    this.strip.style.blockSize = `${rect.height}px`;
+    row.after(this.strip);
     this.strip.hidden = false;
+    const box = this.strip.offsetParent!.getBoundingClientRect();
+    const rect = row.getBoundingClientRect();
+    this.strip.style.insetBlockStart = `${rect.top - box.top}px`;
+    this.strip.style.insetInlineEnd = `${box.right - rect.right + INSET}px`;
+    this.strip.style.blockSize = `${rect.height}px`;
   }
 
   private hide(): void {
+    if (this.pinned) return;
     this.strip.hidden = true;
+    this.row?.classList.remove("has-actions");
     this.row = null;
   }
 
@@ -56,8 +79,8 @@ export class RowActions {
     button.setAttribute("aria-label", action.label);
     button.dataset.tip = action.label;
     button.addEventListener("click", () => {
+      action.run(button);
       this.hide();
-      action.run();
     });
     return button;
   }

@@ -394,7 +394,7 @@ kbd {
   align-items: center;
   gap: 2px;
   inline-size: var(--sidebar-w);
-  padding: 0 14px 6px;
+  padding: 0 12px 6px;
   transition:
     opacity var(--t-slide) ease,
     translate var(--t-slide) var(--ease-in-out);
@@ -412,9 +412,16 @@ kbd {
   display: flex;
   align-items: center;
   gap: 1px;
-  padding-inline: 2px;
-  border-radius: var(--r-control);
+}
+:is(.tree-head, .nav-item):not(.is-current).has-actions {
   background: var(--row-hover);
+  --row-ink: var(--ink);
+}
+.nav-item.has-actions {
+  padding-inline-end: 28px;
+}
+.tree-head.has-actions .tree-count {
+  visibility: hidden;
 }
 .row-action {
   display: grid;
@@ -621,6 +628,10 @@ kbd {
     background: var(--chrome);
     --row-ink: var(--ink);
   }
+}
+.tree-head.is-section.has-actions {
+  background: var(--row-hover);
+  border-radius: var(--r-control);
 }
 .tree-body {
   display: grid;

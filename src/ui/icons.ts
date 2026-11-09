@@ -23,8 +23,7 @@ export const icons = {
   newFolder: svg(
     `<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.4v3.2M6.4 9h3.2"/>`,
   ),
-  rename: svg(`<path d="M10.8 3.2a1.5 1.5 0 0 1 2.1 2.1L5.6 12.6l-2.9.7.7-2.9z"/><path d="m9.6 4.4 2 2"/>`),
-  trash: svg(`<path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.7 9h5.6l.7-9M6.8 7v4M9.2 7v4"/>`),
+  more: svg(`<circle cx="3.5" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="12.5" cy="8" r=".6"/>`),
   collapse: svg(`<path d="m5 3 3 3 3-3M5 13l3-3 3 3"/>`),
   sun: svg(
     `<circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/>`,
