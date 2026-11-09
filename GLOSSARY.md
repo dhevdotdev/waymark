@@ -14,7 +14,7 @@
 
 **Tab**: one place in the window where a view is shown. Each tab has its own trail.
 
-**View**: what a tab shows, either a note or a graph.
+**View**: what a tab shows: a note, a graph, or blank until something is chosen.
 
 **Trail**: the map of where one tab has been. It is a branching graph, not a list. Following a link grows it. Jumping from the tree or the palette starts a new one.
 

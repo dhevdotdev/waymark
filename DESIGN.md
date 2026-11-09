@@ -6,7 +6,7 @@ Waymark is a reader for an Obsidian vault kept in Git. The document is the produ
 
 1. **The page comes first.** The whole window is one surface in the theme's paper colour. Single hairlines mark the columns, so the note is never a box inside a frame. The app has no cards, badges or dashboard elements.
 2. **Use serif for reading and sans for the interface.** Body text uses Source Serif 4 with optical sizing, because these notes are read top to bottom at length. Controls, table headers, callout titles, `h3` and metadata use Inter. Code uses JetBrains Mono with ligatures off, so `->>` and `!=` show exactly what the source contains.
-3. **Keep a reading measure.** Prose stays at 37rem, about 66 to 72 characters. Code blocks and tables keep the prose's left edge and may grow right by 5rem. Diagrams centre on the wider column. Nothing runs edge to edge.
+3. **Keep a reading measure.** Prose stays at 42rem, up to about 85 characters. 37rem read as too narrow on a laptop window. Code blocks and tables keep the prose's left edge and may grow right by 5rem. Diagrams centre on the wider column. Nothing runs edge to edge.
 4. **Use one accent.** Catppuccin mauve marks links, focus, and the current note in the graphs. Callout hues are the only other colours, and they mark the kind of callout.
 5. **Impose no organisation.** Waymark has opinions about how notes look, and none about how they are arranged. It shows the folders on disk and renders Markdown as written. No filename, folder name, heading or frontmatter key has special meaning, except `aliases`, which is how Obsidian links resolve. Frontmatter appears in the Info pane exactly as written.
 6. **Give every kind of thing one home.** Files live in the left tree. The note's location and reading time sit above it, in the pane head. Outline, links and properties live in the inspector on the right, with the local graph pinned below them. Vault state, Git and whole-vault views live in the status bar. The note body holds only the note, and the sidebar column sets where tabs begin.
@@ -19,6 +19,9 @@ Every state has a visible way in and a visible way out.
 - The sidebar always shows a `Files | Search` switch. Search keeps its query and results while you are in Files. Escape returns to Files, and the X only clears the field.
 - The graph is a tab, as in Obsidian. ⌘G brings an open graph forward or opens one beside the current tab. Clicking a note in it replaces it in that tab, and Back returns to it. Escape steps back or closes the tab.
 - Anything that covers something closes with Escape and has a visible control. The button that opened a view stays pressed while the view is open.
+- A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
+- Close controls lead their label on tabs and trail stops, in a 20px target with a 13px icon, the same size as the new-tab plus. Every trail stop has a quiet pill, so its always-visible remove control belongs to something.
+- Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.
 
 ## Trails
