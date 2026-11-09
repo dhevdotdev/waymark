@@ -51,6 +51,7 @@ await withApp({}, async (page, app, { errors, requests }) => {
 
 await withApp({}, async (page, app, { errors }) => {
   await page.goto(`${app.url}?note=${encodeURIComponent("A very long note title")}`);
+  await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
   await page.evaluate(() =>
     window.waymark.open(
       "A very long note title that keeps going well past the width of any sidebar so that truncation has something to do.md",
@@ -65,6 +66,56 @@ await withApp({}, async (page, app, { errors }) => {
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   );
   check("nothing throws on a long title", errors.length === 0, errors[0]);
+
+  const openInNewTab = async (query) => {
+    await page.keyboard.press("Meta+k");
+    await page.keyboard.type(query);
+    await page.waitForTimeout(200);
+    await page.keyboard.press("Meta+Enter");
+    await page.waitForTimeout(400);
+  };
+  for (const query of ["Crumb structure", "Starter feeding", "Welcome"]) await openInNewTab(query);
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.waitForTimeout(300);
+  await page.locator(".tab").first().click();
+  await page.waitForTimeout(300);
+  const measureTabs = () =>
+    page.$$eval(".tab", (tabs) =>
+      tabs.map((tab) => {
+        const title = tab.querySelector(".tab-title");
+        const text = document.createRange();
+        text.selectNodeContents(title);
+        return { width: tab.offsetWidth, text: Math.ceil(text.getBoundingClientRect().width), shown: title.clientWidth };
+      }),
+    );
+  const crowded = await measureTabs();
+  const shortest = crowded.reduce((a, b) => (b.text < a.text ? b : a));
+  check(
+    "a short title keeps its full width when tabs are crowded",
+    crowded.length === 4 && shortest.text <= shortest.shown,
+    JSON.stringify(shortest),
+  );
+  check(
+    "no tab is wider than its own title needs",
+    crowded.every((t) => t.width <= t.text + 41),
+    JSON.stringify(crowded),
+  );
+  check(
+    "crowded tabs and the + button stay inside the strip",
+    await page.evaluate(
+      () =>
+        document.querySelector(".tab-new").getBoundingClientRect().right <=
+        document.querySelector(".tabs").getBoundingClientRect().right,
+    ),
+  );
+  await page.setViewportSize({ width: 1900, height: 800 });
+  await page.waitForTimeout(300);
+  const roomy = await measureTabs();
+  check(
+    "tabs grow back when the window gives them room",
+    roomy.every((t) => (t.text <= t.shown || t.width >= 319) && t.width <= t.text + 41),
+    JSON.stringify(roomy),
+  );
 });
 
 await browser.close();
