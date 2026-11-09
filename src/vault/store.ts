@@ -82,6 +82,16 @@ export class VaultStore {
     return outcome;
   }
 
+  /** Reads one note again and updates what depends on it. Null means it is no longer there. */
+  async reread(path: string): Promise<string | null> {
+    const text = await this.source.readText(path).catch(() => null);
+    if (text !== null && text !== this.texts.get(path)) {
+      this.texts.set(path, text);
+      if (this.index.notes.includes(path)) this.ingest(path);
+    }
+    return text;
+  }
+
   /** Link communities for the whole vault, so a note keeps its colour in every view. */
   communities(): CommunityResult {
     if (!this.communityCache) {

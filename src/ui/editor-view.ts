@@ -1,7 +1,15 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, type Extension, StateField, type Transaction } from "@codemirror/state";
+import {
+  Annotation,
+  Compartment,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  StateField,
+  type Transaction,
+} from "@codemirror/state";
 import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
 import { livePreview } from "./live-preview";
 
@@ -27,6 +35,8 @@ export interface EditorHandle {
   find(): void;
   replace(text: string): void;
   placeCursorAt(x: number, y: number): void;
+  /** Stops typing while text is being moved somewhere safe. */
+  setFrozen(frozen: boolean): void;
   destroy(): void;
 }
 
@@ -178,12 +188,15 @@ function stats(state: EditorState): EditorStats {
 }
 
 export function createEditor(parent: HTMLElement, options: EditorOptions): EditorHandle {
+  const editable = new Compartment();
+  const frozenState = (frozen: boolean): Extension => [EditorState.readOnly.of(frozen), EditorView.editable.of(!frozen)];
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc: options.text,
       extensions: [
         EditorState.lineSeparator.of(options.lineSeparator),
+        editable.of(frozenState(false)),
         history(),
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
@@ -236,6 +249,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       const pos = view.posAtCoords({ x, y }, false);
       view.dispatch({ selection: { anchor: pos } });
     },
+    setFrozen: (frozen) => view.dispatch({ effects: editable.reconfigure(frozenState(frozen)) }),
     destroy: () => view.destroy(),
   };
 }

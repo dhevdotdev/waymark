@@ -23,6 +23,7 @@ interface Session {
 }
 
 const WORDS_PER_MINUTE = 230;
+const CLIPBOARD = "clipboard";
 const STATE_LABEL: Record<DraftState["kind"], string> = {
   saved: "Saved",
   unsaved: "Saving…",
@@ -43,7 +44,7 @@ export class NoteEditing {
   private session: Session | null = null;
   private opening = false;
   private toggling = false;
-  private readonly undoTasks: { path: string; line: number }[] = [];
+  private readonly undoTasks: { path: string; line: number; wrote: string }[] = [];
 
   constructor(private readonly host: EditingHost) {}
 
@@ -60,7 +61,7 @@ export class NoteEditing {
   async finish(): Promise<void> {
     const { scroller } = this.host.els;
     const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-    await this.close();
+    if (!(await this.close())) return;
     await this.host.reshow();
     scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight);
   }
@@ -121,14 +122,22 @@ export class NoteEditing {
   }
 
   /** Closes the editor without ever dropping text: anything that cannot be saved in place is kept as a copy. */
-  async close(): Promise<void> {
+  async close(): Promise<boolean> {
     const session = this.session;
-    if (!session) return;
+    if (!session) return true;
+    session.editor.setFrozen(true);
     const saved = await session.draft.flush();
     if (!saved) {
       const copy = await this.saveCopy(session.path, session.draft.text);
+      if (copy === null) {
+        this.host.toast("Your edits could not be saved anywhere, so the editor is staying open.");
+        session.editor.setFrozen(false);
+        return false;
+      }
       this.host.toast(
-        copy ? `Your edits were kept in “${copy}”.` : "Your edits could not be saved, so they were copied to the clipboard.",
+        copy === CLIPBOARD
+          ? "Your edits could not be saved, so they were copied to the clipboard."
+          : `Your edits were kept in “${copy}”.`,
       );
     }
     session.editor.destroy();
@@ -136,6 +145,7 @@ export class NoteEditing {
     this.host.els.shell.classList.remove("is-editing");
     this.host.els.statusStats.hidden = true;
     this.markMode(false);
+    return true;
   }
 
   find(): boolean {
@@ -147,15 +157,14 @@ export class NoteEditing {
   async vaultChanged(): Promise<void> {
     const session = this.session;
     if (!session) return;
-    const { vault } = this.host;
+    await session.draft.settled();
     /* Read again: the event may describe a save that has already been followed by a newer one. */
-    const disk = await vault.source.readText(session.path).catch(() => null);
+    const disk = await this.host.vault.reread(session.path);
     if (this.session !== session) return;
     if (disk === null) {
       session.draft.diskMissing();
       return;
     }
-    vault.texts.set(session.path, disk);
     const follow = session.draft.diskChanged(disk);
     if (follow !== null) session.editor.replace(follow);
   }
@@ -167,7 +176,10 @@ export class NoteEditing {
   /** Undoes the last task clicked in the reading view. */
   async undoTask(): Promise<void> {
     const last = this.undoTasks.pop();
-    if (last && last.path === this.host.notePath()) await this.flipTask(last.path, last.line, false);
+    if (!last || last.path !== this.host.notePath()) return;
+    /* Any other change since then means the line number may now point at a different task. */
+    if (this.host.vault.texts.get(last.path) === last.wrote) await this.flipTask(last.path, last.line, false);
+    else this.undoTasks.length = 0;
   }
 
   private async flipTask(path: string, line: number, remember: boolean): Promise<void> {
@@ -190,7 +202,7 @@ export class NoteEditing {
         await reshow();
         return;
       }
-      if (remember) this.undoTasks.push({ path, line });
+      if (remember) this.undoTasks.push({ path, line, wrote: after });
       const box = els.scroller.querySelector<HTMLElement>(`.task-box[data-task-line="${line}"]`);
       if (!box) return;
       const done = box.getAttribute("aria-checked") !== "true";
@@ -257,7 +269,8 @@ export class NoteEditing {
     banner.hidden = !(state.kind === "conflict" || state.kind === "missing" || state.kind === "failed");
     banner.replaceChildren();
     if (state.kind === "conflict") {
-      text.textContent = "This note changed outside this editor. Your version is safe here and has not been saved.";
+      text.textContent =
+        "This note changed outside this editor. Your version is safe here. Keep mine replaces the other version. Keep both saves yours as a copy.";
       banner.append(
         text,
         button("Keep mine", true, () => void session.draft.keepMine()),
@@ -279,7 +292,9 @@ export class NoteEditing {
   }
 
   private async keepBoth(session: Session, disk: string): Promise<void> {
-    const copy = await this.saveCopy(session.path, session.draft.text);
+    session.editor.setFrozen(true);
+    const copy = await this.saveCopy(session.path, session.draft.text, false);
+    session.editor.setFrozen(false);
     if (!copy) {
       this.host.toast("Your version could not be saved as a copy, so nothing was changed.");
       return;
@@ -289,8 +304,8 @@ export class NoteEditing {
     this.host.toast(`Your version was saved as “${copy}”.`);
   }
 
-  /** Writes text to a new note beside the original, falling back to the vault root and then the clipboard. */
-  private async saveCopy(path: string, text: string): Promise<string | null> {
+  /** Writes text to a new note beside the original, then the vault root. Null means it was kept nowhere. */
+  private async saveCopy(path: string, text: string, clipboardLast = true): Promise<string | null> {
     const base = path.replace(/\.md$/i, "");
     const name = `${base.split("/").pop()} (conflict ${stamp()}).md`;
     const folder = path.includes("/") ? `${path.slice(0, path.lastIndexOf("/"))}/` : "";
@@ -302,7 +317,10 @@ export class NoteEditing {
         /* The folder may be gone with the note; the next location is tried. */
       }
     }
-    await navigator.clipboard.writeText(text).catch(() => {});
-    return null;
+    if (!clipboardLast) return null;
+    return navigator.clipboard.writeText(text).then(
+      () => CLIPBOARD,
+      () => null,
+    );
   }
 }

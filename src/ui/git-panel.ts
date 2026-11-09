@@ -103,9 +103,7 @@ export class GitPanel {
     if (!fetched || !this.status) return;
     const st = this.status;
     if (st.behind > 0 && st.ahead === 0) {
-      const ok = await this.run(`Updating ${st.behind} commit${st.behind === 1 ? "" : "s"}`, () => git.fastForward());
-      if (ok) {
-        this.host.play("incoming");
+      if (await this.applyIncoming(st.behind)) {
         this.host.toast(`Updated with ${st.behind} incoming commit${st.behind === 1 ? "" : "s"}`);
       }
       return;
@@ -115,6 +113,12 @@ export class GitPanel {
       return;
     }
     this.host.play("synced");
+  }
+
+  private async applyIncoming(count: number): Promise<boolean> {
+    const applied = await this.run(`Updating ${count} commit${count === 1 ? "" : "s"}`, () => git.fastForward());
+    if (applied) this.host.play("incoming");
+    return applied;
   }
 
   private async readyForGit(): Promise<boolean> {
@@ -140,7 +144,7 @@ export class GitPanel {
    */
   async commitAndSync(message: string, publish = true): Promise<void> {
     if (!(await this.readyForGit())) return;
-    const hasRemote = publish && Boolean(this.status?.upstream);
+    const hasRemote = Boolean(this.status?.upstream);
     let online = hasRemote;
     if (hasRemote && !(await this.fetch(true))) {
       if (this.state.kind !== "error" || this.state.error.kind !== "offline") return;
@@ -152,31 +156,18 @@ export class GitPanel {
         this.divergedError(before);
         return;
       }
-      const updated = await this.run(`Updating ${before.behind} commit${before.behind === 1 ? "" : "s"}`, () =>
-        git.fastForward(),
-      );
-      if (!updated) return;
-      this.host.play("incoming");
+      if (!(await this.applyIncoming(before.behind))) return;
     }
     if (!(await this.commitChanges(message))) return;
-    if (!online) {
-      this.host.toast(hasRemote ? "Committed here. You are offline, so it will need a sync later." : "Committed.");
+    if (!online || !publish) {
+      this.host.toast(hasRemote && !online ? "Committed here. You are offline, so it will need a sync later." : "Committed.");
       return;
     }
     if (!this.status?.ahead) {
       this.host.play("synced");
       return;
     }
-    const count = this.status.ahead;
-    const pushed = await this.run(
-      "Pushing",
-      () => git.push(),
-      () => this.host.setLastSync(Date.now()),
-    );
-    if (pushed) {
-      this.host.play("pushed");
-      this.host.toast(`Synced ${count} commit${count === 1 ? "" : "s"}`);
-    }
+    await this.push();
   }
 
   /** Commits what is staged, or every change when nothing is. */

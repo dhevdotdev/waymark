@@ -54,7 +54,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
       },
     ],
     [".search-hit", (el, e) => r.sidebar.searchPane.openHit(Number(el.dataset.hit), e.metaKey)],
-    [".doc button.task-box", (el) => void r.editing.toggleTask(el)],
+    [".doc button.task-box[data-task-line]", (el) => void r.editing.toggleTask(el)],
     [".code-copy", (el) => void copyCode(el as HTMLButtonElement, () => r.deps.sound.play("copy"))],
     ["button.callout-title", (el) => toggleCallout(el)],
     [".diagram-expand", (el) => lightbox(el.closest(".diagram")!.querySelector("svg")!.cloneNode(true) as Element)],

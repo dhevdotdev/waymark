@@ -250,6 +250,7 @@ button.task-box {
   appearance: none;
   border: 0;
   padding: 0;
+  background: none;
   cursor: default;
 }
 button.task-box:focus-visible {

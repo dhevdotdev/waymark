@@ -61,6 +61,22 @@ const stateIs = (s) => page.evaluate((v) => document.querySelector(".edit-state"
 
 try {
   await openNote("Tasks");
+  const taskGeometry = await page.$$eval(".doc li.task", (items) =>
+    items.slice(0, 2).map((item) => {
+      const box = item.querySelector(".task-box");
+      const text = document.createRange();
+      text.selectNodeContents(box.nextSibling);
+      const boxRect = box.getBoundingClientRect();
+      const textRect = text.getBoundingClientRect();
+      return Math.abs(boxRect.top + boxRect.height / 2 - (textRect.top + textRect.height / 2));
+    }),
+  );
+  check(
+    "open and done boxes both sit level with their text",
+    taskGeometry.every((gap) => gap <= 2),
+    taskGeometry.join(),
+  );
+  check("an open box has no fill", await box(0).evaluate((b) => getComputedStyle(b).backgroundColor === "rgba(0, 0, 0, 0)"));
   await box(0).click();
   await pause(250);
   check("clicking a task writes that line", (await disk("Tasks.md")) === TASKS.replace("- [ ] alpha", "- [x] alpha"));
@@ -80,6 +96,23 @@ try {
   await page.keyboard.press("Meta+z");
   await pause(300);
   check("undo reverses the last task", (await disk("Tasks.md")).includes("> - [ ] quoted"));
+
+  await box(0).click();
+  await pause(250);
+  const afterClick = await disk("Tasks.md");
+  await writeFile(file("Tasks.md"), afterClick.replace("Intro", "New line\n\nIntro"));
+  await page.evaluate(() => window.waymark.reader.onVaultChanged(["Tasks.md"]));
+  await pause(300);
+  await page.mouse.click(5, 5);
+  await page.keyboard.press("Meta+z");
+  await pause(300);
+  check(
+    "undo never flips a task after the note has moved on",
+    (await disk("Tasks.md")) === afterClick.replace("Intro", "New line\n\nIntro"),
+  );
+  await writeFile(file("Tasks.md"), afterClick);
+  await page.evaluate(() => window.waymark.reader.onVaultChanged(["Tasks.md"]));
+  await pause(300);
 
   const beforeOutside = await disk("Tasks.md");
   const outside = beforeOutside.replace("Last line.", "Changed elsewhere.");

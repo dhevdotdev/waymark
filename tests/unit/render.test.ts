@@ -6,12 +6,9 @@ import { VaultIndex } from "../../src/vault/index";
 
 const index = new VaultIndex(["Notes/A.md", "Notes/B.md", "Inbox/B.md", "Attachments/pic.png"]);
 const highlighter = { prepare: async () => {}, highlight: () => null } as unknown as Highlighter;
+const deps = { index, highlighter, assetUrl: (p: string) => `/@vault/file?path=${encodeURIComponent(p)}` };
 const render = async (md: string) => {
-  const { fragment, headings } = await renderNote(md, "Notes/A.md", {
-    index,
-    highlighter,
-    assetUrl: (p) => `/@vault/file?path=${encodeURIComponent(p)}`,
-  });
+  const { fragment, headings } = await renderNote(md, "Notes/A.md", deps);
   const div = document.createElement("div");
   div.append(fragment);
   return { div, headings };
@@ -102,6 +99,31 @@ describe("task lists", () => {
   it("works in a loose list", async () => {
     const { div } = await render("- [x] first\n\n- [ ] second");
     expect([...div.querySelectorAll("li > p > .task-box")]).toHaveLength(2);
+  });
+
+  it("gives boxes the task's real line when the note has frontmatter and comments", async () => {
+    const source = "---\na: 1\n---\n\n%%\nhidden\n%%\n\n- [ ] task";
+    const { fragment } = await renderNote(source, "Notes/A.md", deps, { interactive: true });
+    expect(fragment.querySelector<HTMLElement>(".task-box")?.dataset.taskLine).toBe("8");
+  });
+
+  it("does not make a box written as HTML in the note clickable", async () => {
+    const source = '<button class="task-box" data-task-line="0">x</button>\n\n- [ ] real';
+    const { fragment } = await renderNote(source, "Notes/A.md", deps, { interactive: true });
+    expect([...fragment.querySelectorAll("[data-task-line]")]).toHaveLength(1);
+    expect(fragment.querySelector("li button.task-box")?.hasAttribute("data-task-line")).toBe(true);
+  });
+
+  it("makes no box clickable outside the reading view", async () => {
+    const { div } = await render("- [ ] task");
+    expect(div.querySelector("button.task-box")).toBeNull();
+  });
+
+  it("keeps a list whole around a multi-line comment", async () => {
+    const { div } = await render("- a\n%%\nhidden\n%%\n- b");
+    expect(div.querySelectorAll("ul")).toHaveLength(1);
+    expect(div.querySelectorAll("li")).toHaveLength(2);
+    expect(div.textContent).not.toContain("hidden");
   });
 
   it("leaves brackets alone anywhere but the start of an item", async () => {

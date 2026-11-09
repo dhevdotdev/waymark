@@ -244,7 +244,7 @@ fn quit_after_saving(app: &AppHandle) {
     let _ = app.emit("save-before-quit", ());
     let handle = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(1500));
+        std::thread::sleep(Duration::from_secs(5));
         handle.exit(0);
     });
 }

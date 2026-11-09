@@ -17,6 +17,11 @@ describe("toggleTask", () => {
     expect(toggleTask("> - [ ] a", 0)).toBe("> - [x] a");
   });
 
+  it("writes nothing for a line number that is not one", () => {
+    expect(toggleTask("- [ ] a", Number.NaN)).toBeNull();
+    expect(toggleTask("- [ ] a", -1)).toBeNull();
+  });
+
   it("writes nothing when the line is not a task", () => {
     expect(toggleTask("plain\n- a", 0)).toBeNull();
     expect(toggleTask("- a [ ] b", 0)).toBeNull();
@@ -27,6 +32,7 @@ describe("toggleTask", () => {
 describe("taskProgress", () => {
   it("counts tasks and ignores fenced examples", () => {
     expect(taskProgress("- [x] a\n- [ ] b\n```\n- [ ] not one\n```\n* [X] c")).toEqual({ done: 2, total: 3 });
+    expect(taskProgress("~~~\n```\n- [ ] inside\n~~~\n- [ ] after")).toEqual({ done: 0, total: 1 });
   });
 });
 

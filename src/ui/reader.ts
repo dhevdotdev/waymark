@@ -471,8 +471,7 @@ export class Reader {
 
   private async show(opts: ShowOptions = {}): Promise<void> {
     if (this.editing.isOpen) {
-      if (opts.quiet) return;
-      await this.editing.close();
+      if (opts.quiet || !(await this.editing.close())) return;
     }
     const { metrics } = this.deps;
     const seq = ++this.renderSeq;

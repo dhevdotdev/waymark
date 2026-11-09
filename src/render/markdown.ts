@@ -12,6 +12,7 @@ export interface RenderEnv {
   highlight: (code: string, lang: string) => string | null;
   /** Lines above the rendered text in the file, or null when tasks here should not be clickable. */
   taskLineOffset?: number | null;
+  taskNonce?: string;
   headings: { level: number; text: string; id: string }[];
 }
 
@@ -52,7 +53,7 @@ export function createMarkdown(): MarkdownIt {
     const { done, line } = tokens[i].meta as { done: boolean; line: number };
     const offset = (env as unknown as RenderEnv).taskLineOffset ?? null;
     if (offset === null) return `<span class="task-box" role="checkbox" aria-checked="${done}" aria-disabled="true"></span>`;
-    return `<button class="task-box" type="button" role="checkbox" aria-checked="${done}" aria-label="Task" data-task-line="${line + offset}"></button>`;
+    return `<button class="task-box" type="button" role="checkbox" aria-checked="${done}" aria-label="Task" data-task-line="${(env as unknown as RenderEnv).taskNonce}:${line + offset}"></button>`;
   };
   md.renderer.rules.wikilink = (tokens, i, _opts, env) => renderWikilink(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.fence = (tokens, i, _opts, env) => renderFence(md, tokens[i], env as unknown as RenderEnv);

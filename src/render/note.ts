@@ -31,6 +31,8 @@ export async function renderNote(
   const t0 = performance.now();
   const { data, body, offset } = parseFrontmatter(source);
   const text = stripComments(body);
+  /* Marks the task boxes this render made, so a box written as HTML in the note cannot act as one. */
+  const taskNonce = crypto.randomUUID();
   const g0 = performance.now();
   await deps.highlighter.prepare(text);
   const grammarMs = performance.now() - g0;
@@ -41,9 +43,15 @@ export async function renderNote(
     highlight: deps.highlighter.highlight,
     headings: [],
     taskLineOffset: options.interactive ? offset : null,
+    taskNonce,
   };
   const html = md.render(text, env as never);
   const fragment = sanitize(html);
+  for (const box of fragment.querySelectorAll<HTMLElement>("[data-task-line]")) {
+    const [nonce, line] = box.dataset.taskLine!.split(":");
+    if (nonce === taskNonce) box.dataset.taskLine = line;
+    else box.removeAttribute("data-task-line");
+  }
   for (const list of fragment.querySelectorAll<HTMLOListElement>("ol[start]")) {
     const start = Number(list.getAttribute("start"));
     if (Number.isInteger(start)) list.style.setProperty("--list-start", String(start - 1));

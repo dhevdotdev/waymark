@@ -135,11 +135,28 @@ pub fn write_note(
     Ok(WriteOutcome::Saved)
 }
 
+/// A crash between writing and renaming leaves a temporary file, which Git would otherwise offer to commit.
+fn remove_leftover_temp_files(folder: &Path) {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with(".waymark-") && name.ends_with(".tmp") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 /// Writes beside the note and renames over it, so a crash leaves the old text or the new, never half.
 fn replace_atomically(target: &Path, text: &str) -> std::io::Result<()> {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
+    if let Some(folder) = target.parent() {
+        remove_leftover_temp_files(folder);
+    }
     let temp = target.with_file_name(format!(".waymark-{}-{stamp}.tmp", std::process::id()));
     let result = (|| {
         let mut file = std::fs::OpenOptions::new()
@@ -332,6 +349,14 @@ mod tests {
         std::os::unix::fs::symlink(&secret, dir.path().join("link.md")).unwrap();
         assert!(write_note(dir.path(), "link.md", "y", Some("keep")).is_err());
         assert_eq!(std::fs::read_to_string(&secret).unwrap(), "keep");
+    }
+
+    #[test]
+    fn a_save_clears_temp_files_left_by_a_crash() {
+        let (dir, _) = note("old");
+        std::fs::write(dir.path().join(".waymark-1-2.tmp"), "half").unwrap();
+        write_note(dir.path(), "a.md", "new", Some("old")).unwrap();
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
     #[test]

@@ -3,6 +3,7 @@ const FENCE = /^ {0,3}(```|~~~)/;
 
 /** Flips the task on a line of the note. Null means that line is not a task, so nothing should be written. */
 export function toggleTask(text: string, line: number): string | null {
+  if (!Number.isInteger(line) || line < 0) return null;
   let start = 0;
   for (let i = 0; i < line; i++) {
     const next = text.indexOf("\n", start);
@@ -20,10 +21,14 @@ export function toggleTask(text: string, line: number): string | null {
 export function taskProgress(text: string): { done: number; total: number } {
   let done = 0;
   let total = 0;
-  let inFence = false;
+  let fence: string | null = null;
   for (const line of text.split("\n")) {
-    if (FENCE.test(line)) inFence = !inFence;
-    if (inFence) continue;
+    const marker = FENCE.exec(line)?.[1] ?? null;
+    if (marker && (fence === null || fence === marker)) {
+      fence = fence === null ? marker : null;
+      continue;
+    }
+    if (fence !== null) continue;
     const match = TASK_LINE.exec(line);
     if (!match) continue;
     total++;

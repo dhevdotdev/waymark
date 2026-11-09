@@ -42,6 +42,11 @@ export class Draft {
     return this.latest !== this.base;
   }
 
+  /** Resolves once no write is in flight. */
+  async settled(): Promise<void> {
+    await this.running;
+  }
+
   /** Autosaving has stopped because a choice is needed. */
   get isBlocked(): boolean {
     return this.state.kind === "conflict" || this.state.kind === "missing";
