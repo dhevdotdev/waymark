@@ -51,6 +51,7 @@ await withApp({}, async (page, app, { errors, requests }) => {
 
 await withApp({}, async (page, app, { errors }) => {
   await page.goto(`${app.url}?note=${encodeURIComponent("A very long note title")}`);
+  await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
   await page.evaluate(() =>
     window.waymark.open(
       "A very long note title that keeps going well past the width of any sidebar so that truncation has something to do.md",
