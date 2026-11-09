@@ -413,7 +413,7 @@ kbd {
   align-items: center;
   gap: 1px;
 }
-:is(.tree-head, .nav-item):not(.is-current).has-actions {
+.nav-item:not(.is-current).has-actions {
   background: var(--row-hover);
   --row-ink: var(--ink);
 }
@@ -588,8 +588,10 @@ kbd {
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.tree-head, .nav-item):hover {
-    background: var(--row-hover);
     --row-ink: var(--ink);
+  }
+  .nav-item:hover {
+    background: var(--row-hover);
   }
   :is(.tree-head, .nav-item):hover .tree-icon {
     color: var(--ink-2);
@@ -625,13 +627,11 @@ kbd {
 }
 @media (hover: hover) and (pointer: fine) {
   .tree-head.is-section:hover {
-    background: var(--chrome);
     --row-ink: var(--ink);
   }
 }
-.tree-head.is-section.has-actions {
-  background: var(--row-hover);
-  border-radius: var(--r-control);
+.tree-head.has-actions {
+  --row-ink: var(--ink);
 }
 .tree-body {
   display: grid;

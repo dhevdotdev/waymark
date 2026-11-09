@@ -440,17 +440,40 @@ try {
     "there is no box behind them",
     await page.locator(".row-actions").evaluate((box) => getComputedStyle(box).backgroundColor === "rgba(0, 0, 0, 0)"),
   );
-  const headBackground = () =>
-    page.locator('.tree-head[data-folder="Journeys"]').evaluate((row) => getComputedStyle(row).backgroundColor);
+  const styleOf = (selector) =>
+    page.locator(selector).evaluate((row) => {
+      const { backgroundColor, color } = getComputedStyle(row);
+      return { backgroundColor, color };
+    });
+  const FOLDER = '.tree-head[data-folder="Journeys"]';
+  await page.mouse.move(0, 0);
+  await pause(300);
+  const folderAtRest = await styleOf(FOLDER);
+  await hover(FOLDER);
   await pause(250);
-  const tinted = await headBackground();
+  const folderHovered = await styleOf(FOLDER);
+  check(
+    "hovering a folder adds no shade",
+    folderHovered.backgroundColor === folderAtRest.backgroundColor,
+    folderHovered.backgroundColor,
+  );
+  check("it brightens the folder's text instead", folderHovered.color !== folderAtRest.color, folderHovered.color);
+  await strip().last().hover();
+  await pause(250);
+  check("the text stays bright with the pointer on a button", (await styleOf(FOLDER)).color === folderHovered.color);
+  const NOTE = '.nav-item[data-path="Writing.md"]';
+  await hover(NOTE);
+  await pause(250);
+  const noteHovered = await styleOf(NOTE);
+  check("hovering a note still shades it", noteHovered.backgroundColor !== "rgba(0, 0, 0, 0)", noteHovered.backgroundColor);
   await strip().last().hover();
   await pause(250);
   check(
-    "the row stays marked with the pointer on a button",
-    (await headBackground()) === tinted && tinted !== "rgba(0, 0, 0, 0)",
-    tinted,
+    "the note stays shaded with the pointer on its button",
+    (await styleOf(NOTE)).backgroundColor === noteHovered.backgroundColor,
   );
+  await hover(FOLDER);
+  await pause(100);
   await strip().last().click();
   await pause(350);
   const menuPlacement = await page.evaluate(() => {
