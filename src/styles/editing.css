@@ -2,6 +2,7 @@
 
 .doc-editing .edit-surface {
   min-width: 0;
+  margin-block-start: -16px;
 }
 .doc-editing .cm-editor,
 .doc-editing .cm-editor.cm-focused {
@@ -113,10 +114,10 @@
   opacity: 1;
 }
 .doc-editing .cm-placeholder {
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .doc-editing .cm-code-token {
-  color: var(--shiki-light);
+  color: color-mix(in oklab, var(--shiki-light) 50%, var(--ink));
 }
 :root[data-scheme="dark"] .doc-editing .cm-code-token {
   color: var(--shiki-dark);
@@ -361,26 +362,74 @@
 }
 .doc-editing .cm-panels {
   position: sticky;
-  z-index: 2;
+  inset-block-start: 10px;
+  z-index: 20;
+  block-size: 0;
   border: 0;
-  border-radius: var(--r-control);
-  background: var(--float-bg);
-  box-shadow: var(--shadow-float);
+  background: none;
   color: var(--ink);
   font-family: var(--font-ui);
 }
-.doc-editing .cm-panels .cm-textfield {
-  border: 0;
-  border-radius: var(--r-chip);
-  background: var(--fill);
-  color: var(--ink);
+.doc-editing .cm-panels .findbar {
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 4px;
+  font-size: 0.8125rem;
 }
-.doc-editing .cm-panels .cm-button {
+.findbar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.findbar-row[hidden] {
+  display: none;
+}
+.findbar-row.is-replace {
+  gap: 6px;
+  padding-block: 4px 2px;
+  padding-inline: 32px 4px;
+}
+.findbar-field {
+  flex: 1;
+  min-inline-size: 0;
+  inline-size: 170px;
+  border: 0;
+  outline: 2px solid transparent;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+}
+.findbar-more svg {
+  transition: rotate var(--t-hover) ease;
+}
+.findbar-more.is-open svg {
+  rotate: 90deg;
+}
+.find-option {
+  inline-size: 26px;
+  block-size: 26px;
   border: 0;
   border-radius: var(--r-chip);
-  background: var(--fill);
-  background-image: none;
-  color: var(--ink-2);
+  background: none;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  cursor: default;
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease;
+}
+.find-option[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .find-option:hover {
+    background: var(--fill);
+    color: var(--ink);
+  }
 }
 .doc-editing .cm-searchMatch {
   background: color-mix(in oklab, var(--accent) 26%, transparent);
@@ -388,32 +437,29 @@
 .doc-editing .cm-searchMatch-selected {
   background: color-mix(in oklab, var(--accent) 48%, transparent);
 }
-.edit-banner-slot {
-  position: sticky;
-  inset-block-start: 8px;
-  z-index: 3;
-  block-size: 0;
-}
 .edit-banner {
-  position: absolute;
-  inset-inline: 0;
+  flex: 1;
+  min-inline-size: 0;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--r-float);
-  background: var(--float-bg);
-  box-shadow: var(--shadow-float);
-  font-family: var(--font-ui);
+  margin-inline-end: 12px;
+  color: var(--ink-2);
   font-size: 0.8125rem;
+}
+.pane-head:has(.edit-banner:not([hidden])) .crumbs {
+  display: none;
 }
 .edit-banner[hidden] {
   display: none;
 }
 .edit-banner p {
-  flex: 1 1 16rem;
+  flex: 1;
+  min-inline-size: 0;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 button.task-box {
@@ -467,7 +513,7 @@ button.task-box:focus-visible {
   rotate: 45deg;
 }
 .edit-state:is([data-shown="conflict"], [data-shown="missing"], [data-shown="failed"]) {
-  color: var(--warn, var(--accent));
+  color: var(--warn-ink);
 }
 .status-stats {
   margin-inline-end: 8px;
@@ -726,16 +772,16 @@ button.task-box:focus-visible {
 .doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul {
   margin: 0;
   padding: 0;
-  max-block-size: 260px;
+  max-block-size: 256px;
   min-inline-size: 220px;
   font-family: var(--font-ui);
   scrollbar-width: none;
 }
 .doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul > li {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-start;
-  gap: 16px;
+  gap: 10px;
   text-align: start;
   padding: 5px 8px;
   border-radius: var(--r-chip);
@@ -755,7 +801,7 @@ button.task-box:focus-visible {
 }
 .doc-editing .cm-completionMatchedText {
   text-decoration: none;
-  color: var(--link);
+  color: var(--accent-ink);
 }
 .doc-editing .cm-completionDetail {
   margin-inline-start: auto;
@@ -865,4 +911,51 @@ button.task-box:focus-visible {
 }
 .sidebar-inner {
   padding-block-start: 4px;
+}
+
+.doc-editing .cm-code-first:not(.cm-code-open) {
+  text-align: end;
+}
+.doc-editing .cm-code-first:not(.cm-code-open) .cm-code-info {
+  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+}
+.doc-editing .cm-callout {
+  padding-inline: 16px;
+  background: color-mix(in oklab, var(--c) var(--tint), var(--paper));
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.doc-editing .cm-callout-first {
+  padding-block-start: 11px;
+  border-start-start-radius: var(--r-block);
+  border-start-end-radius: var(--r-block);
+  color: color-mix(in oklab, var(--c) 50%, var(--ink));
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 620;
+}
+.doc-editing .cm-callout-last {
+  padding-block-end: 12px;
+  border-end-start-radius: var(--r-block);
+  border-end-end-radius: var(--r-block);
+}
+.doc-editing .cm-block-glyph {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 22px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+@media (min-width: 1200px) {
+  .doc-editing .cm-preview-block .diagram {
+    margin-inline: -62px;
+  }
 }

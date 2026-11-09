@@ -256,7 +256,6 @@ export class GitPanel {
     const root = this.root!;
     const st = this.status;
     const typing = root.querySelector<HTMLTextAreaElement>(".commit-box textarea:focus");
-    const caret = typing ? [typing.selectionStart, typing.selectionEnd] : null;
     root.replaceChildren();
 
     const head = el("header", "sync-head");
@@ -359,10 +358,10 @@ export class GitPanel {
     root.append(body);
     if (this.tab === "changes") this.renderChanges(body, st);
     else this.renderHistory(body);
-    if (caret) {
+    if (typing) {
       const box = root.querySelector<HTMLTextAreaElement>(".commit-box textarea");
       box?.focus({ preventScroll: true });
-      box?.setSelectionRange(caret[0], caret[1]);
+      box?.setSelectionRange(typing.selectionStart, typing.selectionEnd);
     }
   }
 

@@ -84,9 +84,13 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   const titles = el("div", "sheet-titles");
   titles.append(el("h2", "sheet-title", title), el("div", "sheet-sub", subtitle));
   const close = el("button", "icon-btn");
-  close.setAttribute("aria-label", "Close");
-  close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
-  head.append(titles, close);
+  const overSync = document.querySelector(".sync-overlay") !== null;
+  close.setAttribute("aria-label", overSync ? "Back" : "Close");
+  close.innerHTML = overSync
+    ? `<svg viewBox="0 0 16 16"><path d="M10 4L6 8l4 4"/></svg>`
+    : `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
+  if (overSync) head.append(close, titles);
+  else head.append(titles, close);
   const body = el("div", "sheet-body");
   body.append(content);
   sheet.append(head, body);

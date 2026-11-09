@@ -492,7 +492,7 @@ export class GraphCanvas {
         const y = choices.find((v) => !placed.some((b) => hits(boxFor(v), b)));
         if (y === undefined) continue;
         placed.push(boxFor(y));
-        halo(text, c.x, y, this.hue(g.id), groupAlpha);
+        halo(text, c.x, y, p.label, groupAlpha);
       }
     }
 

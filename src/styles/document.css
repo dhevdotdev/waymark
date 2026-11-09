@@ -430,7 +430,7 @@
   color: var(--ink);
 }
 .code .shiki span {
-  color: var(--shiki-light);
+  color: color-mix(in oklab, var(--shiki-light) 50%, var(--ink));
 }
 :root[data-scheme="dark"] .code .shiki span {
   color: var(--shiki-dark);
@@ -554,7 +554,7 @@
   font-size: 0.8125rem;
   font-weight: 620;
   line-height: 1.35;
-  color: color-mix(in oklab, var(--c) 78%, var(--ink));
+  color: color-mix(in oklab, var(--c) 50%, var(--ink));
   text-align: left;
 }
 button.callout-title {

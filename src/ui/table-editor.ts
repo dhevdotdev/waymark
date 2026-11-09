@@ -153,7 +153,8 @@ class TableWidget extends WidgetType {
       }),
       handle("cm-table-grip is-column", "Column actions", icons.gripWide, (button) => {
         const cell = aimed();
-        if (cell) showContextMenu(...at(button), this.columnMenu(view, root, cell));
+        const header = cell?.closest("table")?.rows[0]?.getBoundingClientRect();
+        if (cell && header) showContextMenu(at(button)[0], header.bottom + MENU_GAP, this.columnMenu(view, root, cell));
       }),
       handle("cm-table-add is-row", "Add a row", icons.plus, () => {
         const last = root.querySelectorAll("tr").length - 1;

@@ -37,7 +37,7 @@ export class NoteView {
   showEmptyVault(): void {
     this.showMessage(
       "No Markdown notes here",
-      "Waymark reads .md files. Open a different folder from the palette: press ⌘K and choose “Open another vault”.",
+      "Waymark reads .md files. Start one here, or open a different folder from the palette: press ⌘K and choose “Open another vault”.",
     );
   }
 

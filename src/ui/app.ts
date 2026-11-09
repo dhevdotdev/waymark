@@ -159,7 +159,10 @@ export class App {
 
   private applyTheme(): void {
     const family = findFamily(this.prefs.value.family);
+    const root = document.documentElement;
+    root.classList.add("is-recolouring");
     applyTheme(family, this.scheme());
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("is-recolouring")));
     this.matchWindowToPage();
     this.reader?.refreshTheme();
     if (family.id === this.codeFamily) return;

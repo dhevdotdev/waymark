@@ -60,7 +60,7 @@ export function dismissOnOutside(inside: Node[], close: () => void): () => void 
   return stop;
 }
 
-const FADE_OUT_MS = 140;
+const FADE_OUT_MS = 100;
 
 /** Removes a floating surface after a short fade. Leaving is quicker than arriving. */
 export function fadeOut(element: HTMLElement): void {

@@ -50,6 +50,9 @@ export function scrollToRange(range: Range, scroller: HTMLElement): void {
 }
 
 /** In-note find bar (⌘F). */
+/** Previous, next and close, the same in Read and Edit. */
+export const FIND_BUTTONS = `<button class="icon-btn" data-find="prev" aria-label="Previous match"><svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4"/></svg></button><button class="icon-btn" data-find="next" aria-label="Next match"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button><button class="icon-btn" data-find="close" aria-label="Close find"><svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>`;
+
 export class FindBar {
   private root: HTMLElement | null = null;
   private input!: HTMLInputElement;
@@ -75,7 +78,7 @@ export class FindBar {
     }
     const root = document.createElement("div");
     root.className = "findbar";
-    root.innerHTML = `<input type="text" spellcheck="false" placeholder="Find in note" aria-label="Find in note" /><span class="findbar-count" aria-live="polite"></span><button class="icon-btn" data-find="prev" aria-label="Previous match"><svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4"/></svg></button><button class="icon-btn" data-find="next" aria-label="Next match"><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button><button class="icon-btn" data-find="close" aria-label="Close find"><svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>`;
+    root.innerHTML = `<input type="text" spellcheck="false" placeholder="Find in note" aria-label="Find in note" /><span class="findbar-count" aria-live="polite"></span>${FIND_BUTTONS}`;
     this.root = root;
     this.input = root.querySelector("input")!;
     this.count = root.querySelector(".findbar-count")!;

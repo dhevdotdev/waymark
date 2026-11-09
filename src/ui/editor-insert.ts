@@ -116,6 +116,33 @@ const lineStart =
     insertBlock(view, from, to, [text], 0, text.length);
   };
 
+/** Each block is shown by the Markdown that makes it. */
+const BLOCK_GLYPHS: Record<string, string> = {
+  "Heading 1": "#",
+  "Heading 2": "##",
+  "Heading 3": "###",
+  "Bulleted list": "-",
+  "Numbered list": "1.",
+  Task: "[ ]",
+  Quote: ">",
+  Table: "|",
+  "Code block": "```",
+  Callout: "[!]",
+  Diagram: "->",
+  "Math block": "$$",
+  Divider: "---",
+  "Link to a note": "[[",
+};
+
+function blockGlyph(completion: Completion): HTMLElement | null {
+  const glyph = BLOCK_GLYPHS[completion.displayLabel ?? ""];
+  if (!glyph) return null;
+  const tile = document.createElement("span");
+  tile.className = "cm-block-glyph";
+  tile.textContent = glyph;
+  return tile;
+}
+
 const BLOCKS: [label: string, keywords: string, apply: Apply][] = [
   ["Heading 1", "title h1", lineStart("# ")],
   ["Heading 2", "h2", lineStart("## ")],
@@ -272,7 +299,12 @@ function fileHandlers(options: InsertOptions): Extension {
 /** Everything that puts something new into a note: the `/` menu, `[[` links, and pasted or dropped files. */
 export function editorInsert(options: InsertOptions): Extension {
   return [
-    autocompletion({ override: [slashSource(options), linkSource(options)], icons: false, selectOnOpen: true }),
+    autocompletion({
+      override: [slashSource(options), linkSource(options)],
+      icons: false,
+      addToOptions: [{ render: blockGlyph, position: 20 }],
+      selectOnOpen: true,
+    }),
     heldPlaces,
     fileHandlers(options),
   ];

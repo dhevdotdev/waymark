@@ -121,7 +121,7 @@
   --shadow-raise: 0 0 0 0.5px var(--ring), 0 1px 2px rgb(0 0 0 / 0.35);
   --scrim: color-mix(in oklab, var(--p-crust) 55%, transparent);
   --float-bg: color-mix(in oklab, var(--paper) 88%, var(--p-surface0));
-  --mark: color-mix(in oklab, var(--p-peach) 34%, transparent);
+  --mark: color-mix(in oklab, var(--p-peach) 28%, transparent);
   --shadow-float: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px -4px rgb(0 0 0 / 0.55);
 }
 
@@ -132,12 +132,12 @@
    * palette slots, so every theme keeps secondary text at 4.5:1 or better.
    * --ink-4 is for marks that are not read: list markers, rules, separators.
    */
-  --ink-2: color-mix(in oklab, var(--ink) 84%, var(--paper));
-  --ink-3: color-mix(in oklab, var(--ink) 77%, var(--paper));
+  --ink-2: color-mix(in oklab, var(--ink) 90%, var(--paper));
+  --ink-3: color-mix(in oklab, var(--ink) 82%, var(--paper));
   --ink-4: color-mix(in oklab, var(--ink) 46%, var(--paper));
   --chrome: var(--paper);
-  --chrome-ink: color-mix(in oklab, var(--ink) 84%, var(--chrome));
-  --chrome-ink-3: color-mix(in oklab, var(--ink) 77%, var(--chrome));
+  --chrome-ink: color-mix(in oklab, var(--ink) 90%, var(--chrome));
+  --chrome-ink-3: color-mix(in oklab, var(--ink) 82%, var(--chrome));
 
   /* Fills: one quiet tint for resting tracks and fields, one for hover, one for selection. */
   --fill: color-mix(in oklab, var(--p-surface0) 40%, transparent);
@@ -155,9 +155,10 @@
   /* Accent and what sits on it */
   --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent);
   --on-accent: var(--paper);
+  --accent-ink: color-mix(in oklab, var(--accent) 82%, var(--ink));
   --link: var(--accent);
   --focus: color-mix(in oklab, var(--accent) 55%, transparent);
-  --mark: color-mix(in oklab, var(--p-yellow) 32%, transparent);
+  --mark: color-mix(in oklab, var(--p-yellow) 26%, transparent);
 
   /*
    * Status: one meaning per colour everywhere (sync dot, change badges, diffs,
@@ -169,11 +170,11 @@
   --warn: var(--p-peach);
   --danger: var(--p-red);
   --idle: var(--ink-4);
-  --ok-ink: color-mix(in oklab, var(--ok) 72%, var(--ink));
-  --info-ink: color-mix(in oklab, var(--info) 78%, var(--ink));
-  --pending-ink: color-mix(in oklab, var(--pending) 66%, var(--ink));
-  --warn-ink: color-mix(in oklab, var(--warn) 72%, var(--ink));
-  --danger-ink: color-mix(in oklab, var(--danger) 80%, var(--ink));
+  --ok-ink: color-mix(in oklab, var(--ok) 48%, var(--ink));
+  --info-ink: color-mix(in oklab, var(--info) 62%, var(--ink));
+  --pending-ink: color-mix(in oklab, var(--pending) 40%, var(--ink));
+  --warn-ink: color-mix(in oklab, var(--warn) 55%, var(--ink));
+  --danger-ink: color-mix(in oklab, var(--danger) 70%, var(--ink));
 
   /* Elevation */
   --shadow-hairline: 0 0 0 0.5px var(--ring);

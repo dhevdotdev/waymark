@@ -16,7 +16,7 @@ export interface RenderEnv {
   headings: { level: number; text: string; id: string }[];
 }
 
-const CALLOUT_ALIASES: Record<string, string> = {
+export const CALLOUT_ALIASES: Record<string, string> = {
   summary: "abstract",
   tldr: "abstract",
   hint: "tip",

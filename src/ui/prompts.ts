@@ -75,7 +75,7 @@ export function promptText(options: {
 }
 
 /** Asks before something the user would want to think about. */
-export function confirmAction(options: { title: string; body: string; action: string }): Promise<boolean> {
+export function confirmAction(options: { title: string; body: string; action: string; danger?: boolean }): Promise<boolean> {
   const returnFocus = document.activeElement;
   return new Promise((resolve) => {
     const box = document.createElement("div");
@@ -93,7 +93,7 @@ export function confirmAction(options: { title: string; body: string; action: st
     cancel.className = "btn";
     cancel.textContent = "Cancel";
     const confirm = document.createElement("button");
-    confirm.className = "btn btn-primary";
+    confirm.className = options.danger ? "btn btn-danger" : "btn btn-primary";
     confirm.textContent = options.action;
     actions.append(cancel, confirm);
     box.append(title, body, actions);

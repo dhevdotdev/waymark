@@ -4,6 +4,7 @@ import { Decoration, type DecorationSet, type EditorView, ViewPlugin, type ViewU
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import type { CodeToken } from "../render/highlight";
 import { applyImageSize, knownImageSize } from "../render/image-sizes";
+import { CALLOUT_ALIASES } from "../render/markdown";
 import { MathWidget } from "./editor-blocks";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
@@ -30,8 +31,24 @@ const CODE_LINES_ABOVE_VIEW = 40;
 const CODE_WINDOW_STEP = 20;
 
 const hide = Decoration.replace({});
+const CALLOUT_LINE = /^\s*(?:>\s*)+\[!([\w-]+)\]([+-]?)[ \t]*(.*)$/;
+const KNOWN_CALLOUTS = new Set(["note", "abstract", "info", "tip", "success", "question", "warning", "failure", "danger"]);
 const line = (cls: string) => Decoration.line({ class: cls });
 const mark = (cls: string) => Decoration.mark({ class: cls });
+
+class CalloutLabel extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: CalloutLabel): boolean {
+    return other.text === this.text;
+  }
+  toDOM(): HTMLElement {
+    const label = document.createElement("span");
+    label.textContent = this.text;
+    return label;
+  }
+}
 
 class BulletWidget extends WidgetType {
   toDOM(): HTMLElement {
@@ -93,6 +110,7 @@ class Builder {
   private readonly state: EditorState;
   private readonly activeLines = new Set<number>();
   readonly frontmatterEnd: number;
+  private readonly calloutLines = new Set<number>();
 
   constructor(
     private readonly view: EditorView,
@@ -160,7 +178,8 @@ class Builder {
   private block(name: string, ref: SyntaxNodeRef): void {
     const { from, to } = ref;
     const parent = ref.node.parent?.name ?? "";
-    if (name === "HeaderMark") this.headerMark(parent, from, to);
+    if (name === "Blockquote") this.callout(ref.node);
+    else if (name === "HeaderMark") this.headerMark(parent, from, to);
     else if (name === "InlineCode") this.inlineCode(ref.node);
     else if (name === "FencedCode") this.fencedCode(ref.node);
     else if (name === "QuoteMark") this.quoteMark(from, to);
@@ -187,9 +206,9 @@ class Builder {
     const first = doc.lineAt(node.from).number;
     const last = doc.lineAt(node.to).number;
     let open = false;
+    for (let n = first; n <= last; n++) if (this.activeLines.has(n)) open = true;
     for (let n = first; n <= last; n++) {
-      if (this.activeLines.has(n)) open = true;
-      const edge = n === first ? " cm-code-first" : n === last ? " cm-code-last" : "";
+      const edge = n === first ? ` cm-code-first${open ? " cm-code-open" : ""}` : n === last ? " cm-code-last" : "";
       this.out.push(line(`cm-code-line${edge}`).range(doc.line(n).from));
     }
     if (!open) for (const m of node.getChildren("CodeMark")) this.out.push(hide.range(m.from, m.to));
@@ -231,8 +250,32 @@ class Builder {
     return { from: Math.max(text.from, doc.line(start).from), to: Math.min(text.to, doc.line(end).to) };
   }
 
+  /** A callout looks as it does in Read, and its marker appears only while the cursor is on it. */
+  private callout(node: SyntaxNode): void {
+    const { doc } = this.state;
+    const first = doc.lineAt(node.from);
+    const match = CALLOUT_LINE.exec(first.text);
+    if (!match) return;
+    const type = match[1].toLowerCase();
+    const kind = CALLOUT_ALIASES[type] ?? type;
+    const hue = KNOWN_CALLOUTS.has(kind) ? kind : "note";
+    const last = doc.lineAt(node.to).number;
+    for (let n = first.number; n <= last; n++) {
+      this.calloutLines.add(n);
+      const edges = `${n === first.number ? " cm-callout-first" : ""}${n === last ? " cm-callout-last" : ""}`;
+      this.out.push(
+        Decoration.line({ class: `cm-callout${edges}`, attributes: { style: `--c: var(--c-${hue})` } }).range(doc.line(n).from),
+      );
+    }
+    const from = first.from + first.text.indexOf("[!");
+    const to = first.to - match[3].length;
+    if (this.touchesSelection(from, to)) return;
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+    this.out.push((match[3] ? hide : Decoration.replace({ widget: new CalloutLabel(label) })).range(from, to));
+  }
+
   private quoteMark(from: number, to: number): void {
-    this.lineClass(from, "cm-quote");
+    if (!this.calloutLines.has(this.state.doc.lineAt(from).number)) this.lineClass(from, "cm-quote");
     this.hangMark(from, this.withTrailingSpace(to));
   }
 

@@ -50,5 +50,6 @@ export function nameInPlace(row: HTMLElement, options: InlineNameOptions): Promi
     row.replaceWith(editor);
     input.focus();
     input.select();
+    input.scrollLeft = 0;
   });
 }

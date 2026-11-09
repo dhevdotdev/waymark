@@ -116,6 +116,7 @@ export class NoteFiles {
     const links = vault.links.backlinks(path).length;
     const breaksLinks = () =>
       confirmAction({
+        danger: true,
         title: `Move “${nameOf(path)}” to the Trash?`,
         body: `${plural(links, "note")} link here, and those links will stop working.`,
         action: "Move to Trash",
@@ -156,6 +157,7 @@ export class NoteFiles {
     const linking = new Set(notes.flatMap((note) => vault.links.backlinks(note)).filter((note) => !isInside(folder, note))).size;
     const contents = files ? `${plural(notes.length, "note")} and ${plural(files, "other file")}` : plural(notes.length, "note");
     const confirmed = await confirmAction({
+      danger: true,
       title: `Move “${folderName(folder)}” to the Trash?`,
       body: `This takes ${contents} with it. ${
         linking

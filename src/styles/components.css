@@ -333,7 +333,7 @@
 }
 .palette-label mark {
   background: none;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 650;
 }
 .palette-detail {
@@ -1069,7 +1069,7 @@
   color: var(--info-ink);
 }
 .sync-fact.is-outgoing dd {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .sync-fact.is-changed dd {
   color: var(--pending-ink);
@@ -1244,6 +1244,10 @@
   opacity: 0.6;
 }
 .commit-box {
+  position: sticky;
+  inset-block-end: 0;
+  background: var(--paper);
+  border-block-start: 1px solid var(--rule);
   display: grid;
   gap: 8px;
   padding: 6px;
@@ -1715,5 +1719,20 @@
 .popover.is-leaving {
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--t-exit) ease;
+  transition: opacity 100ms ease;
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+.btn-danger:focus-visible {
+  outline-color: var(--danger);
+}
+.sync-overlay ~ .sheet-overlay {
+  background: transparent;
+}
+body:has(.sheet-overlay) .sync-sheet {
+  visibility: hidden;
 }

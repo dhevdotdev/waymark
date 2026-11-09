@@ -12,6 +12,7 @@ import {
 } from "@codemirror/state";
 import { EditorView, keymap, placeholder, showTooltip, type Tooltip, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
+import { findPanel } from "./editor-find";
 import { editorInsert, type InsertOptions } from "./editor-insert";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
@@ -263,7 +264,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         blocks.extension,
         editorInsert(options),
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
-        search({ top: true }),
+        search({ top: true, createPanel: findPanel }),
         bubbleField,
         bubbleAfterPointer,
         bubbleButtons,
@@ -297,10 +298,6 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
   });
   options.onStats(stats(view.state));
   /* CodeMirror's find bar only searches again when a key is released, so a held Backspace left old matches lit. */
-  view.dom.addEventListener("input", (event) => {
-    const field = event.target as HTMLElement;
-    if (field.closest(".cm-search")) field.dispatchEvent(new KeyboardEvent("keyup"));
-  });
   return {
     focus: () => view.focus(),
     find: () => openSearchPanel(view),

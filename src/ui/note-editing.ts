@@ -113,6 +113,7 @@ export class NoteEditing {
   }
 
   private teardown(): void {
+    this.session?.banner.remove();
     this.session = null;
     this.host.els.shell.classList.remove("is-editing");
     this.stats.hide();
@@ -420,10 +421,8 @@ export class NoteEditing {
     banner.setAttribute("role", "alert");
     const surface = document.createElement("div");
     surface.className = "edit-surface";
-    const bannerSlot = document.createElement("div");
-    bannerSlot.className = "edit-banner-slot";
-    bannerSlot.append(banner);
-    page.append(head, bannerSlot, surface);
+    this.host.els.crumbs.after(banner);
+    page.append(head, surface);
     return { page, banner, surface, heading };
   }
 
@@ -463,13 +462,12 @@ export class NoteEditing {
     banner.hidden = !(state.kind === "conflict" || state.kind === "missing" || state.kind === "failed");
     banner.replaceChildren();
     if (state.kind === "conflict") {
-      text.textContent =
-        "This note changed outside this editor. Your version is safe here. Keep mine replaces the other version. Keep both saves yours as a copy.";
-      banner.append(
-        text,
-        button("Keep mine", true, () => void session.draft.keepMine()),
-        button("Keep both", false, () => void this.keepBoth(session, state.disk)),
-      );
+      text.textContent = "This note changed outside this editor. Your version is safe here.";
+      const both = button("Keep both", true, () => void this.keepBoth(session, state.disk));
+      both.dataset.tip = "Saves yours as a copy and shows the other version";
+      const mine = button("Keep mine", false, () => void session.draft.keepMine());
+      mine.dataset.tip = "Replaces the other version with yours";
+      banner.append(text, both, mine);
     } else if (state.kind === "missing") {
       text.textContent = "This note was moved or deleted. Your version is safe here and has not been saved.";
       banner.append(
@@ -483,6 +481,7 @@ export class NoteEditing {
         button("Try again", true, () => void session.draft.flush()),
       );
     }
+    text.dataset.tip = text.textContent;
   }
 
   private async keepBoth(session: Session, disk: string): Promise<void> {

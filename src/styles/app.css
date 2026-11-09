@@ -614,7 +614,7 @@ kbd {
   }
 }
 .nav-item.is-current {
-  --row-ink: var(--accent);
+  --row-ink: var(--accent-ink);
   background: color-mix(in oklab, var(--accent) 14%, var(--paper));
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent);
   font-weight: 550;
@@ -829,17 +829,17 @@ kbd {
 }
 
 /* A graph tab uses the whole note area, and the inspector has nothing to say about it. */
-.shell:is(.is-graph, .is-blank) {
+.shell:is(.is-graph, .is-blank, :has(.empty-state.is-page)) {
   --col-right: 0px;
 }
-.shell:is(.is-graph, .is-blank) .rail {
+.shell:is(.is-graph, .is-blank, :has(.empty-state.is-page)) .rail {
   opacity: 0;
   pointer-events: none;
 }
 .shell.is-graph :is(.pane-head, .scroller) {
   display: none;
 }
-.shell.is-blank .pane-head {
+.shell:is(.is-blank, :has(.empty-state.is-page)) .pane-head {
   visibility: hidden;
 }
 
@@ -1247,6 +1247,12 @@ kbd {
     color: var(--ink-2);
   }
 }
+.rail-link-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .rail-link-name,
 .rail-link-context {
   min-inline-size: 0;
@@ -1509,6 +1515,14 @@ kbd {
     translate: calc(-100% - 16px) 0;
     transition: translate var(--t-slide) var(--ease-out);
   }
+  .shell.sidebar-peek .reader::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: var(--scrim);
+    pointer-events: none;
+  }
   .shell.sidebar-peek .sidebar {
     translate: 0 0;
   }
@@ -1554,4 +1568,11 @@ kbd {
 ::highlight(find-current) {
   background-color: color-mix(in oklab, var(--warn) 55%, transparent);
   color: var(--ink);
+}
+
+.is-recolouring,
+.is-recolouring *,
+.is-recolouring *::before,
+.is-recolouring *::after {
+  transition: none !important;
 }

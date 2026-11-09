@@ -13,7 +13,7 @@ const DISPLAY_MATH = /^ {0,3}\$\$([^$]*?[^\\])\$\$[ \t]*$/gm;
 interface Block {
   from: number;
   to: number;
-  kind: "diagram" | "math";
+  kind: "diagram" | "math" | "frontmatter";
   source: string;
 }
 
@@ -92,6 +92,15 @@ function displayMathIn(state: EditorState, start: number, code: [number, number]
     .map((match) => ({ from: match.index, to: match.index + match[0].length, kind: "math", source: match[1].trim() }));
 }
 
+/** Properties live in the inspector, so the text and the blank lines under it stay out of the way until the cursor goes there. */
+function frontmatterBlock(state: EditorState, end: number): Block[] {
+  if (!end) return [];
+  const { doc } = state;
+  let last = doc.lineAt(end - 1);
+  while (last.number < doc.lines - 1 && doc.line(last.number + 1).text.trim() === "") last = doc.line(last.number + 1);
+  return [{ from: 0, to: last.to, kind: "frontmatter", source: "" }];
+}
+
 function findBlocks(state: EditorState, start: number): Block[] {
   const tree = ensureSyntaxTree(state, state.doc.length, PARSE_BUDGET_MS) ?? syntaxTree(state);
   const blocks: Block[] = [];
@@ -106,7 +115,7 @@ function findBlocks(state: EditorState, start: number): Block[] {
       return false;
     },
   });
-  blocks.push(...displayMathIn(state, start, code));
+  blocks.push(...frontmatterBlock(state, start), ...displayMathIn(state, start, code));
   return blocks.sort((a, b) => a.from - b.from);
 }
 
@@ -124,6 +133,7 @@ function decorate(state: EditorState, blocks: Block[], focused: boolean): Decora
     blocks
       .filter((block) => !editing(block))
       .map((block) => {
+        if (block.kind === "frontmatter") return Decoration.replace({ block: true }).range(block.from, block.to);
         const widget = block.kind === "diagram" ? new DiagramWidget(block.source) : new MathWidget(block.source, true);
         return Decoration.replace({ widget, block: true }).range(block.from, block.to);
       }),
