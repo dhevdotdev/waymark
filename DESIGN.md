@@ -21,6 +21,7 @@ Every state has a visible way in and a visible way out.
 - Anything that covers something closes with Escape and has a visible control. The button that opened a view stays pressed while the view is open.
 - A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
 - The palette keeps one height while typing, and headings appear only before a query, so results never jump.
+- The Dock icon follows the theme family while Waymark runs, recoloured from one artwork by `scripts/theme-icons.mjs`. macOS shows the bundled Catppuccin icon whenever the app is closed.
 - Task items draw a box where the bullet would be, read-only because Waymark never writes to a note. Done items are dimmed, not struck through, so they stay easy to read.
 - Close controls lead their label on tabs and trail stops, in a 20px target with a 13px icon, the same size as the new-tab plus. Every trail stop has a quiet pill, so its always-visible remove control belongs to something.
 - Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.

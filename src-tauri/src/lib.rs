@@ -1,3 +1,4 @@
+mod dock_icon;
 mod git;
 mod vault;
 
@@ -483,6 +484,7 @@ pub fn run() {
             git_clone,
             read_prefs,
             write_prefs,
+            dock_icon::set_dock_icon,
             selftest_config,
             selftest_report,
             selftest_log

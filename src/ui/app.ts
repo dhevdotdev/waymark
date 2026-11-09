@@ -1,7 +1,7 @@
 import { desktopVaultSource, isDesktop, native } from "../platform";
 import { PrefStore, type Prefs } from "../prefs";
 import { Highlighter } from "../render/highlight";
-import { applyTheme, findFamily, type Scheme } from "../themes";
+import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { type Metrics, Reader } from "./reader";
@@ -141,6 +141,10 @@ export class App {
    * colours, diagrams are bound to theme variables, and canvases re-read their
    * palette. Only a new theme family re-highlights code, keeping scroll.
    */
+  get themeFamilies(): string[] {
+    return FAMILIES.map((family) => family.id);
+  }
+
   private applyTheme(): void {
     const family = findFamily(this.prefs.value.family);
     applyTheme(family, this.scheme());
@@ -148,6 +152,7 @@ export class App {
     if (family.id === this.codeFamily) return;
     const first = this.codeFamily === "";
     this.codeFamily = family.id;
+    if (isDesktop) native.setDockIcon(family.id).catch((error: unknown) => console.warn("Dock icon not changed", error));
     void this.syncCodeTheme().then(() => {
       if (!first) this.reader?.rerender();
     });

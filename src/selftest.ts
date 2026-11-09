@@ -1,4 +1,4 @@
-import { git } from "./platform";
+import { git, native } from "./platform";
 import type { App } from "./ui/app";
 
 type Reader = NonNullable<App["reader"]>;
@@ -30,8 +30,19 @@ async function runShow(ctx: SelfTestContext, mode: string): Promise<void> {
   check("shown", true);
 }
 
+async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
+  const accepted = (family: string) =>
+    native.setDockIcon(family).then(
+      () => true,
+      () => false,
+    );
+  for (const family of app.themeFamilies) check(`macOS accepts the ${family} Dock icon`, await accepted(family));
+  check("a family with no icon is refused", !(await accepted("no-such-family")));
+}
+
 async function runRead(ctx: SelfTestContext): Promise<void> {
   const { app, reader, vault, check, wait, until, log, report } = ctx;
+  await checkDockIcons(ctx);
   const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
   if (sample) {
     const url = vault.source.assetUrl(sample);

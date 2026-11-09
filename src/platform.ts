@@ -78,6 +78,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export const native = {
   openVault: (path: string) => call<VaultInfo>("open_vault", { path }),
   reveal: (path?: string) => call<void>("reveal", { path }),
+  setDockIcon: (family: string) => call<void>("set_dock_icon", { family }),
   openTerminal: () => call<void>("open_terminal"),
   readPrefs: () => call<Record<string, unknown>>("read_prefs"),
   writePrefs: (prefs: unknown) => call<void>("write_prefs", { prefs }),

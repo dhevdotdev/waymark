@@ -4283,6 +4283,9 @@ name = "waymark"
 version = "0.1.0"
 dependencies = [
  "notify-debouncer-mini",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "percent-encoding",
  "serde",
  "serde_json",
