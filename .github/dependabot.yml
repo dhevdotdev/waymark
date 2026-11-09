@@ -1,10 +1,8 @@
-# Version updates stay off so the repository keeps a single branch. Remove the limits to turn them on.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
-    open-pull-requests-limit: 0
     cooldown: { default-days: 7 }
     groups:
       minor-and-patch:
@@ -12,7 +10,6 @@ updates:
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule: { interval: weekly }
-    open-pull-requests-limit: 0
     cooldown: { default-days: 7 }
     groups:
       minor-and-patch:
@@ -20,4 +17,3 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
-    open-pull-requests-limit: 0
