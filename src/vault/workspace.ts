@@ -10,6 +10,8 @@ export interface SavedWorkspace {
   active: number;
 }
 
+const isBlank = (tab: Tab) => tab.trail.current.view.kind === "blank";
+
 /** The open tabs and which one is showing. Each tab owns a trail of where it has been. */
 export class Workspace {
   tabs: Tab[] = [];
@@ -27,6 +29,10 @@ export class Workspace {
   /** The tab whose current view is the graph, or -1. */
   get graphIndex(): number {
     return this.tabs.findIndex((t) => t.trail.current.view.kind === "graph");
+  }
+
+  get blankIndex(): number {
+    return this.tabs.findIndex(isBlank);
   }
 
   startWith(view: View): void {
@@ -69,8 +75,13 @@ export class Workspace {
     return true;
   }
 
+  /** A blank tab holds nothing worth coming back to, so it is left out. */
   save(): SavedWorkspace {
-    return { tabs: this.tabs.map((t) => t.trail.save()), active: this.activeIndex };
+    const kept = (tab: Tab) => !isBlank(tab);
+    return {
+      tabs: this.tabs.filter(kept).map((t) => t.trail.save()),
+      active: this.tabs.slice(0, this.activeIndex).filter(kept).length,
+    };
   }
 
   private make(view: View): Tab {

@@ -74,4 +74,47 @@ describe("Workspace", () => {
     expect(next.tabs).toHaveLength(1);
     expect(current(next)).toBe("b");
   });
+
+  describe("blank tabs", () => {
+    const withBlank = (blankAt: number) => {
+      const w = open("a", "b");
+      w.activeIndex = blankAt - 1;
+      w.addBeside({ kind: "blank" });
+      w.activeIndex = blankAt;
+      return w;
+    };
+
+    it.each([
+      ["jumping", (trail: Workspace["active"]["trail"]) => trail.jump(note("c"))],
+      ["following a link", (trail: Workspace["active"]["trail"]) => trail.follow(note("c"))],
+    ])("%s from a blank tab replaces it and leaves nothing to go back to", (_name, go) => {
+      const w = withBlank(1);
+      go(w.active.trail);
+      expect(current(w)).toBe("c");
+      expect(w.active.trail.size).toBe(1);
+      expect(w.active.trail.canBack).toBe(false);
+    });
+
+    it("finds the blank tab so a second one is not opened", () => {
+      expect(withBlank(1).blankIndex).toBe(1);
+      expect(open("a").blankIndex).toBe(-1);
+    });
+
+    it("does not save a blank tab and keeps the active tab pointing at the same note", () => {
+      const w = withBlank(1);
+      w.activeIndex = 2;
+      const saved = w.save();
+      expect(saved.tabs).toHaveLength(2);
+      const next = new Workspace();
+      next.restore(saved, () => true);
+      expect(current(next)).toBe("b");
+    });
+
+    it("restores the nearest note when the blank tab was active", () => {
+      const next = new Workspace();
+      next.restore(withBlank(2).save(), () => true);
+      expect(next.tabs).toHaveLength(2);
+      expect(current(next)).toBe("b");
+    });
+  });
 });

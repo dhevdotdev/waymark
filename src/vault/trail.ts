@@ -1,6 +1,6 @@
 export type GraphScope = "vault" | "local";
 
-export type View = { kind: "note"; path: string } | { kind: "graph"; note: string; scope: GraphScope };
+export type View = { kind: "note"; path: string } | { kind: "graph"; note: string; scope: GraphScope } | { kind: "blank" };
 
 export interface TrailNode {
   id: number;
@@ -225,8 +225,16 @@ export class Trail {
     return [...this.nodes.values()].reverse().map((n) => n.view);
   }
 
+  /** A blank tab is only a place to start from, so the first view replaces it and leaves nothing to go back to. */
+  private fillBlank(view: View): boolean {
+    if (this.current.view.kind !== "blank") return false;
+    this.startFresh(view);
+    return true;
+  }
+
   /** Follows a link from the current note. */
   follow(view: View): void {
+    if (this.fillBlank(view)) return;
     const existing = this.find(view);
     if (!existing) {
       this.visit(this.add(view, this.cur).id);
@@ -240,6 +248,7 @@ export class Trail {
 
   /** Goes somewhere not linked from here: on this trail if it is already there, otherwise a new one. */
   jump(view: View): void {
+    if (this.fillBlank(view)) return;
     const existing = this.find(view);
     if (existing) {
       this.visit(existing.id);

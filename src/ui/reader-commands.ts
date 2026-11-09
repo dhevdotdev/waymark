@@ -28,13 +28,12 @@ export function readerCommands(r: Reader): Command[] {
   const tabNumbers: Command[] = Array.from({ length: 9 }, (_, i) => ({
     id: `tab-${i + 1}`,
     keys: [`mod+${i + 1}`],
-    needsNote: true,
     run: () => r.switchTab(i === 8 ? r.workspace.tabs.length - 1 : Math.min(i, r.workspace.tabs.length - 1)),
   }));
 
   return [
     { id: "palette", keys: ["mod+k", "mod+o", "mod+p"], inField: true, run: () => r.palette.open() },
-    { id: "new-tab", keys: ["mod+t"], inField: true, needsNote: true, run: () => r.newTab() },
+    { id: "new-tab", keys: ["mod+t"], inField: true, run: () => r.newTab() },
     {
       id: "files",
       label: "Show files",
@@ -59,7 +58,7 @@ export function readerCommands(r: Reader): Command[] {
       keys: ["mod+g"],
       hint: "⌘G",
       inField: true,
-      needsNote: true,
+      when: () => !r.workspace.isEmpty,
       run: (origin) => (origin === "palette" ? r.openGraph("vault") : r.toggleGraph()),
     },
     {
@@ -216,7 +215,7 @@ export function paletteItems(r: Reader, query: string): PaletteItem[] {
 
 /** Notes visited in any open tab, then the commands used most. */
 export function paletteRecent(r: Reader): PaletteItem[] {
-  const seen = new Set([r.current]);
+  const seen = new Set(r.onBlank ? [] : [r.current]);
   const items: PaletteItem[] = [];
   for (const tab of r.workspace.tabs) {
     for (const view of tab.trail.views()) {
