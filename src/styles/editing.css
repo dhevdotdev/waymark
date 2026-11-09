@@ -203,11 +203,15 @@
 .doc-editing .cm-task-done {
   color: var(--ink-3);
 }
+/* Read's typography re-breaks a whole paragraph for each change, which looks like the text rearranging itself under the cursor. */
+.doc-editing :is(.cm-content, .doc-title) {
+  text-wrap: stable;
+}
 .doc-editing .cm-tooltip {
   border: 0;
   background: none;
 }
-.edit-bubble {
+.doc-editing .edit-bubble {
   display: flex;
   gap: 1px;
   padding: 3px;

@@ -86,6 +86,10 @@ await writeFile(file("Table.md"), TABLE);
 await writeFile(file("Mixed.md"), "one\r\ntwo\nthree\r\n");
 await writeFile(file("Blocks.md"), BLOCKS);
 await writeFile(
+  file("Long para.md"),
+  "- The idea here is to build apps that would help boost my identity in particular. i show myself as a java developer but i have been doing whatever i feel like so it is not really ideal because of the projects i keep making\n",
+);
+await writeFile(
   file("Long code.md"),
   `# Long\n\n\`\`\`java\nclass Long {\n${Array.from({ length: 500 }, (_, i) => `  int field${i} = ${i};`).join("\n")}\n}\n\`\`\`\n\nEnd of long.\n`,
 );
@@ -583,6 +587,35 @@ try {
   await page.click('[data-keysound="tactile"]');
   await page.keyboard.press("Escape");
   await pause(200);
+  await page.keyboard.press("Meta+e");
+  await pause(200);
+
+  await openNote("Long para");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(200);
+  const wrapStyle = (selector) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).textWrapStyle);
+  check("lines above the cursor stay put while typing", (await wrapStyle(".cm-line")) === "stable", await wrapStyle(".cm-line"));
+  check("the title does too", (await wrapStyle(".doc-title")) === "stable", await wrapStyle(".doc-title"));
+  await page.locator(".cm-line", { hasText: "The idea" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" more");
+  await pause(100);
+  await page.keyboard.press("Shift+Home");
+  await pause(200);
+  const bubbleAlpha = await page.locator(".edit-bubble").evaluate((bubble) => {
+    const canvas = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    canvas.fillStyle = getComputedStyle(bubble).backgroundColor;
+    canvas.fillRect(0, 0, 1, 1);
+    return canvas.getImageData(0, 0, 1, 1).data[3];
+  });
+  check("the selection toolbar has a solid background", bubbleAlpha === 255, String(bubbleAlpha));
+  await page.keyboard.press("ArrowRight");
+  await saved();
   await page.keyboard.press("Meta+e");
   await pause(200);
 

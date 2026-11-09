@@ -49,7 +49,7 @@ function template(p: Prefs, scheme: Scheme): string {
       <div class="seg seg-full key-volume${p.keySound === "off" ? " is-off" : ""}">${choices("keyvolume", KEY_VOLUMES, p.keyVolume)}</div>
     </div>
     <div class="pop-section pop-toggles">
-      ${toggle("Sounds for sync, copy and new tabs", "sound", p.sound)}
+      ${toggle("Sounds", "sound", p.sound)}
       ${
         isDesktop
           ? `${toggle("Check the remote on launch", "syncOnLaunch", p.syncOnLaunch)}

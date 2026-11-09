@@ -122,6 +122,60 @@ async function checkEditPreview({ app, reader, vault, check, until }: SelfTestCo
   await vault.applyChanges([]);
 }
 
+/** Whole words must not jump between lines above the cursor. Only the system WebKit reflows this way, so only this check can see it. */
+async function checkLinesHoldStill({ app, reader, vault, check, until, wait }: SelfTestContext): Promise<void> {
+  const note = "Selftest wrap.md";
+  const text =
+    "The idea here is to build apps that would help boost my identity in particular and it goes on for a good while longer than one line can hold, so that the note wraps over several lines of the column before the end of it";
+  await vault.save(note, `${text}\n`, null);
+  await until(() => vault.index.notes.includes(note));
+  await app.open(note);
+  await wait(300);
+  await reader.editing.open();
+  await wait(300);
+  const line = () =>
+    [...document.querySelectorAll<HTMLElement>(".cm-line")].find((row) => row.textContent?.includes("The idea"))!;
+  const breaks = () => {
+    const found: number[] = [];
+    const walker = document.createTreeWalker(line(), NodeFilter.SHOW_TEXT);
+    let top: number | null = null;
+    let offset = 0;
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      for (let i = 0; i < node.length; i++) {
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const rect = range.getBoundingClientRect();
+        if (!rect.height) continue;
+        if (top !== null && rect.top > top + 4) found.push(offset + i);
+        top = rect.top;
+      }
+      offset += node.length;
+    }
+    return found;
+  };
+  document.querySelector<HTMLElement>(".cm-content")?.focus();
+  const walker = document.createTreeWalker(line(), NodeFilter.SHOW_TEXT);
+  let last: Text | null = null;
+  for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) last = node;
+  if (last) getSelection()?.collapse(last, last.length);
+  await wait(120);
+  let before = breaks();
+  let moved = 0;
+  for (const letter of " and then the writing keeps going with more words so that the line grows and wraps again") {
+    document.execCommand("insertText", false, letter);
+    await wait(25);
+    const after = breaks();
+    const settled = Math.min(before.length, after.length) - 1;
+    for (let i = 0; i < settled; i++) if (Math.abs(after[i] - before[i]) >= 2) moved++;
+    before = after;
+  }
+  check("typing never moves words on the lines above", moved === 0, moved);
+  await reader.editing.finish();
+  await vault.source.trashNote(note);
+  await vault.applyChanges([]);
+}
+
 /** Renaming and deleting folders in the packaged app, where the native commands run. */
 async function checkFolders({ reader, vault, check, until }: SelfTestContext): Promise<void> {
   const inside = "Selftest folder/Inside.md";
@@ -155,6 +209,7 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   await checkDockIcons(ctx);
   await checkEditing(ctx);
   await checkEditPreview(ctx);
+  await checkLinesHoldStill(ctx);
   await checkFolders(ctx);
   const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
   if (sample) {
