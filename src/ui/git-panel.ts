@@ -249,13 +249,11 @@ export class GitPanel {
     root.replaceChildren();
 
     const head = el("header", "sync-head");
-    const title = el("div", "sync-title");
-    title.append(el("span", "", "Sync"));
     const close = el("button", "icon-btn");
     close.setAttribute("aria-label", "Close");
     close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
     close.onclick = () => this.close();
-    head.append(title, close);
+    head.append(close);
     root.append(head);
 
     if (!st?.isRepo) {
@@ -263,15 +261,15 @@ export class GitPanel {
       return;
     }
 
-    const summary = el("div", "sync-summary");
     const remote = el("div", "sync-remote");
     remote.append(
       el("span", "sync-remote-name", remoteName(st.remoteUrl)),
       el("span", "sync-branch", st.branch ?? "detached HEAD"),
     );
     if (st.upstream) remote.append(el("span", "sync-upstream", `tracks ${st.upstream}`));
-    summary.append(remote);
+    head.prepend(remote);
 
+    const summary = el("div", "sync-summary");
     const quiet = !st.ahead && !st.behind && !st.files.length && this.state.kind !== "error";
     if (quiet) {
       const last = this.host.lastSync();

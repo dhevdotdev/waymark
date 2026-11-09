@@ -299,6 +299,11 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
   check("titlebar explains the state", label === (mode === "diverged" ? "Diverged" : "Blocked"), label);
   panel.open();
   await wait(400);
+  const name = document.querySelector(".sync-head .sync-remote-name")?.getBoundingClientRect();
+  const closeButton = document.querySelector(".sync-head .icon-btn")?.getBoundingClientRect();
+  const offset =
+    name && closeButton ? Math.abs(name.top + name.height / 2 - (closeButton.top + closeButton.height / 2)) : Number.NaN;
+  check("the sync panel opens on the repository, level with its close button", offset <= 2, offset);
   const notice = document.querySelector(".sync-sheet .notice strong")?.textContent;
   check("sync panel explains the problem", !!notice, notice);
   check(

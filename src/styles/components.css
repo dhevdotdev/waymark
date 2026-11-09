@@ -955,13 +955,12 @@
 }
 .sync-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
   padding: 12px 12px 4px 18px;
 }
-.sync-title {
-  font-size: 0.875rem;
-  font-weight: 650;
+.sync-head .icon-btn {
+  margin-inline-start: auto;
 }
 .sync-body {
   flex: 1;
@@ -978,6 +977,9 @@
   padding: 6px 18px 14px;
 }
 .sync-remote {
+  flex: 1;
+  min-inline-size: 0;
+  padding-block-start: 4px;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1061,6 +1063,7 @@
 }
 .sync-uptodate::before {
   content: "";
+  margin-inline-start: 3px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
