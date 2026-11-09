@@ -101,10 +101,10 @@ export class VaultIndex {
     const key = fold(wantNote ? stripExt(raw) : raw);
 
     if (key.includes("/")) {
+      const wanted = (file: string) => !wantNote || file.toLowerCase().endsWith(NOTE_EXT);
       const exact = this.byPath.get(key);
-      if (exact) return { kind: "found", path: exact };
-      const suffix = [...this.byPath.entries()].filter(([p]) => p.endsWith(`/${key}`)).map(([, f]) => f);
-      return pick(suffix);
+      if (exact && wanted(exact)) return { kind: "found", path: exact };
+      return pick([...this.byPath.entries()].filter(([p, f]) => p.endsWith(`/${key}`) && wanted(f)).map(([, f]) => f));
     }
 
     const named = (this.byName.get(key) ?? []).filter((f) => f.toLowerCase().endsWith(NOTE_EXT) === wantNote || !wantNote);

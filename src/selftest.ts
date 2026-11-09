@@ -279,13 +279,14 @@ async function runGit(ctx: SelfTestContext, played: string[]): Promise<void> {
   check("Escape closes the sync sheet", !panel.isOpen && !document.querySelector(".sync-overlay"));
 }
 
-async function runCommit({ panel, vault, check, until }: SelfTestContext): Promise<void> {
+async function runCommit({ panel, vault, check, until, wait }: SelfTestContext): Promise<void> {
   await panel.refresh();
   const saved = await vault.save("Written here.md", "# Written here\n", null);
   check("the note is saved", saved.kind === "saved", saved);
   await panel.refresh();
   panel.open();
   await until(() => [...document.querySelectorAll(".sync-sheet .link-btn")].some((b) => b.textContent === "Stage all"));
+  await wait(500);
   const tabsAt = () => Math.round(document.querySelector(".sync-sheet .seg")?.getBoundingClientRect().top ?? -1);
   const seen = new Set([tabsAt()]);
   [...document.querySelectorAll<HTMLElement>(".sync-sheet .link-btn")].find((b) => b.textContent === "Stage all")?.click();

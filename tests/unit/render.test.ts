@@ -24,6 +24,12 @@ describe("renderNote", () => {
     expect(JSON.parse(links[4].getAttribute("data-candidates")!)).toEqual(["Inbox/B.md", "Notes/B.md"]);
   });
 
+  it("embeds an image written with its folder", async () => {
+    const { div } = await render("![[Attachments/pic.png]]");
+    expect(div.querySelector("img.embed-image")?.getAttribute("src")).toContain("pic.png");
+    expect(div.querySelector(".wikilink")).toBeNull();
+  });
+
   it("makes Markdown links inside the vault work like wikilinks", async () => {
     const { div } = await render(
       "[a](../Notes/A.md#Part) [b](B.md) [c](../Nope.md) [d](../Attachments/pic.png) [e](https://x.dev)",
