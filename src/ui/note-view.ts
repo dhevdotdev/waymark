@@ -34,6 +34,10 @@ export class NoteView {
     );
   }
 
+  showBlank(): void {
+    this.showMessage("Nothing open", "Press ⌘K to go to a note, or choose one from Files.");
+  }
+
   showEmptyVault(): void {
     this.showMessage(
       "No Markdown notes here",

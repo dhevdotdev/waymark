@@ -146,7 +146,10 @@ export class Reader {
       onStatusChanged: () => this.inspector.refreshHistory(),
     });
 
-    this.commands = new CommandTable(readerCommands(this), { desktop: isDesktop, hasNote: () => !this.workspace.isEmpty });
+    this.commands = new CommandTable(readerCommands(this), {
+      desktop: isDesktop,
+      hasNote: () => !this.workspace.isEmpty && !this.onBlank,
+    });
     this.palette = new Palette(
       (query) => paletteItems(this, query),
       () => paletteRecent(this),
@@ -198,7 +201,11 @@ export class Reader {
   }
 
   private get onGraph(): boolean {
-    return this.tab.trail.current.view.kind === "graph";
+    return this.tab?.trail.current.view.kind === "graph";
+  }
+
+  get onBlank(): boolean {
+    return this.tab?.trail.current.view.kind === "blank";
   }
 
   private get notePath(): string {
@@ -210,7 +217,7 @@ export class Reader {
 
   async open(path: string, opts: OpenOptions = {}): Promise<void> {
     const view: View = { kind: "note", path };
-    if (opts.newTab) {
+    if (opts.newTab && (opts.focus === false || !this.onBlank)) {
       const tab = this.workspace.addBeside(view);
       this.deps.sound.play("open");
       if (opts.focus === false) {
@@ -245,9 +252,19 @@ export class Reader {
     if (moved) await this.show({ keyboard: true });
   }
 
-  /** A new tab starts on the current note with the palette open, so the next pick replaces it. */
+  /** A new tab starts blank with the palette open. A blank tab that is already open is reused. */
   newTab(): void {
-    void this.open(this.current, { newTab: true, focus: true, keyboard: true }).then(() => this.palette.open());
+    if (this.workspace.isEmpty) return;
+    this.saveScroll();
+    const existing = this.workspace.blankIndex;
+    if (existing >= 0) {
+      this.workspace.activeIndex = existing;
+    } else {
+      this.workspace.addBeside({ kind: "blank" });
+      this.workspace.activeIndex += 1;
+    }
+    void this.show({ keyboard: true });
+    this.palette.open();
   }
 
   switchTab(index: number): void {
@@ -267,12 +284,18 @@ export class Reader {
 
   /** The graph is a tab, as in Obsidian: an open one comes forward, otherwise it opens beside the current tab. */
   openGraph(scope: GraphScope): void {
+    if (this.workspace.isEmpty) return;
     const view: GraphTabView = { kind: "graph", note: this.current, scope };
     const existing = this.workspace.graphIndex;
     this.saveScroll();
     if (existing >= 0) {
       this.workspace.tabs[existing].trail.setCurrentView(view);
       this.workspace.activeIndex = existing;
+      void this.show({ keyboard: true });
+      return;
+    }
+    if (this.onBlank) {
+      this.tab.trail.setCurrentView(view);
       void this.show({ keyboard: true });
       return;
     }
@@ -345,6 +368,7 @@ export class Reader {
     const { structural, changed } = await this.vault.applyChanges(notes);
     this.sync.scheduleRefresh();
     if (this.onGraph) await this.show({ quiet: true });
+    else if (this.onBlank) this.renderTree();
     else if (!this.vault.texts.has(this.current)) this.noteView.showMissing(this.current);
     else if (changed.includes(this.current) || structural) await this.show({ keepScroll: true, quiet: true });
     else {
@@ -385,7 +409,15 @@ export class Reader {
     else if (this.sync.panel.isOpen) this.sync.panel.close();
     else if (shell.matches(".sidebar-peek, .rail-peek")) shell.classList.remove("sidebar-peek", "rail-peek");
     else if (this.sidebar.isSearching && !inField) this.sidebar.showFiles();
+    else if (this.onBlank && !inField) this.dismissBlank();
     else paint("search", []);
+  }
+
+  /** Cancels a new tab: the tab it opened beside comes back, rather than whichever sits to the right. */
+  private dismissBlank(): void {
+    const blank = this.workspace.activeIndex;
+    if (blank > 0) this.workspace.activeIndex = blank - 1;
+    this.closeTab(blank);
   }
 
   persist(): void {
@@ -414,8 +446,9 @@ export class Reader {
     if (wanted?.kind === "found") {
       this.workspace.startWith({ kind: "note", path: wanted.path });
     } else if (saved?.tabs?.length) {
-      this.workspace.restore({ tabs: saved.tabs, active: saved.active ?? 0 }, (view) =>
-        index.notes.includes(view.kind === "note" ? view.path : view.note),
+      this.workspace.restore(
+        { tabs: saved.tabs, active: saved.active ?? 0 },
+        (view) => view.kind !== "blank" && index.notes.includes(view.kind === "note" ? view.path : view.note),
       );
     }
     if (this.workspace.isEmpty) {
@@ -434,6 +467,10 @@ export class Reader {
       return;
     }
     this.closeGraphView();
+    if (entry.view.kind === "blank") {
+      this.showBlank();
+      return;
+    }
     const path = entry.view.path;
     const prevScroll = this.els.scroller.scrollTop;
     let text: string;
@@ -473,6 +510,15 @@ export class Reader {
     if (opts.find) this.noteView.jumpToText(opts.find);
   }
 
+  private showBlank(): void {
+    if (this.find.isOpen) this.find.close();
+    this.noteView.showBlank();
+    paint("search", []);
+    this.renderTabChrome();
+    this.renderTree();
+    this.persist();
+  }
+
   private showGraph(view: GraphTabView, entering?: number): void {
     if (this.find.isOpen) this.find.close();
     this.current = view.note;
@@ -505,10 +551,13 @@ export class Reader {
   }
 
   private renderTree(): void {
-    this.sidebar.renderTree(this.vault.index, this.current);
+    this.sidebar.renderTree(this.vault.index, this.onBlank ? "" : this.current);
   }
 
-  private viewLabel = (view: View): string => (view.kind === "note" ? this.vault.index.title(view.path) : "Graph");
+  private viewLabel = (view: View): string => {
+    if (view.kind === "note") return this.vault.index.title(view.path);
+    return view.kind === "graph" ? "Graph" : "New tab";
+  };
 
   private renderTabs(entering?: number): void {
     renderTabStrip(this.els.tabs, this.workspace, this.viewLabel, entering);
@@ -522,6 +571,7 @@ export class Reader {
     this.renderTabs(entering);
     this.renderTrail();
     shell.classList.toggle("is-graph", this.onGraph);
+    shell.classList.toggle("is-blank", this.onBlank);
     graphButton.classList.toggle("is-on", this.onGraph);
     graphButton.setAttribute("aria-pressed", String(this.onGraph));
     back.disabled = !trail.canBack;
