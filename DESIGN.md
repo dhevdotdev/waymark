@@ -92,6 +92,7 @@ The rules come from Emil Kowalski's animation standards, good-css.com, Impeccabl
 - Following a link with the pointer fades the new page in over 180ms, with no movement.
 - Popovers scale from their trigger, while sheets and the lightbox stay centred. Toasts rise and stay interruptible because they are transitions, not keyframes.
 - Collapsed callouts and sidebar groups open by animating grid rows, so the content keeps its height and nothing jumps.
+- While writing, each key press can make a quiet synthesised click, with deeper sounds for space and return. Held keys and shortcuts stay silent, and it has its own switch in settings.
 - Sound is a small synthesised palette: copy, a new background tab, sync finished, incoming changes, commit, push, and a problem. Each cue has a 900ms cooldown, so repeated actions never pile up. Nothing plays for clicks, scrolling, typing or background fetches. One toggle mutes everything.
 
 ## Polish review

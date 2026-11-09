@@ -156,6 +156,15 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "audio mute",
       run: () => applySound(prefs, deps.sound, !prefs.value.sound),
     },
+    {
+      id: "typing-sounds",
+      label: () => (prefs.value.typingSounds ? "Turn off typing sounds" : "Turn on typing sounds"),
+      keywords: "mechanical keyboard click audio",
+      run: () =>
+        prefs.update((p) => {
+          p.typingSounds = !p.typingSounds;
+        }),
+    },
     { id: "text-bigger", label: "Make text larger", keys: ["mod+=", "mod+shift+="], hint: "⌘+", run: () => scaleText(1) },
     { id: "text-smaller", label: "Make text smaller", keys: ["mod+-"], hint: "⌘−", run: () => scaleText(-1) },
     { id: "text-reset", label: "Reset text size", keys: ["mod+0"], hint: "⌘0", run: () => scaleText(0) },

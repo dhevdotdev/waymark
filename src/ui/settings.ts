@@ -36,6 +36,7 @@ function template(p: Prefs, scheme: Scheme): string {
     <div class="pop-section"><div class="pop-label">Appearance</div><div class="seg seg-full">${appearances}</div></div>
     <div class="pop-section pop-toggles">
       ${toggle("Sounds for sync, copy and new tabs", "sound", p.sound)}
+      ${toggle("Mechanical keys while writing", "typingSounds", p.typingSounds)}
       ${
         isDesktop
           ? `${toggle("Check the remote on launch", "syncOnLaunch", p.syncOnLaunch)}
@@ -98,6 +99,11 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   pop.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.dataset.pref === "sound") host.setSound(input.checked);
+    if (input.dataset.pref === "typingSounds") {
+      host.prefs.update((p) => {
+        p.typingSounds = input.checked;
+      });
+    }
     if (input.dataset.pref === "syncOnLaunch") {
       host.prefs.update((p) => {
         p.syncOnLaunch = input.checked;

@@ -6,7 +6,7 @@ import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { resolveColor } from "./colors";
 import { type Metrics, Reader } from "./reader";
-import { Sound } from "./sound";
+import { keystrokeOf, Sound } from "./sound";
 import { showWelcome } from "./welcome";
 
 const MAX_RECENT_VAULTS = 8;
@@ -36,6 +36,7 @@ export class App {
     this.prefs.ephemeral = override !== undefined;
     await this.prefs.load();
     this.sound.muted = !this.prefs.value.sound;
+    window.addEventListener("keydown", (e) => this.soundKeyPress(e), true);
     this.applyTheme();
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     window.addEventListener("keydown", (e) => this.reader?.handleKey(e), true);
@@ -167,6 +168,12 @@ export class App {
       this.reader?.rerender();
       this.reader?.editing.redrawCode();
     });
+  }
+
+  private soundKeyPress(e: KeyboardEvent): void {
+    if (!this.prefs.value.typingSounds || !(e.target as Element).closest?.(".doc-editing")) return;
+    const stroke = keystrokeOf(e);
+    if (stroke) this.sound.keystroke(stroke);
   }
 
   /** The window shows its own colour in newly exposed space while it grows, before the page has resized. */

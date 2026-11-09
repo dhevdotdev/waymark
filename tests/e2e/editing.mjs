@@ -476,6 +476,54 @@ try {
   await page.keyboard.press("Meta+e");
   await pause(200);
 
+  await openNote("Tasks");
+  await page.evaluate(() => {
+    window.typed = [];
+    window.waymark.sound.onPlay = (sound) => window.typed.push(sound);
+  });
+  const sounds = () => page.evaluate(() => window.typed.splice(0));
+  await page.keyboard.type("x");
+  check("typing while reading is silent", (await sounds()).length === 0);
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(200);
+  await sounds();
+  await page.keyboard.type("a b");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Backspace");
+  check("typing makes a key sound for each press", (await sounds()).join() === "key,space,key,return,delete");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Meta+b");
+  check("navigation and shortcuts are silent", (await sounds()).length === 0);
+  const rendered = await page.evaluate(async () => {
+    const render = async (stroke) => {
+      const ctx = new OfflineAudioContext(1, 44100 * 0.25, 44100);
+      window.waymark.sound.keystroke(stroke, ctx);
+      const samples = (await ctx.startRendering()).getChannelData(0);
+      let sounding = samples.length - 1;
+      while (sounding > 0 && Math.abs(samples[sounding]) < 0.001) sounding--;
+      let crossings = 0;
+      for (let i = 1; i <= sounding; i++) if (samples[i] > 0 !== samples[i - 1] > 0) crossings++;
+      const pitch = crossings / sounding;
+      return { peak: Math.max(...samples.map(Math.abs)), tail: Math.max(...samples.slice(44100 * 0.1).map(Math.abs)), pitch };
+    };
+    return { key: await render("key"), space: await render("space") };
+  });
+  check("a key press is audible and not loud", rendered.key.peak > 0.02 && rendered.key.peak < 0.4, JSON.stringify(rendered.key));
+  check("it ends within a tenth of a second", rendered.key.tail < 0.0005 && rendered.space.tail < 0.0005);
+  check("the space bar sounds deeper than a letter", rendered.space.pitch < rendered.key.pitch, JSON.stringify(rendered));
+  await sounds();
+  await page.evaluate(() => {
+    window.waymark.sound.muted = true;
+  });
+  await page.keyboard.type("q");
+  check("muting sounds silences typing", (await sounds()).length === 0);
+  await page.evaluate(() => {
+    window.waymark.sound.muted = false;
+  });
+  await page.keyboard.press("Meta+e");
+  await pause(200);
+
   await openNote("Broken blocks");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-preview-block .diagram.is-error", { timeout: 15000 });
