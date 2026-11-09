@@ -119,14 +119,12 @@ export class Palette {
     this.list.replaceChildren();
     let group = "";
     top.forEach(({ item, m }, i) => {
-      if (item.group !== group && (!needle || commandsOnly || i === 0 || top[i - 1].item.group !== item.group)) {
+      if (!needle && item.group !== group) {
         group = item.group;
-        if (!needle || top.some((x) => x.item.group !== top[0].item.group)) {
-          const h = document.createElement("div");
-          h.className = "palette-group";
-          h.textContent = item.group;
-          this.list.append(h);
-        }
+        const h = document.createElement("div");
+        h.className = "palette-group";
+        h.textContent = item.group;
+        this.list.append(h);
       }
       const row = document.createElement("div");
       row.className = "palette-row";

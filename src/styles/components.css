@@ -265,7 +265,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: min(560px, 72vh);
+  height: min(460px, 72vh);
 }
 .palette-field {
   display: flex;
@@ -297,6 +297,8 @@
   color: var(--ink-3);
 }
 .palette-list {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 6px;
   scrollbar-width: thin;

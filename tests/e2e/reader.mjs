@@ -228,6 +228,33 @@ await page.keyboard.press("Enter");
 await pause(500);
 check("palette opens the note", (await title()).startsWith("Tide charts"));
 
+await page.keyboard.press("Meta+k");
+await pause(150);
+const paletteSizeFor = async (query) => {
+  await page.fill(".palette input", query);
+  await pause(120);
+  return page.evaluate(() => ({
+    height: document.querySelector(".palette").getBoundingClientRect().height,
+    firstRow: document.querySelector(".palette-row")?.getBoundingClientRect().top ?? null,
+    headings: document.querySelectorAll(".palette-group").length,
+  }));
+};
+const paletteSizes = [];
+for (const query of ["", "show", "tide", "a", "zzzzqqq"]) paletteSizes.push(await paletteSizeFor(query));
+check(
+  "the palette keeps one height while typing",
+  new Set(paletteSizes.map((s) => s.height)).size === 1,
+  JSON.stringify(paletteSizes),
+);
+const typedRows = paletteSizes.slice(1, 4);
+check(
+  "results start at the same place whatever matched",
+  new Set(typedRows.map((s) => s.firstRow)).size === 1 && typedRows.every((s) => s.headings === 0),
+  JSON.stringify(typedRows),
+);
+await page.keyboard.press("Escape");
+await pause(200);
+
 // Full-text search jumps to the matching passage
 await page.keyboard.press("Meta+Shift+f");
 await page.waitForSelector(".search-field input:visible");
