@@ -13,7 +13,7 @@ import {
 import { EditorView, keymap, placeholder, showTooltip, type Tooltip, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
 import { findPanel } from "./editor-find";
-import { editorInsert, type InsertOptions } from "./editor-insert";
+import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
@@ -275,6 +275,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         })),
         clickHandlers(options),
         keymap.of([
+          { key: "Mod-Shift-v", run: pastePlain },
           { key: "Mod-b", run: (v) => wrap(v, "**") },
           { key: "Mod-i", run: (v) => wrap(v, "*") },
           ...searchKeymap.filter((binding) => binding.key === "Escape" || binding.key === "Mod-g"),

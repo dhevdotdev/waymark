@@ -1,5 +1,6 @@
 import { native } from "../platform";
 import { ancestors } from "../vault/tree";
+import { type Bookmark, currentHeading } from "./bookmarks";
 import { type Command, labelOf } from "./commands";
 import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
@@ -48,6 +49,24 @@ export function readerCommands(r: Reader): Command[] {
     },
     { id: "new-note", label: "New note", keys: ["mod+n"], hint: "⌘N", inField: true, run: () => void r.files.newNote() },
     { id: "new-folder", label: "New folder", run: () => void r.files.newFolder() },
+    {
+      id: "bookmark-note",
+      label: "Bookmark this note",
+      keywords: "save star favourite remove",
+      needsNote: true,
+      run: () => r.bookmarks.toggle({ path: r.current }),
+    },
+    {
+      id: "bookmark-heading",
+      label: "Bookmark the current heading",
+      keywords: "save star section",
+      needsNote: true,
+      run: () => {
+        const heading = currentHeading(r.els.scroller);
+        if (heading) r.bookmarks.toggle({ path: r.current, heading });
+        else toast("There is no heading here to bookmark.");
+      },
+    },
     { id: "collapse-folders", label: "Collapse all folders", run: () => r.sidebar.tree.collapseAll() },
     {
       id: "rename-note",
@@ -245,6 +264,18 @@ function commandItem(command: Command): PaletteItem {
   };
 }
 
+function bookmarkItem(r: Reader, bookmark: Bookmark): PaletteItem {
+  const missing = r.bookmarks.isMissing(bookmark);
+  return {
+    id: `bookmark:${bookmark.path}#${bookmark.heading ?? ""}`,
+    label: r.bookmarks.label(bookmark),
+    detail: missing ? "Missing" : ancestors(bookmark.path).at(-1),
+    group: "Bookmarks",
+    keywords: bookmark.path,
+    run: ({ newTab }) => r.bookmarks.open(bookmark, newTab),
+  };
+}
+
 function noteItem(r: Reader, path: string, group: string): PaletteItem {
   return {
     id: path,
@@ -259,7 +290,9 @@ function noteItem(r: Reader, path: string, group: string): PaletteItem {
 export function paletteItems(r: Reader, query: string): PaletteItem[] {
   const commands = r.commands.listed().map(commandItem);
   if (query.startsWith(">")) return commands;
-  return [...r.vault.index.notes.map((p) => noteItem(r, p, "Notes")), ...commands];
+  const headings = r.bookmarks.list.filter((b) => b.heading).map((b) => bookmarkItem(r, b));
+  const notes = [...r.vault.index.notes, ...r.vault.index.bases].map((p) => noteItem(r, p, "Notes"));
+  return [...headings, ...notes, ...commands];
 }
 
 /** Notes visited in any open tab, then the commands used most. */
@@ -273,5 +306,6 @@ export function paletteRecent(r: Reader): PaletteItem[] {
       items.push(noteItem(r, view.path, "Recent"));
     }
   }
-  return [...items.slice(0, RECENT_NOTES), ...r.commands.listed().slice(0, RECENT_COMMANDS).map(commandItem)];
+  const bookmarks = r.bookmarks.list.slice(0, RECENT_NOTES).map((b) => bookmarkItem(r, b));
+  return [...bookmarks, ...items.slice(0, RECENT_NOTES), ...r.commands.listed().slice(0, RECENT_COMMANDS).map(commandItem)];
 }

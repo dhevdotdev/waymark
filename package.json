@@ -9,7 +9,7 @@
     "size": "vite build --logLevel error && node scripts/check-bundle.mjs",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs && node tests/e2e/editing.mjs && node tests/e2e/note-files.mjs",
+    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs && node tests/e2e/editing.mjs && node tests/e2e/note-files.mjs && node tests/e2e/recovery.mjs && node tests/e2e/backup.mjs && node tests/e2e/library.mjs",
     "test:sweep": "node tests/e2e/sweep.mjs",
     "test:visual": "node tests/e2e/visual.mjs",
     "install:app": "node scripts/install-app.mjs",
@@ -50,7 +50,8 @@
     "markdown-it-texmath": "^1.0.0",
     "mermaid": "^12.3.0",
     "minisearch": "^7.2.0",
-    "shiki": "^4.6.0"
+    "shiki": "^4.6.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

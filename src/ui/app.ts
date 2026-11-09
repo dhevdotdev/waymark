@@ -31,9 +31,9 @@ export class App {
     return this.requireReader().open(path);
   }
 
-  async start(devSource?: VaultSource, initial?: string, override?: string): Promise<void> {
+  async start(devSource?: VaultSource, initial?: string, override?: string, keepPrefs = false): Promise<void> {
     const t0 = performance.now();
-    this.prefs.ephemeral = override !== undefined;
+    this.prefs.ephemeral = override !== undefined && !keepPrefs;
     await this.prefs.load();
     this.sound.muted = !this.prefs.value.sound;
     window.addEventListener("keydown", (e) => this.soundKey(e, true), true);
@@ -44,11 +44,13 @@ export class App {
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     window.addEventListener("keydown", (e) => this.reader?.handleKey(e), true);
     window.addEventListener("beforeunload", () => {
+      this.reader?.spots.record();
       this.reader?.persist();
       void this.prefs.flush();
     });
     if (isDesktop) await native.onVaultChanged((paths) => void this.reader?.onVaultChanged(paths));
     await native.saveBeforeQuit(async () => {
+      this.reader?.spots.record();
       await this.reader?.editing.close();
       this.reader?.persist();
       await this.prefs.flush();

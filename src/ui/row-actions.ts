@@ -4,7 +4,7 @@ export interface RowAction {
   run: (button: HTMLElement) => void;
 }
 
-const ROWS = ".nav-item[data-path], .tree-head[data-folder]";
+const ROWS = ".nav-item[data-path], .nav-item[data-bookmark], .tree-head[data-folder]";
 const INSET = 3;
 
 /** The buttons on the file tree row under the pointer or keyboard, kept as one set so hundreds of rows carry none of their own. */

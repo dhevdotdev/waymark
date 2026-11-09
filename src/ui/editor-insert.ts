@@ -5,9 +5,13 @@ import {
   type CompletionResult,
   startCompletion,
 } from "@codemirror/autocomplete";
+import { isolateHistory } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
 import { EditorSelection, type EditorState, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { native } from "../platform";
+import { frontmatterEnd } from "./live-preview";
+import { htmlToMarkdown, isCodeEditorCopy } from "./paste-html";
 import { focusTableAt } from "./table-editor";
 
 export interface LinkOption {
@@ -263,6 +267,44 @@ function linkSource(options: InsertOptions) {
 
 const URL_ONLY = /^https?:\/\/\S+$/;
 
+function insertAsOneStep(view: EditorView, text: string): void {
+  view.dispatch({
+    ...view.state.replaceSelection(text),
+    annotations: isolateHistory.of("full"),
+    scrollIntoView: true,
+    userEvent: "input.paste",
+  });
+}
+
+/** Keeps blocks on their own lines when they land in the middle of existing text. */
+function padded(view: EditorView, markdown: string): string {
+  const { from, to } = view.state.selection.main;
+  if (!/\n\n|^(#{1,6} |[-*] |\d+\. |> |\||```)/.test(markdown)) return markdown;
+  const before = view.state.sliceDoc(view.state.doc.lineAt(from).from, from);
+  const after = view.state.sliceDoc(to, view.state.doc.lineAt(to).to);
+  return `${before.trim() ? "\n\n" : ""}${markdown}${after.trim() ? "\n\n" : ""}`;
+}
+
+function pasteHtml(event: ClipboardEvent, view: EditorView): boolean {
+  const html = event.clipboardData?.getData("text/html");
+  if (!html || view.state.selection.main.from < frontmatterEnd(view.state)) return false;
+  if (inCode(view.state, view.state.selection.main.from)) return false;
+  if (isCodeEditorCopy([...(event.clipboardData?.types ?? [])], html)) return false;
+  const markdown = htmlToMarkdown(html);
+  if (!markdown) return false;
+  event.preventDefault();
+  insertAsOneStep(view, padded(view, markdown));
+  return true;
+}
+
+/** ⌘⇧V: the clipboard's plain text, ignoring anything richer it also holds. */
+export function pastePlain(view: EditorView): boolean {
+  void native.clipboardText().then((text) => {
+    if (text) insertAsOneStep(view, text.replace(/\r\n/g, "\n"));
+  });
+  return true;
+}
+
 function fileHandlers(options: InsertOptions): Extension {
   return EditorView.domEventHandlers({
     paste(event, view) {
@@ -274,7 +316,7 @@ function fileHandlers(options: InsertOptions): Extension {
       }
       const text = event.clipboardData?.getData("text/plain").trim() ?? "";
       const { from, to, empty } = view.state.selection.main;
-      if (empty || !URL_ONLY.test(text)) return false;
+      if (empty || !URL_ONLY.test(text)) return pasteHtml(event, view);
       event.preventDefault();
       view.dispatch({
         changes: [

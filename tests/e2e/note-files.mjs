@@ -193,7 +193,7 @@ try {
   await page.keyboard.type("/");
   await pause(300);
   check("typing / opens the insert menu", await page.locator(".cm-tooltip-autocomplete").isVisible());
-  const offered = await page.locator(".cm-tooltip-autocomplete li").allTextContents();
+  const offered = await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents();
   check(
     "it offers tables",
     offered.some((o) => o.startsWith("Table")),
@@ -231,7 +231,7 @@ try {
   await pause(300);
   check(
     "menu items can be found by other words",
-    (await page.locator(".cm-tooltip-autocomplete li").allTextContents()).some((o) => o.startsWith("Task")),
+    (await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents()).some((o) => o.startsWith("Task")),
   );
   await page.keyboard.press("Enter");
   await page.keyboard.type("todo");
@@ -241,7 +241,9 @@ try {
   await pause(300);
   check(
     "blocks that need a whole line are not offered above existing text",
-    !(await page.locator(".cm-tooltip-autocomplete li").allTextContents()).some((o) => o.startsWith("Code block")),
+    !(await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents()).some((o) =>
+      o.startsWith("Code block"),
+    ),
   );
   await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
@@ -254,7 +256,7 @@ try {
   await pause(100);
   await page.keyboard.type("words /");
   await pause(300);
-  const midLine = await page.locator(".cm-tooltip-autocomplete li").allTextContents();
+  const midLine = await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents();
   check(
     "mid-sentence, only inline items are offered",
     !midLine.some((o) => o.startsWith("Table")) && midLine.some((o) => o.startsWith("Web link")),
@@ -274,7 +276,7 @@ try {
   await pause(350);
   check(
     "# offers that note's headings",
-    (await page.locator(".cm-tooltip-autocomplete li").first().textContent()).includes("Part"),
+    (await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").first().textContent()).includes("Part"),
   );
   await page.keyboard.press("Enter");
   await saved();

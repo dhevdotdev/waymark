@@ -1,4 +1,4 @@
-import type { VaultIndex } from "../vault/index";
+import { isBaseFile, type VaultIndex } from "../vault/index";
 import { ancestors, buildTree, type TreeFolder } from "../vault/tree";
 import { icons } from "./icons";
 
@@ -11,6 +11,8 @@ export class FileTree {
   private readonly notes = new Map<string, HTMLElement>();
   private builtFor: VaultIndex | null = null;
   private current = "";
+  /** Shown above the folders. */
+  leading: HTMLElement | null = null;
 
   constructor(
     private readonly box: HTMLElement,
@@ -29,7 +31,8 @@ export class FileTree {
       this.notes.clear();
       const tree = document.createElement("div");
       tree.className = "tree";
-      tree.append(...this.children(buildTree(index.notes), 0, index));
+      if (this.leading) tree.append(this.leading);
+      tree.append(...this.children(buildTree([...index.notes, ...index.bases]), 0, index));
       const keep = this.box.scrollTop;
       this.box.replaceChildren(tree);
       this.box.scrollTop = keep;
@@ -116,7 +119,7 @@ export class FileTree {
     row.dataset.path = path;
     row.dataset.tip = title;
     row.style.setProperty("--d", String(Math.max(0, depth - 1)));
-    row.innerHTML = treeIcon(icons.note);
+    row.innerHTML = treeIcon(isBaseFile(path) ? icons.table : icons.note);
     const label = document.createElement("span");
     label.className = "nav-text";
     label.textContent = title;

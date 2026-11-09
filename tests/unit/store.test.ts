@@ -5,6 +5,9 @@ import { VaultStore } from "../../src/vault/store";
 function source(files: Record<string, string>) {
   const reads: string[] = [];
   const fake: VaultSource = {
+    settings: async () => ({ attachmentFolder: "", newNoteLocation: "", newNoteFolder: "", ignoreFilters: [] }),
+    keepInTrash: async () => {},
+    fileStats: async () => ({}),
     list: async () => Object.keys(files),
     readText: async (path) => {
       reads.push(path);

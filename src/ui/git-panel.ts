@@ -1,7 +1,7 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import type { PrefStore } from "../prefs";
-import { renderDiff } from "./diff";
-import { EXPLAIN, el, openSheet, relative, remoteName, WorkIndicator } from "./git-panel-parts";
+import { GitDetail } from "./git-detail";
+import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
 import { plural } from "./plural";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
@@ -19,6 +19,12 @@ export interface GitHost {
   onStatus(status: GitStatus | null, state: SyncState): void;
   renderNoteAt(markdown: string, path: string, into: HTMLElement): Promise<void>;
   title(path: string): string;
+  lastBackup(): { at: number; reached: boolean } | null;
+  backupOn(): boolean;
+  /** Resolves once no backup is running. */
+  backupDone(): Promise<void>;
+  /** Writes the text of a past version over a note. */
+  restoreVersion(path: string, text: string, when: string): Promise<void>;
 }
 
 export type SyncState = { kind: "idle" } | { kind: "busy"; label: string } | { kind: "error"; error: GitError };
@@ -30,6 +36,7 @@ const SHEET_EXIT_MS = 180;
  * (stage, commit, push, update) is an explicit button press.
  */
 export class GitPanel {
+  readonly detail: GitDetail;
   status: GitStatus | null = null;
   state: SyncState = { kind: "idle" };
   private root: HTMLElement | null = null;
@@ -41,8 +48,16 @@ export class GitPanel {
   private busy = false;
   private message: string | null = null;
   private readonly work = new WorkIndicator();
+  /** Outlives routine background checks, which would otherwise wipe it from the indicator. A manual action clears it. */
+  private backupProblem: GitError | null = null;
 
-  constructor(private host: GitHost) {}
+  constructor(private host: GitHost) {
+    this.detail = new GitDetail(
+      host,
+      () => this.status,
+      () => this.historyPath,
+    );
+  }
 
   get isOpen(): boolean {
     return this.root !== null;
@@ -67,6 +82,7 @@ export class GitPanel {
   ): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;
+    await this.host.backupDone();
     const before = this.status;
     this.state = { kind: "busy", label };
     this.work.start(label, () => {
@@ -76,7 +92,7 @@ export class GitPanel {
     try {
       const now = await op();
       this.status = now;
-      this.state = { kind: "idle" };
+      this.state = this.backupProblem ? { kind: "error", error: this.backupProblem } : { kind: "idle" };
       after?.(before, now);
       return true;
     } catch (err) {
@@ -97,6 +113,16 @@ export class GitPanel {
     }
   }
 
+  /** Shows how a backup ended, without touching anything a manual action has started since. */
+  backupFinished(problem: GitError | null): void {
+    this.backupProblem = problem;
+    if (this.state.kind === "busy") return;
+    if (problem) this.state = { kind: "error", error: problem };
+    else if (this.state.kind === "error") this.state = { kind: "idle" };
+    this.host.onStatus(this.status, this.state);
+    if (this.root) this.render();
+  }
+
   /** Fetch only. Used for launch and background checks; never changes files. */
   async fetch(quiet = false): Promise<boolean> {
     return this.run(
@@ -111,6 +137,7 @@ export class GitPanel {
 
   /** The deliberate sync: fetch, then fast-forward if that is safe. */
   async sync(): Promise<void> {
+    this.backupProblem = null;
     if (!(await this.readyForGit())) return;
     const fetched = await this.fetch(true);
     if (!fetched || !this.status) return;
@@ -159,6 +186,7 @@ export class GitPanel {
    * anything that would need a merge stops here with nothing committed.
    */
   async commitAndSync(message: string, publish = true): Promise<void> {
+    this.backupProblem = null;
     if (!(await this.readyForGit())) return;
     const hasRemote = Boolean(this.status?.upstream);
     let online = hasRemote;
@@ -303,6 +331,8 @@ export class GitPanel {
       fact("Last checked", relative(this.host.lastSync()));
       summary.append(facts);
     }
+    const backup = this.backupLine();
+    if (backup) summary.append(backup);
 
     const actions = el("div", "sync-actions");
     const btn = (label: string, primary: boolean, enabled: boolean, onClick: () => void, hint?: string) => {
@@ -363,6 +393,16 @@ export class GitPanel {
       box?.focus({ preventScroll: true });
       box?.setSelectionRange(typing.selectionStart, typing.selectionEnd);
     }
+  }
+
+  /** When the last backup ran and whether it got as far as the remote. Present only once backups are in use. */
+  private backupLine(): HTMLElement | null {
+    const last = this.host.lastBackup();
+    if (!last && !this.host.backupOn()) return null;
+    const text = last
+      ? `Backed up ${relative(last.at)}, ${last.reached ? "on the remote" : "not on the remote yet"}`
+      : "Backup is on. The first one runs within 10 minutes.";
+    return el("p", last && !last.reached ? "sync-backup is-waiting" : "sync-backup", text);
   }
 
   private explain(error: GitError): HTMLElement {
@@ -444,7 +484,7 @@ export class GitPanel {
       el("span", "", base.replace(/\.md$/, "")),
       el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")),
     );
-    name.onclick = () => void this.showWorktreeDiff(f, isStaged);
+    name.onclick = () => void this.detail.showWorktreeDiff(f, isStaged);
     const act = el("button", "icon-btn change-act");
     act.setAttribute("aria-label", isStaged ? `Unstage ${base}` : `Stage ${base}`);
     act.innerHTML = isStaged
@@ -460,7 +500,11 @@ export class GitPanel {
   private renderChanges(body: HTMLElement, st: GitStatus): void {
     if (!st.files.length) {
       const empty = el("div", "empty-state");
-      empty.append(el("strong", "", "Nothing to commit"), el("p", "", "Notes you edit appear here, ready to commit."));
+      const diverged = st.ahead > 0 && st.behind > 0;
+      empty.append(
+        el("strong", "", diverged ? EXPLAIN.diverged.title : "Nothing to commit"),
+        el("p", "", diverged ? EXPLAIN.diverged.body : "Notes you edit appear here, ready to commit."),
+      );
       body.append(empty);
       return;
     }
@@ -583,67 +627,10 @@ export class GitPanel {
       const meta = el("span", "commit-meta");
       meta.append(el("span", "", c.author), el("span", "", relative(c.date)), el("code", "", c.short));
       b.append(meta);
-      b.onclick = () => void this.showCommit(c);
+      b.onclick = () => void this.detail.showCommit(c);
       li.append(b);
       list.append(li);
     }
     body.append(list);
-  }
-
-  private diffView(text: string, emptyMessage?: string): HTMLElement {
-    const { prefs } = this.host;
-    return renderDiff(text, {
-      emptyMessage,
-      wrapped: prefs.value.diffWrap,
-      onWrapChange: (wrapped) =>
-        prefs.update((p) => {
-          p.diffWrap = wrapped;
-        }),
-    });
-  }
-
-  async showWorktreeDiff(f: FileChange, staged: boolean): Promise<void> {
-    try {
-      const text = await git.diff(f.path, staged, f.unstaged === "?" && !staged);
-      openSheet(
-        `${f.path}`,
-        staged ? "Staged changes" : f.unstaged === "?" ? "New file" : "Unstaged changes",
-        this.diffView(text),
-      );
-    } catch (err) {
-      this.host.toast((err as Error).message);
-    }
-  }
-
-  /** Shows one commit: limited to a note's changes when `notePath` is given, with a way to read or compare that version. */
-  async showCommit(c: Commit, notePath: string | null = this.historyPath): Promise<void> {
-    const path = notePath ? (c.path ?? notePath) : null;
-    try {
-      const text = await git.show(c.sha, path);
-      const content = el("div");
-      if (path?.endsWith(".md")) {
-        const bar = el("div", "sheet-actions");
-        const read = el("button", "btn btn-small", "Read this version");
-        read.onclick = async () => {
-          const md = await git.fileAt(c.sha, path);
-          const doc = el("article", "doc is-revision");
-          await this.host.renderNoteAt(md, path, doc);
-          openSheet(this.host.title(path), `As of ${new Date(c.date).toLocaleString()} · ${c.short} · read-only`, doc);
-        };
-        const cmp = el("button", "btn btn-small", "Compare with current");
-        cmp.onclick = async () => {
-          const head = this.status?.head;
-          if (!head) return;
-          const d = await git.diffRevs(c.sha, head, path);
-          openSheet(this.host.title(path), `${c.short} → current`, this.diffView(d, "Identical to the current version."));
-        };
-        bar.append(read, cmp);
-        content.append(bar);
-      }
-      content.append(this.diffView(text, "This commit changed no file contents."));
-      openSheet(c.subject || c.short, `${c.author} · ${new Date(c.date).toLocaleString()} · ${c.short}`, content);
-    } catch (err) {
-      this.host.toast((err as Error).message);
-    }
   }
 }

@@ -32,7 +32,7 @@
   font-weight: 600;
   line-height: var(--leading-tight);
   letter-spacing: -0.006em;
-  padding-block-start: 20px;
+  padding-block-start: 24px;
 }
 .doc-editing .cm-h1 {
   font-size: 1.75rem;
@@ -49,6 +49,7 @@
   font-weight: 620;
 }
 .doc-editing .cm-h3 {
+  padding-block-start: 12px;
   font-size: var(--text-h3);
   line-height: 1.35;
 }
@@ -87,16 +88,14 @@
 .doc-editing .cm-code-first {
   border-start-start-radius: var(--r-control);
   border-start-end-radius: var(--r-control);
-  padding-block-start: 0.5rem;
   font-size: 11px;
-  line-height: 18px;
+  line-height: 14px;
 }
 .doc-editing .cm-code-last {
   border-end-start-radius: var(--r-control);
   border-end-end-radius: var(--r-control);
-  padding-block-end: 0.5rem;
   font-size: 11px;
-  line-height: 12px;
+  line-height: 14px;
 }
 .doc-editing .cm-hang {
   display: inline-block;
@@ -169,7 +168,6 @@
 }
 .cm-table-widget {
   position: relative;
-  padding-block: var(--s2) var(--s5);
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
@@ -371,8 +369,8 @@
   font-family: var(--font-ui);
 }
 .doc-editing .cm-panels .findbar {
-  inset-block-start: 0;
-  inset-inline-end: 0;
+  position: fixed;
+  inline-size: min(432px, 100%);
   flex-direction: column;
   align-items: stretch;
   padding: 4px;
@@ -435,7 +433,7 @@
   background: color-mix(in oklab, var(--accent) 26%, transparent);
 }
 .doc-editing .cm-searchMatch-selected {
-  background: color-mix(in oklab, var(--accent) 48%, transparent);
+  background: color-mix(in oklab, var(--accent) 38%, transparent);
 }
 .edit-banner {
   flex: 1;
@@ -750,7 +748,7 @@ button.task-box:focus-visible {
 .cm-embed-image {
   display: block;
   max-inline-size: 100%;
-  max-block-size: 480px;
+  max-block-size: min(80vh, 900px);
   margin-block: 0.4em;
   border-radius: var(--r-control);
   text-indent: 0;
@@ -937,7 +935,7 @@ button.task-box:focus-visible {
   font-weight: 620;
 }
 .doc-editing .cm-callout-last {
-  padding-block-end: 12px;
+  padding-block-end: 15px;
   border-end-start-radius: var(--r-block);
   border-end-end-radius: var(--r-block);
 }
@@ -949,7 +947,7 @@ button.task-box:focus-visible {
   block-size: 22px;
   border-radius: var(--r-chip);
   background: var(--fill);
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   line-height: 1;
@@ -958,4 +956,43 @@ button.task-box:focus-visible {
   .doc-editing .cm-preview-block .diagram {
     margin-inline: -62px;
   }
+  .cm-embed-image {
+    position: relative;
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    max-inline-size: calc(100% + 124px);
+  }
+}
+
+.doc-editing .cm-blank {
+  line-height: 16px;
+}
+.doc-editing .cm-blank:has(+ :is(.cm-code-first, .cm-table-widget, .cm-callout-first, .cm-preview-block)),
+.doc-editing :is(.cm-code-last, .cm-table-widget, .cm-callout-last, .cm-preview-block) + .cm-blank {
+  line-height: 24px;
+}
+.doc-editing .cm-blank:has(+ :is(.cm-h1, .cm-h2, .cm-h3, .cm-h4)) {
+  line-height: 16px;
+}
+.doc-editing .cm-h2 + .cm-blank {
+  line-height: 12px;
+}
+.doc-editing .cm-h3 + .cm-blank {
+  line-height: 8px;
+}
+.doc-editing .cm-list-line + .cm-list-line {
+  padding-block-start: 5.7px;
+}
+
+.doc-editing .cm-callout-mark {
+  display: contents;
+}
+.doc-editing .cm-callout-mark .callout-icon {
+  display: inline-block;
+  margin-inline-end: 8px;
+  vertical-align: -2px;
+}
+
+.context-item.is-danger {
+  color: var(--danger-ink);
 }

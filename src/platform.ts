@@ -1,4 +1,4 @@
-import type { VaultSettings, VaultSource, WriteOutcome } from "./vault/source";
+import type { FileStat, VaultSettings, VaultSource, WriteOutcome } from "./vault/source";
 
 export const isDesktop = "__TAURI_INTERNALS__" in window;
 
@@ -12,6 +12,7 @@ export type GitErrorKind =
   | "noUpstream"
   | "inProgress"
   | "timeout"
+  | "noteConflict"
   | "other";
 
 export class GitError extends Error {
@@ -52,6 +53,14 @@ export interface Commit {
   path: string | null;
 }
 
+export interface BackupReport {
+  outcome: "locked" | "nothing" | "ran";
+  committed: boolean;
+  pushed: boolean;
+  problem: { kind: GitErrorKind; message: string } | null;
+  status: GitStatus;
+}
+
 export interface VaultInfo {
   root: string;
   name: string;
@@ -80,6 +89,7 @@ async function call<T>(cmd: string, args?: InvokeBody, options?: InvokeOptions):
 export const native = {
   openVault: (path: string) => call<VaultInfo>("open_vault", { path }),
   reveal: (path?: string) => call<void>("reveal", { path }),
+  clipboardText: () => (isDesktop ? call<string>("clipboard_text") : navigator.clipboard.readText()),
   setDockIcon: (family: string) => call<void>("set_dock_icon", { family }),
   async setWindowColor(color: [number, number, number]): Promise<void> {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -130,6 +140,7 @@ export const git = {
   stage: (paths: string[]) => call<GitStatus>("git_stage", { paths }),
   unstage: (paths: string[]) => call<GitStatus>("git_unstage", { paths }),
   commit: (message: string) => call<GitStatus>("git_commit", { message }),
+  backup: (message: string) => call<BackupReport>("git_backup", { message }),
   diff: (path: string, staged: boolean, untracked: boolean) => call<string>("git_diff", { path, staged, untracked }),
   log: (path: string | null, limit = 50, skip = 0) => call<Commit[]>("git_log", { path, limit, skip }),
   show: (sha: string, path: string | null) => call<string>("git_show", { sha, path }),
@@ -144,10 +155,12 @@ export function desktopVaultSource(): VaultSource {
   return {
     list: () => call<string[]>("list_files"),
     readText: (path) => call<string>("read_text", { path }),
+    fileStats: (paths) => call<Record<string, FileStat>>("file_stats", { paths }),
     readMany: (paths) => call<(string | null)[]>("read_many", { paths }),
     writeNote: (path, text, expected) => call<WriteOutcome>("write_note", { path, text, expected }),
     renameNote: (from, to) => call<void>("rename_note", { from, to }),
     trashNote: (path) => call<void>("trash_note", { path }),
+    keepInTrash: (name, text) => call<void>("keep_in_trash", { name, text }),
     renameFolder: (from, to) => call<void>("rename_folder", { from, to }),
     trashFolder: (path) => call<void>("trash_folder", { path }),
     writeAttachment: (path, bytes) => call<void>("write_attachment", bytes, { headers: { "x-path": encodeURIComponent(path) } }),

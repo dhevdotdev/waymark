@@ -20,7 +20,7 @@ async function boot(): Promise<void> {
     log(`csp: ${e.violatedDirective} blocked ${e.blockedURI} (policy: ${e.originalPolicy.slice(0, 400)})`),
   );
   log("starting");
-  await app.start(undefined, undefined, selftest.vault);
+  await app.start(undefined, undefined, selftest.vault, selftest.mode.startsWith("relaunch"));
   log(`started: ${JSON.stringify(app.metrics)}`);
   const { runSelfTest } = await import("./selftest");
   await invoke("selftest_report", { report: await runSelfTest(app, selftest.mode, log) });

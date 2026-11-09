@@ -23,7 +23,7 @@ Rust needs `source $HOME/.cargo/env` in a fresh shell. To see a change working, 
 These are product promises. Do not trade them for convenience.
 
 - Never reset, stash, rebase, force-push or merge divergent histories. Incoming commits apply only as fast-forwards. Anything else is explained and handed to the user's terminal.
-- No automatic commits or pushes. Background work may only fetch.
+- No automatic commits or pushes, except the opt-in backup in `src/ui/backup.ts` and `src-tauri/src/git/backup.rs`, which is off by default. Other background work may only fetch.
 - Never write to `.obsidian/`, ignore rules or Git config. Preferences live in the app's own support folder.
 - A note changes only because the user edited it, and only through `write_note`, which refuses to replace text the user has not seen. Never add a blind overwrite. Edits must keep every byte the user did not touch, line endings included.
 - Note content is untrusted. It gets no script execution, no remote loads and no filesystem access beyond the vault. Every path from the frontend goes through `src-tauri/src/vault.rs`.

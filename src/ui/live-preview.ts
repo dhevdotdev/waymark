@@ -36,17 +36,26 @@ const KNOWN_CALLOUTS = new Set(["note", "abstract", "info", "tip", "success", "q
 const line = (cls: string) => Decoration.line({ class: cls });
 const mark = (cls: string) => Decoration.mark({ class: cls });
 
-class CalloutLabel extends WidgetType {
-  constructor(readonly text: string) {
+class CalloutMark extends WidgetType {
+  constructor(
+    readonly kind: string,
+    readonly type: string,
+    readonly label: string,
+  ) {
     super();
   }
-  eq(other: CalloutLabel): boolean {
-    return other.text === this.text;
+  eq(other: CalloutMark): boolean {
+    return other.kind === this.kind && other.type === this.type && other.label === this.label;
   }
   toDOM(): HTMLElement {
-    const label = document.createElement("span");
-    label.textContent = this.text;
-    return label;
+    const mark = document.createElement("span");
+    mark.className = "callout cm-callout-mark";
+    mark.dataset.callout = this.kind;
+    mark.dataset.type = this.type;
+    const icon = document.createElement("span");
+    icon.className = "callout-icon";
+    mark.append(icon, this.label);
+    return mark;
   }
 }
 
@@ -154,6 +163,17 @@ class Builder {
 
   private withTrailingSpace(to: number): number {
     return this.state.doc.sliceString(to, to + 1) === " " ? to + 1 : to;
+  }
+
+  /** Empty lines stand in for the gap between blocks, so they take the height of that gap and not of a line of text. */
+  blankLines(from: number, to: number): void {
+    const { doc } = this.state;
+    for (let pos = from; pos <= to; ) {
+      const row = doc.lineAt(pos);
+      if (row.from >= this.frontmatterEnd && !row.text.trim() && !this.inCode(row.from))
+        this.out.push(line("cm-blank").range(row.from));
+      pos = row.to + 1;
+    }
   }
 
   frontmatter(): void {
@@ -270,8 +290,8 @@ class Builder {
     const from = first.from + first.text.indexOf("[!");
     const to = first.to - match[3].length;
     if (this.touchesSelection(from, to)) return;
-    const label = type.charAt(0).toUpperCase() + type.slice(1);
-    this.out.push((match[3] ? hide : Decoration.replace({ widget: new CalloutLabel(label) })).range(from, to));
+    const label = match[3] ? "" : type.charAt(0).toUpperCase() + type.slice(1);
+    this.out.push(Decoration.replace({ widget: new CalloutMark(hue, type, label) }).range(from, to));
   }
 
   private quoteMark(from: number, to: number): void {
@@ -393,6 +413,7 @@ function build(view: EditorView, options: PreviewOptions): DecorationSet {
   const builder = new Builder(view, options);
   builder.frontmatter();
   for (const { from, to } of view.visibleRanges) {
+    builder.blankLines(from, to);
     syntaxTree(view.state).iterate({ from, to, enter: (node) => builder.node(node) });
     builder.wikilinks(from, to);
   }

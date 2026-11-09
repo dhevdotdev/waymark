@@ -45,7 +45,7 @@ async function writeNote(root: string, body: { path: string; text: string; expec
   return { kind: "saved" };
 }
 
-const FILE_ACTIONS = new Set(["/rename", "/trash", "/trash-folder", "/attachment"]);
+const FILE_ACTIONS = new Set(["/rename", "/trash", "/trash-folder", "/attachment", "/keep-in-trash"]);
 
 function insideVault(root: string, rel: string): string {
   const abs = path.resolve(root, rel);
@@ -63,6 +63,11 @@ async function respondToFileAction(root: string, url: URL, req: IncomingMessage,
     const target = insideVault(root, url.searchParams.get("path") ?? "");
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, body, { flag: "wx" });
+  } else if (url.pathname === "/keep-in-trash") {
+    const { name, text } = JSON.parse(body.toString());
+    if (path.basename(name) !== name || !name.endsWith(".md")) throw new Error("not a note name");
+    await mkdir(path.join(root, ".dev-trash"), { recursive: true });
+    await writeFile(path.join(root, ".dev-trash", name), text);
   } else if (url.pathname === "/trash") {
     await unlink(insideVault(root, JSON.parse(body.toString()).path));
   } else if (url.pathname === "/trash-folder") {
@@ -90,6 +95,7 @@ async function respondWithSettings(root: string, res: ServerResponse): Promise<v
       attachmentFolder: app.attachmentFolderPath ?? "",
       newNoteLocation: app.newFileLocation ?? "",
       newNoteFolder: app.newFileFolderPath ?? "",
+      ignoreFilters: Array.isArray(app.userIgnoreFilters) ? app.userIgnoreFilters : [],
     }),
   );
 }
@@ -122,6 +128,19 @@ async function respondToWrite(root: string, req: IncomingMessage, res: ServerRes
   res.end(JSON.stringify(outcome));
 }
 
+async function respondWithStats(root: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  const entries = await Promise.all(
+    (JSON.parse(raw) as string[]).map(async (rel) => {
+      const info = await stat(path.join(root, rel)).catch(() => null);
+      return info ? [rel, { mtime: info.mtimeMs, ctime: info.birthtimeMs, size: info.size }] : null;
+    }),
+  );
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify(Object.fromEntries(entries.filter((e) => e !== null))));
+}
+
 function devVault(root: string | undefined): Plugin {
   return {
     name: "waymark-dev-vault",
@@ -145,6 +164,10 @@ function devVault(root: string | undefined): Plugin {
           }
           if (FILE_ACTIONS.has(url.pathname) && req.method === "POST") {
             await respondToFileAction(root, url, req, res);
+            return;
+          }
+          if (url.pathname === "/stats" && req.method === "POST") {
+            await respondWithStats(root, req, res);
             return;
           }
           if (url.pathname === "/write" && req.method === "POST") {

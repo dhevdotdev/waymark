@@ -1,5 +1,6 @@
 import { type CommunityResult, detectCommunities } from "./communities";
 import { parseFrontmatter } from "./frontmatter";
+import { excludedBy } from "./ignore-filters";
 import { VaultIndex } from "./index";
 import { LinkGraph } from "./links";
 import { SearchIndex } from "./search";
@@ -28,13 +29,15 @@ export class VaultStore {
   private constructor(
     readonly source: VaultSource,
     files: string[],
+    private readonly excluded: (path: string) => boolean,
   ) {
-    this.index = new VaultIndex(files);
+    this.index = new VaultIndex(files, excluded);
     this.links = new LinkGraph(this.index);
   }
 
   static async open(source: VaultSource): Promise<VaultStore> {
-    return new VaultStore(source, await source.list());
+    const settings = await source.settings().catch(() => null);
+    return new VaultStore(source, await source.list(), excludedBy(settings?.ignoreFilters));
   }
 
   /** The note's text, read from disk the first time it is asked for. */
@@ -58,10 +61,10 @@ export class VaultStore {
   async applyChanges(paths: string[]): Promise<VaultChange> {
     const files = await this.source.list();
     const fileSet = new Set(files);
-    const known = new Set([...this.index.notes, ...this.index.attachments]);
+    const known = new Set(this.index.allFiles);
     const structural = files.length !== known.size || files.some((f) => !known.has(f));
     if (structural) {
-      this.index = new VaultIndex(files);
+      this.index = new VaultIndex(files, this.excluded);
       this.links = new LinkGraph(this.index);
       for (const path of [...this.texts.keys()]) {
         if (fileSet.has(path)) continue;
@@ -69,7 +72,7 @@ export class VaultStore {
         this.search.set(path, "", null);
       }
     }
-    const candidates = paths.filter((p) => p.endsWith(".md") && fileSet.has(p));
+    const candidates = paths.filter((p) => p.endsWith(".md") && fileSet.has(p) && !this.excluded(p));
     const before = new Map(candidates.map((p) => [p, this.texts.get(p)]));
     await this.readInto(candidates);
     const changed = candidates.filter((p) => this.texts.get(p) !== before.get(p));

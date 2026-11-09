@@ -178,6 +178,7 @@ pub struct VaultSettings {
     pub attachment_folder: String,
     pub new_note_location: String,
     pub new_note_folder: String,
+    pub ignore_filters: Vec<String>,
 }
 
 /// Read only. Waymark never writes to `.obsidian`.
@@ -191,7 +192,38 @@ pub fn settings(root: &Path) -> VaultSettings {
         attachment_folder: field("attachmentFolderPath"),
         new_note_location: field("newFileLocation"),
         new_note_folder: field("newFileFolderPath"),
+        ignore_filters: config["userIgnoreFilters"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default(),
     }
+}
+
+/// When a file was last changed and created, in milliseconds, and its size in bytes.
+#[derive(Serialize, Debug, Clone, Copy)]
+pub struct FileStat {
+    pub mtime: f64,
+    pub ctime: f64,
+    pub size: u64,
+}
+
+fn millis(time: std::io::Result<std::time::SystemTime>) -> f64 {
+    time.ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0.0, |d| d.as_millis() as f64)
+}
+
+pub fn file_stat(path: &Path) -> Option<FileStat> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some(FileStat {
+        mtime: millis(meta.modified()),
+        ctime: millis(meta.created()),
+        size: meta.len(),
+    })
 }
 
 const ATTACHMENT_TYPES: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "avif", "pdf"];
@@ -574,6 +606,23 @@ mod tests {
         let policy = csp_for(Path::new("Attachments/x.svg")).unwrap();
         assert!(policy.contains("sandbox") && policy.contains("default-src 'none'"));
         assert_eq!(csp_for(Path::new("a.PDF")), None);
+    }
+
+    #[test]
+    fn reads_the_excluded_files_list_as_written() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".obsidian")).unwrap();
+        std::fs::write(
+            dir.path().join(".obsidian/app.json"),
+            r#"{"userIgnoreFilters":["AGENTS.md","/x$/",7]}"#,
+        )
+        .unwrap();
+        assert_eq!(settings(dir.path()).ignore_filters, ["AGENTS.md", "/x$/"]);
+        assert!(
+            settings(tempfile::tempdir().unwrap().path())
+                .ignore_filters
+                .is_empty()
+        );
     }
 
     #[test]

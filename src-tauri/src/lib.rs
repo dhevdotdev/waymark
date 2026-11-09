@@ -1,6 +1,8 @@
+mod clipboard;
 mod dock_icon;
 mod folders;
 mod git;
+mod selftest;
 mod trash;
 mod vault;
 
@@ -137,6 +139,29 @@ async fn read_text(vault: State<'_, Vault>, path: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
+async fn file_stats(
+    vault: State<'_, Vault>,
+    paths: Vec<String>,
+) -> CmdResult<std::collections::HashMap<String, vault::FileStat>> {
+    let resolved: Vec<_> = paths
+        .into_iter()
+        .filter_map(|path| vault.resolve(&path).ok().map(|abs| (path, abs)))
+        .collect();
+    blocking(move || {
+        Ok(resolved
+            .into_iter()
+            .filter_map(|(path, abs)| vault::file_stat(&abs).map(|stat| (path, stat)))
+            .collect())
+    })
+    .await
+}
+
+#[tauri::command]
+async fn clipboard_text() -> CmdResult<String> {
+    Ok(clipboard::text())
+}
+
+#[tauri::command]
 async fn read_many(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Vec<Option<String>>> {
     let root = vault.root().map_err(plain_err)?;
     blocking(move || {
@@ -250,6 +275,11 @@ async fn rename_note(vault: State<'_, Vault>, from: String, to: String) -> CmdRe
 }
 
 #[tauri::command]
+async fn keep_in_trash(name: String, text: String) -> CmdResult<()> {
+    blocking(move || trash::keep_text(&name, &text).map_err(plain_err)).await
+}
+
+#[tauri::command]
 async fn trash_note(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
     if !path.to_ascii_lowercase().ends_with(".md") {
         return Err(plain_err("Only notes can be moved to the Trash"));
@@ -357,6 +387,13 @@ async fn git_unstage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<S
 }
 
 #[tauri::command]
+async fn git_backup(vault: State<'_, Vault>, message: String) -> CmdResult<git::BackupReport> {
+    let root = vault.root().map_err(plain_err)?;
+    let gate = vault.write_gate();
+    blocking(move || git::backup(&root, &message, &gate)).await
+}
+
+#[tauri::command]
 async fn git_commit(vault: State<'_, Vault>, message: String) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
     let gate = vault.write_gate();
@@ -441,46 +478,6 @@ fn prefs_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 /// Preferences and per-vault state live in Application Support, never in the vault.
-#[derive(Serialize)]
-struct SelfTest {
-    vault: String,
-    mode: String,
-}
-
-/// QA hook: when WAYMARK_SELFTEST_OUT is set, the frontend runs its in-app checks
-/// against WAYMARK_SELFTEST_VAULT and reports back through `selftest_report`.
-#[tauri::command]
-fn selftest_config(app: AppHandle) -> Option<SelfTest> {
-    std::env::var("WAYMARK_SELFTEST_OUT").ok()?;
-    /* macOS throttles timers in hidden windows; a self-test runs in front so its timings are real. */
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.set_focus();
-    }
-    Some(SelfTest {
-        vault: std::env::var("WAYMARK_SELFTEST_VAULT").ok()?,
-        mode: std::env::var("WAYMARK_SELFTEST_MODE").unwrap_or_else(|_| "read".into()),
-    })
-}
-
-#[tauri::command]
-fn selftest_log(line: String) {
-    eprintln!("[selftest] {line}");
-}
-
-#[tauri::command]
-fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), String> {
-    let out = std::env::var("WAYMARK_SELFTEST_OUT").map_err(|e| e.to_string())?;
-    std::fs::write(
-        out,
-        serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    if std::env::var("WAYMARK_SELFTEST_STAY").is_err() {
-        app.exit(0);
-    }
-    Ok(())
-}
-
 #[tauri::command]
 async fn read_prefs(app: AppHandle) -> CmdResult<serde_json::Value> {
     blocking(move || {
@@ -594,11 +591,14 @@ pub fn run() {
             open_vault,
             list_files,
             read_text,
+            file_stats,
+            clipboard_text,
             read_many,
             write_note,
             vault_settings,
             rename_note,
             trash_note,
+            keep_in_trash,
             rename_folder,
             trash_folder,
             write_attachment,
@@ -612,6 +612,7 @@ pub fn run() {
             git_stage,
             git_unstage,
             git_commit,
+            git_backup,
             git_diff,
             git_log,
             git_show,
@@ -622,9 +623,9 @@ pub fn run() {
             read_prefs,
             write_prefs,
             dock_icon::set_dock_icon,
-            selftest_config,
-            selftest_report,
-            selftest_log
+            selftest::selftest_config,
+            selftest::selftest_report,
+            selftest::selftest_log
         ])
         .build(tauri::generate_context!())
         .expect("error while running Waymark")

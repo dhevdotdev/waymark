@@ -1,5 +1,6 @@
 import { type GitStatus, isDesktop } from "../platform";
 import type { PrefStore } from "../prefs";
+import { Backup } from "./backup";
 import { type GitHost, GitPanel, type SyncState } from "./git-panel";
 import type { ShellElements } from "./shell";
 import { describeSync } from "./sync-status";
@@ -11,13 +12,17 @@ export interface SyncControllerDeps {
   els: Pick<ShellElements, "sync" | "branch">;
   prefs: PrefStore;
   root: string;
-  panelHost: Omit<GitHost, "prefs" | "lastSync" | "setLastSync" | "onVisible" | "onStatus">;
+  panelHost: Omit<
+    GitHost,
+    "prefs" | "lastSync" | "setLastSync" | "onVisible" | "onStatus" | "lastBackup" | "backupOn" | "backupDone"
+  >;
   onStatusChanged: () => void;
 }
 
 /** Keeps the status bar and the sync panel in step with the repository. Background work only ever fetches. */
 export class SyncController {
   readonly panel: GitPanel;
+  readonly backup: Backup;
   private backgroundTimer = 0;
   private refreshTimer = 0;
 
@@ -32,8 +37,19 @@ export class SyncController {
           p.vaults[root] ??= { tabs: [], active: 0, lastSync: null };
           p.vaults[root].lastSync = at;
         }),
+      lastBackup: () => prefs.value.vaults[root]?.lastBackup ?? null,
+      backupOn: () => Boolean(prefs.value.backupMinutes),
+      backupDone: () => this.backup.finished(),
       onVisible: (open) => els.sync.classList.toggle("is-on", open),
       onStatus: (status, state) => this.render(status, state),
+    });
+    this.backup = new Backup({
+      prefs,
+      root,
+      panel: this.panel,
+      flushEdits: panelHost.flushEdits,
+      toast: panelHost.toast,
+      play: panelHost.play,
     });
     this.render(null, { kind: "idle" });
   }
@@ -47,6 +63,7 @@ export class SyncController {
   }
 
   scheduleBackground(): void {
+    if (isDesktop) this.backup.schedule();
     clearInterval(this.backgroundTimer);
     const minutes = this.deps.prefs.value.backgroundMinutes;
     if (!minutes || !isDesktop) return;
@@ -76,6 +93,7 @@ export class SyncController {
     window.removeEventListener("focus", this.checkOnFocus);
     clearInterval(this.backgroundTimer);
     clearTimeout(this.refreshTimer);
+    this.backup.dispose();
   }
 
   private render(status: GitStatus | null, state: SyncState): void {

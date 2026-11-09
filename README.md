@@ -38,8 +38,8 @@ On first launch, choose **Open a vault…** (an existing folder) or **Clone from
 
 - Reading never waits for the network. Fetching is manual by default. Checking on launch, and every 15 minutes, are opt-in, and both only fetch.
 - **Sync** fetches, then applies incoming commits only when that is a fast-forward. Diverged histories, local edits that incoming commits would overwrite, and unfinished merges or rebases are explained, and Waymark offers Terminal as the route to resolve them. Waymark never merges, rebases, stashes, resets or force-pushes.
-- Staging, committing and pushing are explicit buttons in the sync panel. Nothing is committed or pushed automatically.
-- History is read-only: vault log, per-note log (follows renames), diffs per commit, comparing a past version with the current one, and reading a past version.
+- Staging, committing and pushing are explicit buttons in the sync panel. The one exception is Back up every 10 minutes, off by default: once turned on, it commits every change Git would track as `vault backup: <date and time>`, fast-forwards when that is safe, and pushes. It never force-pushes, resets, stashes or merges, and stops and explains itself on a diverged branch, an unfinished merge, a note awaiting a choice, or a sign-in failure.
+- History: vault log, per-note log (follows renames), diffs per commit, comparing a past version with the current one, and reading a past version.
 - Waymark does not touch `.obsidian/`, ignore files or Git config. Preferences live in `~/Library/Application Support/dev.dhev.folio/`.
 
 ## Develop

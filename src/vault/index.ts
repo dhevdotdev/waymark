@@ -58,17 +58,29 @@ const fold = (s: string) => s.normalize("NFC").toLowerCase();
  * Maps link text to vault paths the way Obsidian does, except that a name shared
  * by several files resolves to "ambiguous" instead of silently picking one.
  */
+const BASE_EXT = /\.base$/i;
+
+export const isBaseFile = (path: string): boolean => BASE_EXT.test(path);
+
 export class VaultIndex {
   readonly notes: string[];
   readonly attachments: string[];
+  /** Saved views. These are files the app shows but never writes. */
+  readonly bases: string[];
+  /** Everything on disk, including what the vault's settings exclude. */
+  readonly allFiles: string[];
   private byName = new Map<string, string[]>();
   private byPath = new Map<string, string>();
   private aliases = new Map<string, string[]>();
   private aliasesOf = new Map<string, string[]>();
 
-  constructor(files: string[]) {
-    this.notes = files.filter((f) => f.toLowerCase().endsWith(NOTE_EXT));
-    this.attachments = files.filter((f) => !f.toLowerCase().endsWith(NOTE_EXT));
+  /** Excluded files disappear from every list, but a link to one still resolves. */
+  constructor(files: string[], excluded: (path: string) => boolean = () => false) {
+    const shown = files.filter((f) => !excluded(f));
+    this.allFiles = files;
+    this.notes = shown.filter((f) => f.toLowerCase().endsWith(NOTE_EXT));
+    this.attachments = shown.filter((f) => !f.toLowerCase().endsWith(NOTE_EXT));
+    this.bases = shown.filter(isBaseFile);
     for (const file of files) {
       const isNote = file.toLowerCase().endsWith(NOTE_EXT);
       const key = fold(isNote ? stripExt(basename(file)) : basename(file));
@@ -123,7 +135,7 @@ export class VaultIndex {
   }
 
   title(path: string): string {
-    return stripExt(basename(path));
+    return stripExt(basename(path)).replace(BASE_EXT, "");
   }
 }
 

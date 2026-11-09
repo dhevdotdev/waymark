@@ -2,7 +2,7 @@ use super::runner::{ErrorKind, MAX_OUTPUT, WRITE_PATIENCE};
 use super::*;
 use std::process::Command;
 
-fn git(dir: &Path, args: &[&str]) {
+pub(super) fn git(dir: &Path, args: &[&str]) {
     let ok = Command::new("git")
         .current_dir(dir)
         .args(args)
@@ -17,12 +17,12 @@ fn git(dir: &Path, args: &[&str]) {
     assert!(ok, "git {args:?} failed");
 }
 
-fn write(dir: &Path, rel: &str, text: &str) {
+pub(super) fn write(dir: &Path, rel: &str, text: &str) {
     std::fs::write(dir.join(rel), text).unwrap();
 }
 
 /// A bare remote with two clones, so ahead/behind/diverged states are real.
-fn fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+pub(super) fn fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
     let tmp = tempfile::tempdir().unwrap();
     let remote = tmp.path().join("remote.git");
     git(

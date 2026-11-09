@@ -16,6 +16,8 @@ const ERROR_LABELS: Partial<Record<GitErrorKind, string>> = {
   localChangesBlock: "Blocked",
   rejected: "Push rejected",
   timeout: "Timed out",
+  inProgress: "Unfinished merge",
+  noteConflict: "Needs a choice",
 };
 
 /** What the status bar says about the vault's relationship with its remote. The first matching state wins. */

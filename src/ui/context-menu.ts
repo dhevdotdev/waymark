@@ -1,10 +1,14 @@
 import { dismissOnOutside, fadeOut } from "./overlays";
 
+const STATUS_BAR_ROOM = 40;
+
 export interface MenuItem {
   label: string;
   run: () => void;
   /** Draws a line above this item. */
   startsGroup?: boolean;
+  /** Marks something that removes the thing it acts on. */
+  danger?: boolean;
 }
 
 export interface MenuOptions {
@@ -32,7 +36,7 @@ export function showContextMenu(x: number, y: number, items: MenuItem[], options
       menu.append(line);
     }
     const button = document.createElement("button");
-    button.className = "context-item";
+    button.className = item.danger ? "context-item is-danger" : "context-item";
     button.setAttribute("role", "menuitem");
     button.textContent = item.label;
     button.addEventListener("click", () => {
@@ -46,6 +50,6 @@ export function showContextMenu(x: number, y: number, items: MenuItem[], options
   const { offsetWidth: width, offsetHeight: height } = menu;
   const left = options.alignEnd ? x - width : x;
   menu.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
-  menu.style.top = `${Math.min(y, innerHeight - height - 8)}px`;
+  menu.style.top = `${Math.min(y, innerHeight - height - STATUS_BAR_ROOM)}px`;
   menu.style.transformOrigin = options.alignEnd ? "right top" : "left top";
 }

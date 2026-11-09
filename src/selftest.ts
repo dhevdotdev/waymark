@@ -1,19 +1,6 @@
 import { git, native } from "./platform";
+import { runBackup, runConflict, runLibrary, runRelaunch, runRestore, type SelfTestContext } from "./selftest-recovery";
 import type { App } from "./ui/app";
-
-type Reader = NonNullable<App["reader"]>;
-
-interface SelfTestContext {
-  app: App;
-  reader: Reader;
-  vault: Reader["vault"];
-  panel: Reader["sync"]["panel"];
-  check: (name: string, ok: boolean, detail?: unknown) => void;
-  wait: (ms: number) => Promise<unknown>;
-  until: (fn: () => boolean, ms?: number) => Promise<boolean>;
-  log: (line: string) => void;
-  report: Record<string, unknown>;
-}
 
 async function runShow(ctx: SelfTestContext, mode: string): Promise<void> {
   const { app, reader, vault, panel, check, wait } = ctx;
@@ -448,6 +435,11 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   if (mode === "git") await runGit(ctx, played);
   if (mode === "commit") await runCommit(ctx);
   if (mode === "diverged" || mode === "blocked") await runRefusal(ctx, mode, played);
+  if (mode === "restore") await runRestore(ctx);
+  if (mode === "conflict") await runConflict(ctx);
+  if (mode === "backup") await runBackup(ctx);
+  if (mode === "library") await runLibrary(ctx);
+  if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
 
   report.results = results;
   report.passed = results.every((r) => r.ok);

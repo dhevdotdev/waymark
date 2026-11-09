@@ -186,7 +186,9 @@ class TableWidget extends WidgetType {
     return [
       ...(row > 0 ? [{ label: "Insert row above", run: change((lines) => insertRow(lines, row - 1), row) }] : []),
       { label: "Insert row below", run: change((lines) => insertRow(lines, row), row + 1) },
-      ...(row > 0 ? [{ label: "Delete row", startsGroup: true, run: change((lines) => deleteRow(lines, row), row - 1) }] : []),
+      ...(row > 0
+        ? [{ label: "Delete row", startsGroup: true, danger: true, run: change((lines) => deleteRow(lines, row), row - 1) }]
+        : []),
       this.asText(view, root),
     ];
   }
@@ -210,6 +212,7 @@ class TableWidget extends WidgetType {
         ? [
             {
               label: "Delete column",
+              danger: true,
               startsGroup: true,
               run: change((lines) => deleteColumn(lines, column), Math.max(0, column - 1)),
             },

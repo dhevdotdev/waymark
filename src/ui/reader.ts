@@ -1,12 +1,12 @@
 import { isDesktop, native } from "../platform";
-import type { PrefStore, Prefs } from "../prefs";
 import { renderDiagrams } from "../render/diagrams";
-import type { Highlighter } from "../render/highlight";
 import { type RenderContext, renderInlineMarkdown, renderNote } from "../render/note";
-import type { Scheme } from "../themes";
+import { isBaseFile } from "../vault/index";
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
 import { type Tab, Workspace } from "../vault/workspace";
+import { BaseView } from "./base-view";
+import { Bookmarks } from "./bookmarks";
 import { CommandTable } from "./commands";
 import { FindBar, paint } from "./find";
 import { type GraphTabView, GraphView } from "./graph-view";
@@ -20,56 +20,19 @@ import { toast } from "./overlays";
 import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
+import { TrailActions } from "./reader-trail";
+import type { Metrics, OpenOptions, ReaderDeps, ShowOptions } from "./reader-types";
+import { ReadingSpots } from "./reading-spots";
 import { restoreTabs } from "./restore-tabs";
 import { applySound, previewKeys, toggleSettings } from "./settings";
 import { mountShell, type ShellElements } from "./shell";
 import { Sidebar } from "./sidebar";
-import type { Sound } from "./sound";
 import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
-import { TrailMap } from "./trail-map";
 
-export type Metrics = Record<string, number>;
-type Appearance = Prefs["appearance"];
-
-export interface ReaderDeps {
-  host: HTMLElement;
-  vault: VaultStore;
-  root: string;
-  name: string;
-  prefs: PrefStore;
-  sound: Sound;
-  highlighter: Highlighter;
-  codeThemeReady: Promise<void>;
-  metrics: Metrics;
-  scheme: () => Scheme;
-  setAppearance: (appearance: Appearance) => void;
-  setFamily: (id: string) => void;
-  openAnotherVault: () => void;
-  closeVault: () => void;
-}
-
-export interface OpenOptions {
-  anchor?: string;
-  newTab?: boolean;
-  focus?: boolean;
-  find?: string;
-  keyboard?: boolean;
-  via?: "link" | "jump";
-}
-
-interface ShowOptions {
-  anchor?: string;
-  entering?: number;
-  find?: string;
-  keepScroll?: boolean;
-  quiet?: boolean;
-  restoring?: boolean;
-  keyboard?: boolean;
-  onPainted?: () => void;
-}
+export type { Metrics, OpenOptions, ReaderDeps };
 
 /** One open vault's window: its panels, its tabs and how the user moves between notes. */
 export class Reader {
@@ -82,14 +45,17 @@ export class Reader {
   readonly inspector: Inspector;
   readonly preview: LinkPreview;
   readonly editing: NoteEditing;
+  readonly spots: ReadingSpots;
+  readonly bookmarks: Bookmarks;
+  private readonly baseView: BaseView;
   readonly files: NoteFiles;
   readonly workspace = new Workspace();
   /** The note on screen, or the note a graph tab was opened from. */
   current = "";
 
-  private readonly els: ShellElements;
+  readonly els: ShellElements;
   private readonly noteView: NoteView;
-  private readonly trailMap: TrailMap;
+  private readonly trail: TrailActions;
   private graph: GraphView | null = null;
   private renderSeq = 0;
 
@@ -101,12 +67,15 @@ export class Reader {
     const { els } = this;
 
     this.noteView = new NoteView(els, vault, deps.name, toast);
-    this.trailMap = new TrailMap({
-      select: (id, newTab) => this.selectOnTrail(id, newTab),
-      remove: (id) => this.removeFromTrail(id),
-      toggle: (id) => this.toggleTrailBranch(id),
+    this.trail = new TrailActions({
+      tab: () => this.tab,
+      label: (view) => this.viewLabel(view),
+      open: (path) => void this.open(path, { newTab: true, focus: true }),
+      saveScroll: () => this.saveScroll(),
+      show: () => void this.show({ keyboard: true }),
+      persist: () => this.persist(),
     });
-    els.reader.prepend(this.trailMap.root);
+    els.reader.prepend(this.trail.map.root);
 
     this.sidebar = new Sidebar(els, prefs, p.vaults[deps.root]?.openFolders ?? [], {
       search: (query, limit) => vault.search.search(query, limit),
@@ -127,8 +96,9 @@ export class Reader {
       {
         status: () => this.sync.panel.status,
         currentNote: () => this.current,
-        showWorktreeDiff: (change) => void this.sync.panel.showWorktreeDiff(change, change.unstaged === " " || !change.unstaged),
-        showCommit: (commit, path) => void this.sync.panel.showCommit(commit, path),
+        showWorktreeDiff: (change) =>
+          void this.sync.panel.detail.showWorktreeDiff(change, change.unstaged === " " || !change.unstaged),
+        showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
       },
       p.railPane,
@@ -146,8 +116,39 @@ export class Reader {
       openUrl: (url) => void native.openExternal(url),
       renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
       rename: (path, name) => this.files.renameTo(path, name),
+      prefs,
+      noteRestored: async (path) => {
+        await vault.applyChanges([path]);
+        if (path === this.current && !this.editing.isOpen) await this.show({ keepScroll: true, quiet: true, keyboard: true });
+        this.renderTree();
+        this.sync.scheduleRefresh();
+      },
+    });
+    this.spots = new ReadingSpots({
+      prefs,
+      root: deps.root,
+      scroller: els.scroller,
+      note: () => (this.onGraph || this.onBlank || this.onBase ? null : this.current || null),
+      isEditing: () => this.editing.isOpen,
+      editingAnchor: () => this.editing.editingAnchor(),
+    });
+    this.bookmarks = new Bookmarks({
+      prefs,
+      root: deps.root,
+      index: () => vault.index,
+      text: (path) => vault.texts.get(path),
+      open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor }),
+      toast,
+      current: () => (this.onBlank ? "" : this.current),
+    });
+    this.sidebar.tree.leading = this.bookmarks.element;
+    this.baseView = new BaseView({
+      vault,
+      scroller: els.scroller,
+      open: (path, newTab) => void this.open(path, { newTab, focus: true, via: "link" }),
     });
     this.files = new NoteFiles({
+      bookmarks: this.bookmarks,
       sidebar: els.sidebar,
       vault,
       prefs,
@@ -176,6 +177,7 @@ export class Reader {
           await renderDiagrams(into);
         },
         title: (path) => vault.index.title(path),
+        restoreVersion: (path, text, when) => this.editing.restoreVersion(path, text, when),
       },
       onStatusChanged: () => this.inspector.refreshHistory(),
     });
@@ -196,7 +198,14 @@ export class Reader {
     });
 
     bindReaderClicks(els.shell, this);
-    els.scroller.addEventListener("scroll", () => this.inspector.spy(), { passive: true });
+    els.scroller.addEventListener(
+      "scroll",
+      () => {
+        this.inspector.spy();
+        this.spots.scrolled();
+      },
+      { passive: true },
+    );
     bindTooltips(els.shell);
   }
 
@@ -238,6 +247,10 @@ export class Reader {
     return this.tab?.trail.current.view.kind === "graph";
   }
 
+  get onBase(): boolean {
+    return this.tab?.trail.current.view.kind === "base";
+  }
+
   get onBlank(): boolean {
     return this.tab?.trail.current.view.kind === "blank";
   }
@@ -250,7 +263,7 @@ export class Reader {
   // Navigation
 
   async open(path: string, opts: OpenOptions = {}): Promise<void> {
-    const view: View = { kind: "note", path };
+    const view: View = isBaseFile(path) ? { kind: "base", path } : { kind: "note", path };
     if (opts.newTab && (opts.focus === false || !this.onBlank)) {
       const tab = this.workspace.addBeside(view);
       this.deps.sound.play("open");
@@ -393,10 +406,13 @@ export class Reader {
     if (this.editing.isOpen) {
       await this.editing.vaultChanged();
       this.renderTree();
-    } else if (this.onGraph) await this.show({ quiet: true });
+    } else if (this.onBase) await this.show({ keepScroll: true, quiet: true, keyboard: true });
+    else if (this.onGraph) await this.show({ quiet: true });
     else if (this.onBlank) this.renderTree();
-    else if (!this.vault.texts.has(this.current)) this.noteView.showMissing(this.current);
-    else if (changed.includes(this.current) || structural) await this.show({ keepScroll: true, quiet: true });
+    else if (!this.vault.texts.has(this.current)) {
+      this.noteView.showMissing(this.current);
+      this.renderTree();
+    } else if (changed.includes(this.current) || structural) await this.show({ keepScroll: true, quiet: true });
     else {
       this.renderTree();
       this.inspector.refresh();
@@ -455,9 +471,9 @@ export class Reader {
     const { prefs, root } = this.deps;
     prefs.update((p) => {
       p.vaults[root] = {
+        ...p.vaults[root],
         ...this.workspace.save(),
         lastSync: p.vaults[root]?.lastSync ?? null,
-        recent: p.vaults[root]?.recent,
         openFolders: this.sidebar.tree.openFolders,
       };
     });
@@ -484,6 +500,10 @@ export class Reader {
       this.showBlank();
       return;
     }
+    if (entry.view.kind === "base") {
+      await this.showBase(entry.view.path, opts, seq);
+      return;
+    }
     const path = entry.view.path;
     const prevScroll = this.els.scroller.scrollTop;
     let text: string;
@@ -505,6 +525,7 @@ export class Reader {
     const animate = changedNote && !opts.quiet && !opts.keyboard && !opts.restoring;
     const doc = this.noteView.mount(path, rendered.fragment, animate);
     this.els.scroller.scrollTop = opts.keepScroll ? prevScroll : entry.scroll;
+    if (!opts.keepScroll && !opts.anchor && !opts.find && (!entry.scroll || opts.restoring)) this.spots.restore(path);
     if (opts.anchor) this.noteView.scrollToAnchor(opts.anchor);
     if (opts.find) this.noteView.jumpToText(opts.find);
     else if (changedNote) paint("search", []);
@@ -521,8 +542,20 @@ export class Reader {
     const t0 = performance.now();
     await renderDiagrams(doc);
     metrics.diagramsMs = performance.now() - t0;
+    if (seq === this.renderSeq) this.spots.settle();
     if (opts.anchor) this.noteView.scrollToAnchor(opts.anchor, true);
     if (opts.find) this.noteView.jumpToText(opts.find);
+  }
+
+  private async showBase(path: string, opts: ShowOptions, seq: number): Promise<void> {
+    const scroll = opts.keepScroll ? this.els.scroller.scrollTop : this.tab.trail.current.scroll;
+    this.current = path;
+    this.noteView.showPaneHead(path, "");
+    await this.baseView.show(path, scroll, () => seq !== this.renderSeq);
+    if (seq !== this.renderSeq) return;
+    this.renderTabChrome(opts.entering);
+    this.renderTree();
+    this.persist();
   }
 
   /** After files move or vanish, redraws without disturbing a note being edited. */
@@ -575,10 +608,11 @@ export class Reader {
 
   private renderTree(): void {
     this.sidebar.renderTree(this.vault.index, this.onBlank ? "" : this.current);
+    this.bookmarks.render();
   }
 
   private viewLabel = (view: View): string => {
-    if (view.kind === "note") return this.vault.index.title(view.path);
+    if (view.kind === "note" || view.kind === "base") return this.vault.index.title(view.path);
     return view.kind === "graph" ? "Graph" : "New tab";
   };
 
@@ -592,58 +626,20 @@ export class Reader {
     const { shell, graphButton, back, forward } = this.els;
     const { trail } = this.tab;
     this.renderTabs(entering);
-    this.renderTrail();
+    this.trail.render();
     shell.classList.toggle("is-graph", this.onGraph);
     shell.classList.toggle("is-blank", this.onBlank);
-    if (this.onGraph || this.onBlank) this.editing.stats.hide();
+    shell.classList.toggle("is-base", this.onBase);
+    if (this.onGraph || this.onBlank || this.onBase) this.editing.stats.hide();
     graphButton.classList.toggle("is-on", this.onGraph);
     graphButton.setAttribute("aria-pressed", String(this.onGraph));
     back.disabled = !trail.canBack;
     forward.disabled = !trail.canForward;
   }
 
-  private renderTrail(): void {
-    const { trail } = this.tab;
-    this.trailMap.root.hidden = trail.size < 2;
-    if (trail.size < 2) return;
-    const entries = trail.layout().map((placement) => {
-      const view = trail.view(placement.id)!;
-      return { ...placement, label: this.viewLabel(view), isGraph: view.kind === "graph" };
-    });
-    this.trailMap.render(this.tab.id, entries, trail.current.id, trail.pathToCurrent());
-  }
-
   private saveScroll(): void {
     const node = this.tab?.trail.current;
-    if (node?.view.kind === "note") node.scroll = this.els.scroller.scrollTop;
-  }
-
-  private selectOnTrail(id: number, newTab: boolean): void {
-    const view = this.tab.trail.view(id);
-    if (!view) return;
-    if (newTab && view.kind === "note") {
-      void this.open(view.path, { newTab: true, focus: true });
-      return;
-    }
-    this.saveScroll();
-    this.tab.trail.select(id);
-    void this.show({ keyboard: true });
-  }
-
-  private removeFromTrail(id: number): void {
-    this.saveScroll();
-    const before = this.tab.trail.current.view;
-    this.tab.trail.remove(id);
-    if (this.tab.trail.current.view !== before) void this.show({ keyboard: true });
-    else {
-      this.renderTrail();
-      this.persist();
-    }
-  }
-
-  private toggleTrailBranch(id: number): void {
-    this.tab.trail.toggleCollapsed(id);
-    this.renderTrail();
-    this.persist();
+    if (node?.view.kind === "note" || node?.view.kind === "base") node.scroll = this.els.scroller.scrollTop;
+    this.spots.record();
   }
 }

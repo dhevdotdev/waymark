@@ -477,7 +477,7 @@ export class GraphCanvas {
     if (openNote && lit(openNote) && openNote !== focus) labelNote(openNote, true, 1);
 
     /* Zoomed out, each community is named just outside its cluster; zooming in hands over to individual notes. */
-    const groupAlpha = focus || this.filter ? 0 : this.spot !== null ? 1 : clamp01((1.5 - k) / 0.4);
+    const groupAlpha = focus || this.filter ? 0 : this.spot !== null ? 1 : clamp01((2.2 - k) / 0.4);
     if (groupAlpha > 0) {
       const size = 12.5 / k;
       ctx.font = `600 ${size}px ${p.font}`;

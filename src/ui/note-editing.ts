@@ -1,9 +1,15 @@
+import { git } from "../platform";
+import type { PrefStore } from "../prefs";
 import type { Highlighter } from "../render/highlight";
 import { Draft, type DraftState } from "../vault/draft";
 import type { VaultStore } from "../vault/store";
 import { lineEnding, toggleTask } from "../vault/tasks";
+import { showConflictCompare } from "./conflict-compare";
 import type { LinkOption } from "./editor-insert";
 import type { EditorHandle } from "./editor-view";
+import { closeSheet } from "./git-panel-parts";
+import { confirmAction } from "./prompts";
+import { readingAnchor, type ScrollAnchor, showReadingLine } from "./reading-spots";
 import type { ShellElements } from "./shell";
 import { StatusStats } from "./status-stats";
 
@@ -19,6 +25,9 @@ export interface EditingHost {
   openUrl: (url: string) => void;
   renderInline: (text: string, path: string) => DocumentFragment;
   rename: (path: string, name: string) => Promise<boolean>;
+  prefs: PrefStore;
+  /** A past version was written over this note. */
+  noteRestored: (path: string) => Promise<void>;
 }
 
 interface Session {
@@ -38,25 +47,6 @@ const TYPE_EXTENSION: Record<string, string> = {
   "image/webp": "webp",
 };
 const SHOWN_AS_IMAGE = /\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i;
-interface ScrollAnchor {
-  line: number;
-  offset: number;
-}
-
-const readingBlocks = (scroller: HTMLElement) => [...scroller.querySelectorAll<HTMLElement>(".doc [data-line]")];
-
-/** The block at the top of the reading view and how far below the top edge it sits. Null at the very top of a note. */
-function readingAnchor(scroller: HTMLElement): ScrollAnchor | null {
-  if (scroller.scrollTop <= 0) return null;
-  const top = scroller.getBoundingClientRect().top;
-  const block = readingBlocks(scroller).find((candidate) => candidate.getBoundingClientRect().bottom > top);
-  return block ? { line: Number(block.dataset.line), offset: block.getBoundingClientRect().top - top } : null;
-}
-
-function showReadingLine(scroller: HTMLElement, { line, offset }: ScrollAnchor): void {
-  const block = readingBlocks(scroller).findLast((candidate) => Number(candidate.dataset.line) <= line);
-  if (block) scroller.scrollTop += block.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset;
-}
 
 const SLOW_SAVE_MS = 900;
 const STATE_LABEL: Record<DraftState["kind"], string> = {
@@ -463,11 +453,13 @@ export class NoteEditing {
     banner.replaceChildren();
     if (state.kind === "conflict") {
       text.textContent = "This note changed outside this editor. Your version is safe here.";
-      const both = button("Keep both", true, () => void this.keepBoth(session, state.disk));
+      const compare = button("Compare", true, () => void this.compare(session));
+      compare.dataset.tip = "See both versions before choosing";
+      const both = button("Keep both", false, () => void this.keepBoth(session, state.disk));
       both.dataset.tip = "Saves yours as a copy and shows the other version";
-      const mine = button("Keep mine", false, () => void session.draft.keepMine());
-      mine.dataset.tip = "Replaces the other version with yours";
-      banner.append(text, both, mine);
+      const mine = button("Keep mine", false, () => void this.keepMine(session));
+      mine.dataset.tip = "Replaces the other version with yours. The other version goes to the Trash";
+      banner.append(text, compare, both, mine);
     } else if (state.kind === "missing") {
       text.textContent = "This note was moved or deleted. Your version is safe here and has not been saved.";
       banner.append(
@@ -484,6 +476,69 @@ export class NoteEditing {
     text.dataset.tip = text.textContent;
   }
 
+  /** Sets the side not chosen aside in the Trash. False means it could not be kept, so nothing should change. */
+  private async setAside(path: string, text: string, label: string): Promise<string | null> {
+    const name = `${this.host.vault.index.title(path)} (${label} ${stamp()}).md`;
+    try {
+      await this.host.vault.source.keepInTrash(name, text);
+      return name.replace(/\.md$/i, "");
+    } catch {
+      this.host.toast("That version could not be set aside in the Trash, so nothing was changed.");
+      return null;
+    }
+  }
+
+  private async keepMine(session: Session): Promise<void> {
+    closeSheet();
+    const { state } = session.draft;
+    if (state.kind === "conflict") {
+      const kept = await this.setAside(session.path, state.disk, "other version");
+      if (!kept) return;
+      this.host.toast(`The other version is in the Trash as “${kept}”.`);
+    }
+    await session.draft.keepMine();
+  }
+
+  /** The other side wins, with the text in the editor set aside first. */
+  private async useOther(session: Session): Promise<void> {
+    closeSheet();
+    const disk = await this.host.vault.source.readText(session.path).catch(() => null);
+    if (disk === null) {
+      this.host.toast("The other version is no longer there, so yours was left as it is.");
+      return;
+    }
+    session.editor.setFrozen(true);
+    const kept = await this.setAside(session.path, session.draft.text, "my version");
+    if (kept) {
+      session.editor.replace(disk);
+      session.draft.adopt(disk);
+      this.host.toast(`Your version is in the Trash as “${kept}”.`);
+    }
+    session.editor.setFrozen(false);
+  }
+
+  /** Shows both sides of a conflict, read fresh from disk so the choice is about what is there now. */
+  private async compare(session: Session): Promise<void> {
+    const disk = await this.host.vault.source.readText(session.path).catch(() => null);
+    if (disk === null) {
+      await this.vaultChanged();
+      return;
+    }
+    showConflictCompare({
+      title: this.host.vault.index.title(session.path),
+      path: session.path,
+      disk,
+      mine: session.draft.text,
+      prefs: this.host.prefs,
+      keepBoth: () => {
+        closeSheet();
+        void this.keepBoth(session, disk);
+      },
+      keepMine: () => void this.keepMine(session),
+      useOther: () => void this.useOther(session),
+    });
+  }
+
   private async keepBoth(session: Session, disk: string): Promise<void> {
     session.editor.setFrozen(true);
     const copy = await this.saveCopy(session.path, session.draft.text, false);
@@ -497,10 +552,73 @@ export class NoteEditing {
     this.host.toast(`Your version was saved as “${copy}”.`);
   }
 
+  /**
+   * Puts an older text back in the working file as an ordinary change, for the
+   * normal review and commit. Anything the write would replace that Git does
+   * not hold is first saved as a copy, and the user is asked before that.
+   */
+  async restoreVersion(path: string, older: string, when: string): Promise<void> {
+    closeSheet();
+    if (older.includes("\u0000") || older.includes("\uFFFD")) {
+      this.host.toast("That version is not plain text, so it cannot be restored.");
+      return;
+    }
+    const session = this.session?.path === path ? this.session : null;
+    const saved = session ? await session.draft.flush() : true;
+    const disk = await this.host.vault.source.readText(path).catch(() => null);
+    const current = session?.draft.text ?? disk;
+    if (current === older && disk === older) {
+      this.host.toast("This note already matches that version.");
+      return;
+    }
+    const status = await git.status().catch(() => null);
+    const committed = saved && disk !== null && status?.isRepo === true && !status.files.some((f) => f.path === path);
+    let copy: string | null = null;
+    if (!committed && current !== null) {
+      const proceed = await confirmAction({
+        title: "Keep your current text first?",
+        body: "This note has changes that are not committed. Restoring replaces them, so they will be saved as a copy beside the note first.",
+        action: "Save a copy and restore",
+      });
+      if (!proceed) return;
+      copy = await this.saveCopy(path, current, false, "before restore");
+      if (!copy) {
+        this.host.toast("Your current text could not be saved as a copy, so nothing was changed.");
+        return;
+      }
+    }
+    session?.editor.setFrozen(true);
+    try {
+      const outcome = await this.host.vault.save(path, older, disk);
+      if (outcome.kind !== "saved") {
+        this.host.toast("The note changed while restoring, so nothing was replaced.");
+        return;
+      }
+      if (session) {
+        session.editor.replace(older);
+        session.draft.adopt(older);
+      }
+    } catch (error) {
+      this.host.toast((error as Error).message);
+      return;
+    } finally {
+      session?.editor.setFrozen(false);
+    }
+    await this.host.noteRestored(path);
+    const kept = copy ? ` Your earlier text is in “${copy}”.` : "";
+    this.host.toast(`Restored the version from ${when}. It is an uncommitted change until you commit it.${kept}`);
+  }
+
+  /** The editor's top line while one is open, for remembering the reading position. */
+  editingAnchor(): ScrollAnchor | null {
+    const { scroller } = this.host.els;
+    return this.session && scroller.scrollTop > 0 ? this.session.editor.topLine(scroller) : null;
+  }
+
   /** Writes text to a new note beside the original, then the vault root. Null means it was kept nowhere. */
-  private async saveCopy(path: string, text: string, clipboardLast = true): Promise<string | null> {
+  private async saveCopy(path: string, text: string, clipboardLast = true, label = "conflict"): Promise<string | null> {
     const base = path.replace(/\.md$/i, "");
-    const name = `${base.split("/").pop()} (conflict ${stamp()}).md`;
+    const name = `${base.split("/").pop()} (${label} ${stamp()}).md`;
     const folder = path.includes("/") ? `${path.slice(0, path.lastIndexOf("/"))}/` : "";
     for (const target of [`${folder}${name}`, name]) {
       try {

@@ -70,11 +70,7 @@ export class NoteHistory {
       nodes.push(this.row("Uncommitted changes", "Edited since the last commit", () => this.host.showWorktreeDiff(changed)));
     }
     for (const commit of commits) {
-      nodes.push(
-        this.row(commit.subject || "(no message)", `${relative(commit.date)} · ${commit.short}`, () =>
-          this.host.showCommit(commit, path),
-        ),
-      );
+      nodes.push(this.row(commit.subject || "(no message)", relative(commit.date), () => this.host.showCommit(commit, path)));
     }
     if (!commits.length && !changed) nodes.push(emptyLine("Not committed yet."));
     box.replaceChildren(...nodes);

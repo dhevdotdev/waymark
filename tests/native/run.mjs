@@ -1,7 +1,7 @@
 // Runs the packaged app's self-test against disposable vaults and fails on any failed check.
 // Usage: node tests/native/run.mjs [read|git|commit|diverged|blocked ...]
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +41,8 @@ async function vaultBehindRemote(base) {
   return local;
 }
 
+const LIBRARY_BASE = `filters: note.sort-of == "yes"\nviews:\n  - type: table\n    order: [file.name, file.mtime]\n`;
+
 const SETUP = {
   async read(base) {
     const vault = path.join(base, "vault");
@@ -57,6 +59,49 @@ const SETUP = {
     await commitAll(vault, "local change");
     return vault;
   },
+  async restore(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await writeFile(path.join(vault, "Selftest note.md"), "# Selftest note\n\nThe first text.\n");
+    await commitAll(vault, "first version");
+    await writeFile(path.join(vault, "Selftest note.md"), "# Selftest note\n\nThe second text.\n");
+    await commitAll(vault, "second version");
+    return vault;
+  },
+  backup: vaultBehindRemote,
+  async library(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await mkdir(path.join(vault, ".obsidian"), { recursive: true });
+    await writeFile(path.join(vault, ".obsidian/app.json"), JSON.stringify({ userIgnoreFilters: ["Excluded.md"] }));
+    await writeFile(path.join(vault, "Excluded.md"), "uniquewordexcluded\n");
+    await writeFile(path.join(vault, "Selftest item one.md"), "---\nsort-of: yes\n---\n\nOne.\n");
+    await mkdir(path.join(vault, "Views"), { recursive: true });
+    await writeFile(path.join(vault, "Views/Items.base"), LIBRARY_BASE);
+    await commitAll(vault, "fixture");
+    return vault;
+  },
+  async conflict(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await commitAll(vault, "fixture");
+    return vault;
+  },
+  async relaunch(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await writeFile(path.join(vault, "Welcome.md"), "# Welcome\n");
+    await writeFile(
+      path.join(vault, "Selftest long.md"),
+      `${"A long paragraph of reading that fills the page with enough words to wrap.\n\n".repeat(120)}`,
+    );
+    await commitAll(vault, "fixture");
+    return vault;
+  },
   async blocked(base) {
     const vault = await vaultBehindRemote(base);
     await writeFile(path.join(vault, "Welcome.md"), "# Welcome\n\nmy local edit\n");
@@ -66,6 +111,32 @@ const SETUP = {
 
 /** What must be true on disk afterwards, read with Git itself rather than through the app. */
 const VERIFY = {
+  async library(base) {
+    const vault = path.join(base, "vault");
+    if ((await readFile(path.join(vault, "Views/Items.base"), "utf8")) !== LIBRARY_BASE)
+      throw new Error("the .base file changed");
+    const settings = JSON.parse(await readFile(path.join(vault, ".obsidian/app.json"), "utf8"));
+    if (settings.userIgnoreFilters?.[0] !== "Excluded.md") throw new Error("Obsidian's settings changed");
+  },
+  backup(base) {
+    const remote = path.join(base, "remote.git");
+    const subjects = execFileSync("git", ["-C", remote, "log", "--format=%s", "main"]).toString().trim().split("\n");
+    if (!/^vault backup: \d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(subjects[0]))
+      throw new Error(`remote holds: ${subjects.join(" | ")}`);
+    if (!subjects.includes("remote change")) throw new Error("incoming work was lost");
+    const merges = execFileSync("git", ["-C", remote, "rev-list", "--merges", "--count", "main"]).toString().trim();
+    if (merges !== "0") throw new Error("the backup created a merge");
+    const text = execFileSync("git", ["-C", remote, "show", "main:Selftest backup.md"]).toString();
+    if (!text.includes("typed just before the run")) throw new Error(`the note on the remote: ${text}`);
+  },
+  restore(base) {
+    const vault = path.join(base, "vault");
+    const run = (...args) => execFileSync("git", ["-C", vault, ...args]).toString();
+    if (run("rev-list", "--count", "HEAD").trim() !== "2") throw new Error("the history changed");
+    if (run("stash", "list").trim()) throw new Error("a stash was created");
+    const status = run("status", "--porcelain");
+    if (!/ M "?Selftest note\.md/.test(status) || !status.includes("before restore")) throw new Error(`status: ${status}`);
+  },
   commit(base) {
     const remote = path.join(base, "remote.git");
     const subject = execFileSync("git", ["-C", remote, "log", "-1", "--format=%s", "main"]).toString().trim();
@@ -76,10 +147,16 @@ const VERIFY = {
   },
 };
 
-function launch(vault, mode, out) {
+function launch(vault, mode, out, home) {
   return new Promise((resolve, reject) => {
     const child = spawn(APP, [], {
-      env: { ...process.env, WAYMARK_SELFTEST_OUT: out, WAYMARK_SELFTEST_VAULT: vault, WAYMARK_SELFTEST_MODE: mode },
+      env: {
+        ...process.env,
+        ...(home ? { HOME: home } : {}),
+        WAYMARK_SELFTEST_OUT: out,
+        WAYMARK_SELFTEST_VAULT: vault,
+        WAYMARK_SELFTEST_MODE: mode,
+      },
       stdio: "ignore",
     });
     const timer = setTimeout(() => {
@@ -99,9 +176,19 @@ for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys
   const base = await mkdtemp(path.join(tmpdir(), "waymark-native-"));
   try {
     const out = path.join(base, "report.json");
-    await launch(await SETUP[mode](base), mode, out);
+    const vault = await SETUP[mode](base);
+    if (mode === "relaunch") {
+      const home = path.join(base, "home");
+      await mkdir(home, { recursive: true });
+      await launch(vault, "relaunch-1", out, home);
+      const first = JSON.parse(await readFile(out, "utf8"));
+      if (!first.passed) throw new Error(`first launch failed: ${JSON.stringify(first.results.filter((r) => !r.ok))}`);
+      await launch(vault, "relaunch-2", out, home);
+    } else {
+      await launch(vault, mode, out);
+    }
     const report = JSON.parse(await readFile(out, "utf8"));
-    VERIFY[mode]?.(base);
+    await VERIFY[mode]?.(base);
     const bad = report.results.filter((r) => !r.ok);
     failed += bad.length;
     console.log(

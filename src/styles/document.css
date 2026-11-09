@@ -19,7 +19,7 @@
   color: var(--ink);
   font-kerning: normal;
   hanging-punctuation: first;
-  text-wrap: pretty;
+  text-wrap: stable;
   -webkit-font-smoothing: antialiased;
 }
 .doc > * {

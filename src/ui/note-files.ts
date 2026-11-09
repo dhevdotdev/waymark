@@ -1,8 +1,10 @@
 import { isDesktop, native } from "../platform";
 import type { PrefStore } from "../prefs";
+import { isBaseFile } from "../vault/index";
 import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
 import type { VaultStore } from "../vault/store";
 import type { Workspace } from "../vault/workspace";
+import type { Bookmarks } from "./bookmarks";
 import { type MenuItem, showContextMenu } from "./context-menu";
 import type { FileTree } from "./file-tree";
 import { icons } from "./icons";
@@ -11,6 +13,7 @@ import type { NoteEditing } from "./note-editing";
 import { Palette, type PaletteItem } from "./palette";
 import { plural } from "./plural";
 import { confirmAction, promptText } from "./prompts";
+import { moveSpot } from "./reading-spots";
 import { type RowAction, RowActions } from "./row-actions";
 import { renameRecent } from "./start-page";
 
@@ -25,6 +28,7 @@ export interface NoteFilesHost {
   toast: (message: string) => void;
   notePath: () => string;
   open: (path: string, newTab?: boolean) => Promise<void>;
+  bookmarks: Bookmarks;
   /** Redraws whatever depends on which files exist. */
   redraw: () => Promise<void>;
 }
@@ -307,6 +311,8 @@ export class NoteFiles {
     for (const [from, to] of notes) {
       workspace.replaceNote(from, to);
       renameRecent(prefs, root, from, to);
+      moveSpot(prefs, root, from, to);
+      this.host.bookmarks.noteMoved(from, to);
     }
     const { count, failed } = await this.applyLinkUpdates(planned, moved);
     await editing.vaultChanged();
@@ -367,6 +373,10 @@ export class NoteFiles {
 
   private rowActions(row: HTMLElement): RowAction[] {
     const folder = row.dataset.folder;
+    if (row.dataset.bookmark !== undefined) {
+      const bookmark = this.host.bookmarks.at(Number(row.dataset.bookmark));
+      return bookmark ? [{ label: "Remove bookmark", icon: icons.close, run: () => this.host.bookmarks.remove(bookmark) }] : [];
+    }
     const more = (items: MenuItem[]): RowAction => ({
       label: "More",
       icon: icons.more,
@@ -392,17 +402,23 @@ export class NoteFiles {
       { label: "New folder here…", run: () => void this.newFolder(folder) },
       { label: "Rename…", startsGroup: true, run: () => void this.startRenameFolder(folder) },
       ...this.reveal(folder),
-      { label: "Move to Trash", run: () => void this.removeFolder(folder) },
+      { label: "Move to Trash", danger: true, run: () => void this.removeFolder(folder) },
     ];
   }
 
   private noteMenu(path: string): MenuItem[] {
+    if (isBaseFile(path)) return [{ label: "Open in new tab", run: () => void this.host.open(path, true) }, ...this.reveal(path)];
+    const { bookmarks } = this.host;
     return [
+      {
+        label: bookmarks.has({ path }) ? "Remove bookmark" : "Bookmark",
+        run: () => bookmarks.toggle({ path }),
+      },
       { label: "Open in new tab", run: () => void this.host.open(path, true) },
       { label: "Rename…", run: () => void this.startRename(path) },
       { label: "Move to…", run: () => this.promptMove(path) },
       ...this.reveal(path),
-      { label: "Move to Trash", startsGroup: true, run: () => void this.remove(path) },
+      { label: "Move to Trash", startsGroup: true, danger: true, run: () => void this.remove(path) },
     ];
   }
 

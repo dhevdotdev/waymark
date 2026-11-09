@@ -178,6 +178,9 @@ importers:
       shiki:
         specifier: ^4.6.0
         version: 4.6.0
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.6.6

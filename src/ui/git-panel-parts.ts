@@ -33,6 +33,10 @@ export const EXPLAIN: Record<string, { title: string; body: string; terminal?: b
     body: "This branch does not track a remote branch. Set one in a terminal with git push -u.",
     terminal: true,
   },
+  noteConflict: {
+    title: "A note needs a decision",
+    body: "The note you are editing changed elsewhere. Choose what to keep in the bar above it, and the next backup will carry on.",
+  },
   timeout: {
     title: "Git took too long",
     body: "Waymark stopped waiting. For a commit, a Git hook or signing prompt may still be running, and it was left alone so nothing is half-written. Otherwise check your connection and try again.",
@@ -73,6 +77,10 @@ export function remoteName(url: string | null): string {
 
 /** A large read-only sheet for diffs and past revisions. Escape or a click outside closes it. */
 let closeActiveSheet: (() => void) | null = null;
+
+export function closeSheet(): void {
+  closeActiveSheet?.();
+}
 
 export function openSheet(title: string, subtitle: string, content: HTMLElement): void {
   closeActiveSheet?.();

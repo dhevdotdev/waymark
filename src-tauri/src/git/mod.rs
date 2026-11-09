@@ -3,17 +3,21 @@
 //!
 //! Safety rules: nothing here resets, stashes, force-pushes, rebases or creates
 //! merge commits. Incoming changes apply only as fast-forwards, and every
-//! write to history is an explicit user action.
+//! write to history is an explicit user action or a backup the user turned on.
 
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use serde::Serialize;
 
+mod backup;
+#[cfg(test)]
+mod backup_tests;
 mod runner;
 #[cfg(test)]
 mod tests;
 
+pub use backup::{BackupReport, backup};
 pub use runner::{ErrorKind, GitError, GitResult, redact};
 use runner::{Mode, base_command, checked, classify, run, run_with_input};
 

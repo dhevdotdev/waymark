@@ -7,6 +7,14 @@ export interface VaultSettings {
   attachmentFolder: string;
   newNoteLocation: string;
   newNoteFolder: string;
+  /** Obsidian's "Excluded files" list, as written in its settings. */
+  ignoreFilters: string[];
+}
+
+export interface FileStat {
+  mtime: number;
+  ctime: number;
+  size: number;
 }
 
 export interface VaultSource {
@@ -18,12 +26,16 @@ export interface VaultSource {
   /** Moves a note. Fails rather than landing on anything that exists. */
   renameNote(from: string, to: string): Promise<void>;
   trashNote(path: string): Promise<void>;
+  /** Puts text in the macOS Trash as a new file named `name`, so a version being replaced can be recovered. */
+  keepInTrash(name: string, text: string): Promise<void>;
   /** Moves a folder and everything in it. Fails rather than landing on anything that exists. */
   renameFolder(from: string, to: string): Promise<void>;
   trashFolder(path: string): Promise<void>;
   /** Adds an image or PDF. Fails rather than replacing a file. */
   writeAttachment(path: string, bytes: Uint8Array): Promise<void>;
   settings(): Promise<VaultSettings>;
+  /** When each file was last changed and created, and its size. A file that is gone is left out. */
+  fileStats(paths: string[]): Promise<Record<string, FileStat>>;
   assetUrl(path: string): string;
 }
 
@@ -53,6 +65,9 @@ export function devVaultSource(): VaultSource {
     async trashNote(path) {
       await post("/@vault/trash", JSON.stringify({ path }), `Could not remove ${path}`);
     },
+    async keepInTrash(name, text) {
+      await post("/@vault/keep-in-trash", JSON.stringify({ name, text }), `Could not keep ${name}`);
+    },
     async renameFolder(from, to) {
       await post("/@vault/rename", JSON.stringify({ from, to }), `Could not rename ${from}`);
     },
@@ -61,6 +76,10 @@ export function devVaultSource(): VaultSource {
     },
     async writeAttachment(path, bytes) {
       await post(`/@vault/attachment?path=${encodeURIComponent(path)}`, bytes as BodyInit, `Could not add ${path}`);
+    },
+    async fileStats(paths) {
+      const res = await fetch("/@vault/stats", { method: "POST", headers: { "x-waymark": "1" }, body: JSON.stringify(paths) });
+      return res.json();
     },
     async settings() {
       const res = await fetch("/@vault/settings");

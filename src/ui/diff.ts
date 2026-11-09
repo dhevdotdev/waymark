@@ -1,3 +1,5 @@
+import type { PrefStore } from "../prefs";
+
 interface Line {
   kind: "add" | "del" | "ctx" | "meta";
   text: string;
@@ -221,4 +223,16 @@ function row(line: Line, content?: DocumentFragment): HTMLElement {
   else text.textContent = line.text || " ";
   el.append(o, n, sign, text);
   return el;
+}
+
+/** Draws a diff with the reader's wrap setting, and remembers a change to it. */
+export function diffWithPrefs(prefs: PrefStore, text: string, emptyMessage?: string): HTMLElement {
+  return renderDiff(text, {
+    emptyMessage,
+    wrapped: prefs.value.diffWrap,
+    onWrapChange: (wrapped) =>
+      prefs.update((p) => {
+        p.diffWrap = wrapped;
+      }),
+  });
 }

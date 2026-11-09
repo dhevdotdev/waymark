@@ -8,6 +8,13 @@ interface VaultState {
   openFolders?: string[];
   /** Notes opened lately, newest first, for the new-tab page. */
   recent?: { path: string; at: number }[];
+  /** Where reading stopped in each note. Read through ReadingSpots, which validates it. */
+  spots?: Record<string, { line: number; offset: number; at: number } | undefined>;
+  /** Saved notes and headings. Read through Bookmarks, which validates them. */
+  bookmarks?: unknown[];
+  bookmarksClosed?: boolean;
+  /** When the last backup ran, and whether everything had reached the remote afterwards. */
+  lastBackup?: { at: number; reached: boolean };
 }
 
 export type SwitchProfile = "linear" | "tactile" | "clicky";
@@ -22,6 +29,8 @@ export interface Prefs {
   sound: boolean;
   syncOnLaunch: boolean;
   backgroundMinutes: number;
+  /** Minutes between automatic commits and pushes. Zero is off, which is the default. */
+  backupMinutes: number;
   /** Set once the remote-check defaults have been applied, so turning a check off afterwards sticks. */
   remoteChecksApplied: boolean;
   sidebar: boolean;
@@ -42,6 +51,7 @@ const DEFAULTS: Prefs = {
   sound: true,
   syncOnLaunch: true,
   backgroundMinutes: 15,
+  backupMinutes: 0,
   remoteChecksApplied: true,
   sidebar: true,
   rail: true,

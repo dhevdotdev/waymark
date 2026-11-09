@@ -1,6 +1,10 @@
 export type GraphScope = "vault" | "local";
 
-export type View = { kind: "note"; path: string } | { kind: "graph"; note: string; scope: GraphScope } | { kind: "blank" };
+export type View =
+  | { kind: "note"; path: string }
+  | { kind: "base"; path: string }
+  | { kind: "graph"; note: string; scope: GraphScope }
+  | { kind: "blank" };
 
 export interface TrailNode {
   id: number;
@@ -30,11 +34,12 @@ export interface Placement {
   collapsed: boolean;
 }
 
-const sameView = (a: View, b: View) => (a.kind === "note" && b.kind === "note" ? a.path === b.path : a.kind === b.kind);
+const sameView = (a: View, b: View) =>
+  (a.kind === "note" && b.kind === "note") || (a.kind === "base" && b.kind === "base") ? a.path === b.path : a.kind === b.kind;
 
 function isView(value: unknown): value is View {
   if (typeof value !== "object" || value === null || !("kind" in value)) return false;
-  if (value.kind === "note") return "path" in value && typeof value.path === "string";
+  if (value.kind === "note" || value.kind === "base") return "path" in value && typeof value.path === "string";
   if (value.kind === "graph")
     return (
       "note" in value &&

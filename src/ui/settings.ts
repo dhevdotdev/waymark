@@ -47,18 +47,22 @@ function template(p: Prefs, scheme: Scheme): string {
       <div class="pop-label">Typing sounds</div>
       <div class="seg seg-full">${choices("keysound", KEY_SOUNDS, p.keySound)}</div>
       <div class="seg seg-full key-volume${p.keySound === "off" ? " is-off" : ""}">${choices("keyvolume", KEY_VOLUMES, p.keyVolume)}</div>
+      <div class="pop-toggles">${toggle("Sounds", "sound", p.sound)}</div>
     </div>
-    <div class="pop-section pop-toggles">
-      ${toggle("Sounds", "sound", p.sound)}
-      ${
-        isDesktop
-          ? `${toggle("Check the remote on launch", "syncOnLaunch", p.syncOnLaunch)}
+    ${
+      isDesktop
+        ? `<div class="pop-section pop-toggles">
+             <div class="pop-label">Sync</div>
+             ${toggle("Check the remote on launch", "syncOnLaunch", p.syncOnLaunch)}
              ${toggle("Check every 15 minutes", "background", Boolean(p.backgroundMinutes))}
-             <p class="pop-note">Checks only fetch. Incoming changes apply when you press Sync, and only as a fast-forward.</p>`
-          : ""
-      }
-    </div>`;
+             ${toggle("Back up every 10 minutes", "backup", Boolean(p.backupMinutes))}
+             <p class="pop-note">Checks only fetch. Backup commits every change and pushes it, and stops rather than force-pushing or merging.</p>
+           </div>`
+        : ""
+    }`;
 }
+
+const BACKUP_MINUTES = 10;
 
 const KEY_SOUNDS = [
   ["off", "Off"],
@@ -144,6 +148,12 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
       host.prefs.update((p) => {
         p.syncOnLaunch = input.checked;
       });
+    }
+    if (input.dataset.pref === "backup") {
+      host.prefs.update((p) => {
+        p.backupMinutes = input.checked ? BACKUP_MINUTES : 0;
+      });
+      host.rescheduleBackground();
     }
     if (input.dataset.pref === "background") {
       host.prefs.update((p) => {

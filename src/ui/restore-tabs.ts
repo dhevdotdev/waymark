@@ -12,9 +12,10 @@ export function restoreTabs(workspace: Workspace, index: VaultIndex, saved: Save
   if (wanted?.kind === "found") {
     workspace.startWith({ kind: "note", path: wanted.path });
   } else if (saved?.tabs?.length) {
-    workspace.restore(
-      { tabs: saved.tabs, active: saved.active ?? 0 },
-      (view) => view.kind !== "blank" && index.notes.includes(view.kind === "note" ? view.path : view.note),
+    workspace.restore({ tabs: saved.tabs, active: saved.active ?? 0 }, (view) =>
+      view.kind === "base"
+        ? index.bases.includes(view.path)
+        : view.kind !== "blank" && index.notes.includes(view.kind === "note" ? view.path : view.note),
     );
   }
   if (workspace.isEmpty) {

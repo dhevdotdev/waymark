@@ -1,3 +1,4 @@
+import { isDesktop } from "../platform";
 import { headingKey } from "../vault/index";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
@@ -23,7 +24,7 @@ export class NoteView {
     doc.append(this.heading(path), body);
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);
-    this.renderPaneHead(path);
+    this.showPaneHead(path, `${Math.max(1, Math.round(this.vault.wordCount(path) / WORDS_PER_MINUTE))} min read`);
     return doc;
   }
 
@@ -35,10 +36,11 @@ export class NoteView {
   }
 
   showEmptyVault(): void {
-    this.showMessage(
-      "No Markdown notes here",
-      "Waymark reads .md files. Start one here, or open a different folder from the palette: press ⌘K and choose “Open another vault”.",
-    );
+    this.showMessage("No Markdown notes here", "Waymark reads .md files. Start one here, or open a different folder.");
+    const actions = document.createElement("div");
+    actions.className = "empty-actions";
+    actions.innerHTML = `<button class="btn btn-primary btn-small" data-act="new-note">New note</button>${isDesktop ? `<button class="btn btn-small" data-act="open-vault">Open another folder</button>` : ""}`;
+    this.els.scroller.querySelector(".empty-state.is-page")?.append(actions);
   }
 
   scrollToAnchor(anchor: string, quiet = false): void {
@@ -86,7 +88,7 @@ export class NoteView {
   }
 
   /** The note's real location and its reading time. */
-  private renderPaneHead(path: string): void {
+  showPaneHead(path: string, meta: string): void {
     const { crumbs, paneMeta } = this.els;
     crumbs.replaceChildren();
     const add = (text: string, folder: string | null) => {
@@ -98,7 +100,7 @@ export class NoteView {
     };
     add(this.vaultName, null);
     for (const folder of ancestors(path)) add(folder.slice(folder.lastIndexOf("/") + 1), folder);
-    paneMeta.textContent = `${Math.max(1, Math.round(this.vault.wordCount(path) / WORDS_PER_MINUTE))} min read`;
+    paneMeta.textContent = meta;
   }
 
   private appendBacklinks(doc: HTMLElement, path: string): void {

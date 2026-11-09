@@ -12,6 +12,8 @@ import type { EditorView, Panel, ViewUpdate } from "@codemirror/view";
 import { FIND_BUTTONS } from "./find";
 
 const COUNT_LIMIT = 999;
+const BAR_TOP = 4;
+const BAR_RIGHT = 142;
 
 type OptionKey = "caseSensitive" | "wholeWord" | "regexp";
 
@@ -130,10 +132,19 @@ export function findPanel(view: EditorView): Panel {
     }
   });
 
+  /** Sits in the bar above the note, where the Read find bar is, so it covers none of the text. */
+  const place = () => {
+    const reader = view.dom.closest(".reader")?.getBoundingClientRect();
+    if (!reader) return;
+    dom.style.top = `${reader.top + BAR_TOP}px`;
+    dom.style.right = `${window.innerWidth - reader.right + BAR_RIGHT}px`;
+  };
+
   return {
     dom,
     top: true,
     mount() {
+      place();
       field.value = current().search;
       replacement.value = current().replace;
       render();
@@ -141,6 +152,7 @@ export function findPanel(view: EditorView): Panel {
     },
     update(update: ViewUpdate) {
       const queryChanged = update.transactions.some((tr) => tr.effects.some((effect) => effect.is(setSearchQuery)));
+      if (update.geometryChanged) place();
       if (update.docChanged) origin = update.changes.mapPos(origin);
       if (queryChanged && document.activeElement !== field) field.value = current().search;
       if (update.docChanged || update.selectionSet || queryChanged) render();
