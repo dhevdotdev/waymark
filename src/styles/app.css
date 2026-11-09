@@ -6,6 +6,7 @@
 @import "./tokens.css";
 @import "./document.css";
 @import "./components.css";
+@import "./editing.css";
 
 /* The packaged Latin subsets stop short of these, and a fallback font's different width breaks text diagrams. */
 @font-face {

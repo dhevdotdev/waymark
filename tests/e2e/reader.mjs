@@ -534,7 +534,7 @@ check(
   "Escape closes the palette and leaves the blank tab",
   !(await page.locator(".palette input").isVisible()) &&
     (await page.locator(".tab").count()) === tabsBefore + 1 &&
-    (await page.locator(".empty-state.is-page").isVisible()),
+    (await page.locator(".start-page").isVisible()),
 );
 await page.keyboard.press("Meta+t");
 await pause(250);

@@ -11,3 +11,7 @@ Waymark treats note content as untrusted, because a vault can be cloned from any
 | Preferences | Stored outside the vault, validated per key | `src/prefs.ts` |
 
 Report a problem privately to the repository owner through a GitHub security advisory.
+
+## Writing notes
+
+The only code that changes a note is `write_note` in `src-tauri/src/vault.rs`. It accepts Markdown files inside the vault, refuses dot-folders and symlinks that leave the vault, and replaces a file only if it still holds the text the caller expected. Nothing in a note can trigger a write without the reader clicking or typing.

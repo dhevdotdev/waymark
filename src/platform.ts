@@ -1,4 +1,4 @@
-import type { VaultSource } from "./vault/source";
+import type { VaultSource, WriteOutcome } from "./vault/source";
 
 export const isDesktop = "__TAURI_INTERNALS__" in window;
 
@@ -100,6 +100,16 @@ export const native = {
     const { listen } = await import("@tauri-apps/api/event");
     await listen<{ paths: string[] }>("vault-changed", (e) => handler(e.payload.paths));
   },
+  /** Runs `save` when the app is about to quit, then lets it finish. */
+  async saveBeforeQuit(save: () => Promise<unknown>): Promise<void> {
+    if (!isDesktop) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen("save-before-quit", () => {
+      void save()
+        .catch(() => {})
+        .finally(() => void call<void>("finish_quit"));
+    });
+  },
   async onCloneProgress(handler: (line: string) => void): Promise<() => void> {
     const { listen } = await import("@tauri-apps/api/event");
     return listen<string>("clone-progress", (e) => handler(e.payload));
@@ -129,6 +139,7 @@ export function desktopVaultSource(): VaultSource {
     list: () => call<string[]>("list_files"),
     readText: (path) => call<string>("read_text", { path }),
     readMany: (paths) => call<(string | null)[]>("read_many", { paths }),
+    writeNote: (path, text, expected) => call<WriteOutcome>("write_note", { path, text, expected }),
     assetUrl: (path) => `vault://localhost/${path.split("/").map(encodeURIComponent).join("/")}`,
   };
 }

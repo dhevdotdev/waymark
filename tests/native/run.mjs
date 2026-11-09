@@ -1,5 +1,5 @@
 // Runs the packaged app's self-test against disposable vaults and fails on any failed check.
-// Usage: node tests/native/run.mjs [read|git|diverged|blocked ...]
+// Usage: node tests/native/run.mjs [read|git|commit|diverged|blocked ...]
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -50,6 +50,7 @@ const SETUP = {
     return vault;
   },
   git: vaultBehindRemote,
+  commit: vaultBehindRemote,
   async diverged(base) {
     const vault = await vaultBehindRemote(base);
     await writeFile(path.join(vault, "Local.md"), "A local note.\n");
@@ -60,6 +61,18 @@ const SETUP = {
     const vault = await vaultBehindRemote(base);
     await writeFile(path.join(vault, "Welcome.md"), "# Welcome\n\nmy local edit\n");
     return vault;
+  },
+};
+
+/** What must be true on disk afterwards, read with Git itself rather than through the app. */
+const VERIFY = {
+  commit(base) {
+    const remote = path.join(base, "remote.git");
+    const subject = execFileSync("git", ["-C", remote, "log", "-1", "--format=%s", "main"]).toString().trim();
+    const files = execFileSync("git", ["-C", remote, "ls-tree", "--name-only", "main"]).toString();
+    if (subject !== "From Waymark" || !files.includes("Written here.md")) throw new Error(`remote holds: ${subject}`);
+    const parents = execFileSync("git", ["-C", remote, "log", "-1", "--format=%p", "main"]).toString().trim().split(" ");
+    if (parents.length !== 1) throw new Error("the push created a merge");
   },
 };
 
@@ -88,6 +101,7 @@ for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys
     const out = path.join(base, "report.json");
     await launch(await SETUP[mode](base), mode, out);
     const report = JSON.parse(await readFile(out, "utf8"));
+    VERIFY[mode]?.(base);
     const bad = report.results.filter((r) => !r.ok);
     failed += bad.length;
     console.log(

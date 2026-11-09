@@ -22,6 +22,7 @@ const RENDERER_DATA = new Set([
   "data-key",
   "data-external",
   "data-attachment",
+  "data-task-line",
 ]);
 
 let configured = false;

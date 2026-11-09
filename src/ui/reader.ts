@@ -1,4 +1,4 @@
-import { isDesktop } from "../platform";
+import { isDesktop, native } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { renderDiagrams } from "../render/diagrams";
 import type { Highlighter } from "../render/highlight";
@@ -13,15 +13,17 @@ import { type GraphTabView, GraphView } from "./graph-view";
 import { Inspector } from "./inspector";
 import { LinkPreview } from "./link-preview";
 import { isNarrow, railFloats } from "./media";
+import { NoteEditing } from "./note-editing";
 import { NoteView } from "./note-view";
 import { toast } from "./overlays";
 import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
-import { toggleSettings } from "./settings";
+import { applySound, toggleSettings } from "./settings";
 import { mountShell, type ShellElements } from "./shell";
 import { Sidebar } from "./sidebar";
 import type { Sound } from "./sound";
+import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
@@ -77,6 +79,7 @@ export class Reader {
   readonly sidebar: Sidebar;
   readonly inspector: Inspector;
   readonly preview: LinkPreview;
+  readonly editing: NoteEditing;
   readonly workspace = new Workspace();
   /** The note on screen, or the note a graph tab was opened from. */
   current = "";
@@ -128,11 +131,23 @@ export class Reader {
       p.railPane,
     );
 
+    this.editing = new NoteEditing({
+      els,
+      vault,
+      toast,
+      notePath: () => this.notePath,
+      reshow: () => this.show({ keepScroll: true, keyboard: true }),
+      incomingCommits: () => this.sync.panel.status?.behind ?? 0,
+      open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
+      openUrl: (url) => void native.openExternal(url),
+    });
+
     this.sync = new SyncController({
       els,
       prefs,
       root: deps.root,
       panelHost: {
+        flushEdits: () => this.editing.flush(),
         play: (cue) => deps.sound.play(cue),
         toast,
         openNote: (path) => void this.open(path),
@@ -343,19 +358,9 @@ export class Reader {
       scheme: this.deps.scheme,
       setFamily: this.deps.setFamily,
       setAppearance: this.deps.setAppearance,
-      setSound: (on) => this.setSound(on),
+      setSound: (on) => applySound(this.deps.prefs, this.deps.sound, on),
       rescheduleBackground: () => this.sync.scheduleBackground(),
     });
-  }
-
-  setSound(on: boolean): void {
-    const { prefs, sound } = this.deps;
-    prefs.update((p) => {
-      p.sound = on;
-    });
-    sound.muted = !on;
-    if (on) sound.play("synced");
-    toast(on ? "Sounds on" : "Sounds muted");
   }
 
   // External events
@@ -367,7 +372,10 @@ export class Reader {
     if (!notes.length || this.workspace.isEmpty) return;
     const { structural, changed } = await this.vault.applyChanges(notes);
     this.sync.scheduleRefresh();
-    if (this.onGraph) await this.show({ quiet: true });
+    if (this.editing.isOpen) {
+      await this.editing.vaultChanged();
+      this.renderTree();
+    } else if (this.onGraph) await this.show({ quiet: true });
     else if (this.onBlank) this.renderTree();
     else if (!this.vault.texts.has(this.current)) this.noteView.showMissing(this.current);
     else if (changed.includes(this.current) || structural) await this.show({ keepScroll: true, quiet: true });
@@ -389,7 +397,10 @@ export class Reader {
   }
 
   handleKey(e: KeyboardEvent): void {
-    const inField = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const inField =
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      (e.target instanceof Element && e.target.closest(".cm-editor") !== null);
     if (e.key === "Escape") {
       this.handleEscape(inField);
       return;
@@ -428,6 +439,7 @@ export class Reader {
       p.vaults[root] = {
         ...this.workspace.save(),
         lastSync: p.vaults[root]?.lastSync ?? null,
+        recent: p.vaults[root]?.recent,
         openFolders: this.sidebar.tree.openFolders,
       };
     });
@@ -458,6 +470,10 @@ export class Reader {
   }
 
   private async show(opts: ShowOptions = {}): Promise<void> {
+    if (this.editing.isOpen) {
+      if (opts.quiet) return;
+      await this.editing.close();
+    }
     const { metrics } = this.deps;
     const seq = ++this.renderSeq;
     metrics.navStart = performance.now();
@@ -480,11 +496,12 @@ export class Reader {
       if (seq === this.renderSeq) this.noteView.showMissing(path);
       return;
     }
-    const rendered = await renderNote(text, path, this.renderContext());
+    const rendered = await renderNote(text, path, this.renderContext(), { interactive: true });
     if (seq !== this.renderSeq) return;
 
     const changedNote = path !== this.current;
     this.current = path;
+    if (changedNote || opts.restoring) rememberNote(this.deps.prefs, this.deps.root, path);
     metrics.lastRenderMs = rendered.ms;
     metrics.lastGrammarMs = rendered.grammarMs;
 
@@ -512,7 +529,8 @@ export class Reader {
 
   private showBlank(): void {
     if (this.find.isOpen) this.find.close();
-    this.noteView.showBlank();
+    const { prefs, root, name } = this.deps;
+    this.els.scroller.replaceChildren(startPage(this.vault, prefs, root, name));
     paint("search", []);
     this.renderTabChrome();
     this.renderTree();

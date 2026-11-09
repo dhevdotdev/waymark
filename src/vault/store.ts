@@ -3,7 +3,7 @@ import { parseFrontmatter } from "./frontmatter";
 import { VaultIndex } from "./index";
 import { LinkGraph } from "./links";
 import { SearchIndex } from "./search";
-import type { VaultSource } from "./source";
+import type { VaultSource, WriteOutcome } from "./source";
 
 const READ_CHUNK = 120;
 
@@ -63,11 +63,23 @@ export class VaultStore {
       this.links = new LinkGraph(this.index);
       for (const p of [...this.texts.keys()]) if (!fileSet.has(p)) this.texts.delete(p);
     }
-    const changed = paths.filter((p) => p.endsWith(".md") && fileSet.has(p));
-    await this.readInto(changed);
+    const candidates = paths.filter((p) => p.endsWith(".md") && fileSet.has(p));
+    const before = new Map(candidates.map((p) => [p, this.texts.get(p)]));
+    await this.readInto(candidates);
+    const changed = candidates.filter((p) => this.texts.get(p) !== before.get(p));
     await this.readInto(this.index.notes.filter((p) => !this.texts.has(p)));
     for (const path of structural ? this.index.notes : changed) this.ingest(path);
     return { structural, changed };
+  }
+
+  /** Saves a note and, once it is on disk, updates everything derived from it. */
+  async save(path: string, text: string, expected: string | null): Promise<WriteOutcome> {
+    const outcome = await this.source.writeNote(path, text, expected);
+    if (outcome.kind === "saved") {
+      this.texts.set(path, text);
+      if (this.index.notes.includes(path)) this.ingest(path);
+    }
+    return outcome;
   }
 
   /** Link communities for the whole vault, so a note keeps its colour in every view. */

@@ -43,6 +43,11 @@ export class App {
       void this.prefs.flush();
     });
     if (isDesktop) await native.onVaultChanged((paths) => void this.reader?.onVaultChanged(paths));
+    await native.saveBeforeQuit(async () => {
+      await this.reader?.editing.close();
+      this.reader?.persist();
+      await this.prefs.flush();
+    });
 
     if (devSource) await this.loadVault(devSource, "dev", "Vault", initial);
     else if (override) await this.openVault(override);
@@ -53,6 +58,7 @@ export class App {
   }
 
   async openVault(path: string): Promise<void> {
+    await this.reader?.editing.close();
     const info = await native.openVault(path);
     this.prefs.update((p) => {
       p.lastVault = info.root;
@@ -114,7 +120,8 @@ export class App {
         this.applyTheme();
       },
       openAnotherVault: () => void this.pickVault(),
-      closeVault: () => {
+      closeVault: async () => {
+        await this.reader?.editing.close();
         this.reader?.persist();
         this.prefs.update((p) => {
           p.lastVault = null;

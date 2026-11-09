@@ -4,6 +4,7 @@ import { type Command, labelOf } from "./commands";
 import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
 import type { Reader } from "./reader";
+import { applySound } from "./settings";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -34,6 +35,20 @@ export function readerCommands(r: Reader): Command[] {
   return [
     { id: "palette", keys: ["mod+k", "mod+o", "mod+p"], inField: true, run: () => r.palette.open() },
     { id: "new-tab", keys: ["mod+t"], inField: true, run: () => r.newTab() },
+    {
+      id: "edit",
+      label: () => (r.editing.isOpen ? "Back to reading" : "Edit this note"),
+      keys: ["mod+e"],
+      hint: "⌘E",
+      keywords: "write change",
+      inField: true,
+      needsNote: true,
+      run: () => void r.editing.toggle(),
+    },
+    { id: "mode-edit", needsNote: true, run: () => void r.editing.open() },
+    { id: "mode-read", needsNote: true, run: () => (r.editing.isOpen ? void r.editing.finish() : undefined) },
+    { id: "save-note", keys: ["mod+s"], inField: true, run: () => void r.editing.flush() },
+    { id: "undo-task", keys: ["mod+z"], run: () => void r.editing.undoTask() },
     {
       id: "files",
       label: "Show files",
@@ -78,7 +93,9 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘F",
       inField: true,
       needsNote: true,
-      run: () => r.find.open(),
+      run: () => {
+        if (!r.editing.find()) r.find.open();
+      },
     },
     {
       id: "sidebar",
@@ -116,7 +133,7 @@ export function readerCommands(r: Reader): Command[] {
       id: "sound",
       label: () => (prefs.value.sound ? "Mute sounds" : "Turn sounds on"),
       keywords: "audio mute",
-      run: () => r.setSound(!prefs.value.sound),
+      run: () => applySound(prefs, deps.sound, !prefs.value.sound),
     },
     { id: "text-bigger", label: "Make text larger", keys: ["mod+=", "mod+shift+="], hint: "⌘+", run: () => scaleText(1) },
     { id: "text-smaller", label: "Make text smaller", keys: ["mod+-"], hint: "⌘−", run: () => scaleText(-1) },
@@ -130,6 +147,16 @@ export function readerCommands(r: Reader): Command[] {
       inField: true,
       desktop: true,
       run: () => void r.sync.panel.sync(),
+    },
+    {
+      id: "commit-sync",
+      label: "Commit and sync",
+      keys: ["mod+alt+s"],
+      hint: "⌥⌘S",
+      keywords: "git save push pull",
+      inField: true,
+      desktop: true,
+      run: () => r.sync.panel.openCommit(),
     },
     {
       id: "sync-panel",

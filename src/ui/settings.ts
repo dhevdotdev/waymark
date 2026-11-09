@@ -1,7 +1,8 @@
 import { isDesktop } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { FAMILIES, type Scheme } from "../themes";
-import { dismissOnOutside } from "./overlays";
+import { dismissOnOutside, toast } from "./overlays";
+import type { Sound } from "./sound";
 
 type Appearance = Prefs["appearance"];
 
@@ -111,4 +112,13 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   });
 
   pop.querySelector<HTMLElement>(".theme-swatch.is-on")?.focus({ preventScroll: true });
+}
+
+export function applySound(prefs: PrefStore, sound: Sound, on: boolean): void {
+  prefs.update((p) => {
+    p.sound = on;
+  });
+  sound.muted = !on;
+  if (on) sound.play("synced");
+  toast(on ? "Sounds on" : "Sounds muted");
 }

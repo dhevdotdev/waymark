@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
@@ -26,9 +27,38 @@ async function walk(root: string, rel = ""): Promise<string[]> {
 }
 
 /**
- * Development stand-in for the Tauri vault commands: serves a vault directory
- * read-only so the reading surface can be built against real notes in a browser.
+ * Development stand-in for the Tauri vault commands, so the app can be built
+ * and tested in a browser. Writes follow the same rule as the desktop build:
+ * a note is replaced only if it still holds what the caller expected.
  */
+async function writeNote(root: string, body: { path: string; text: string; expected: string | null }): Promise<object | null> {
+  const abs = path.resolve(root, body.path);
+  const inside = abs.startsWith(path.resolve(root) + path.sep) && !body.path.split("/").some((p) => p.startsWith("."));
+  if (!inside || !body.path.toLowerCase().endsWith(".md")) return null;
+  const current = await readFile(abs, "utf8").catch(() => null);
+  if (current === null && body.expected !== null) return { kind: "missing" };
+  if (current !== null && current !== body.expected) return { kind: "changed", current };
+  const temp = `${abs}.waymark-tmp`;
+  await writeFile(temp, body.text);
+  await rename(temp, abs);
+  return { kind: "saved" };
+}
+
+async function respondToWrite(root: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  /* A custom header forces a CORS preflight, so another site open in a browser cannot post here. */
+  if (req.headers["x-waymark"] !== "1") {
+    res.statusCode = 403;
+    res.end();
+    return;
+  }
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  const outcome = await writeNote(root, JSON.parse(raw));
+  res.statusCode = outcome ? 200 : 403;
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify(outcome));
+}
+
 function devVault(root: string | undefined): Plugin {
   return {
     name: "waymark-dev-vault",
@@ -44,6 +74,10 @@ function devVault(root: string | undefined): Plugin {
           if (url.pathname === "/index") {
             res.setHeader("content-type", "application/json");
             res.end(JSON.stringify(await walk(root)));
+            return;
+          }
+          if (url.pathname === "/write" && req.method === "POST") {
+            await respondToWrite(root, req, res);
             return;
           }
           if (url.pathname === "/file") {

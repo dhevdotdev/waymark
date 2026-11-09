@@ -5,6 +5,7 @@ import type { ShellElements } from "./shell";
 import { describeSync } from "./sync-status";
 
 const REFRESH_DEBOUNCE_MS = 400;
+const FOCUS_CHECK_AFTER_MS = 2 * 60_000;
 
 export interface SyncControllerDeps {
   els: Pick<ShellElements, "sync" | "branch">;
@@ -39,8 +40,9 @@ export class SyncController {
   async start(): Promise<void> {
     if (!isDesktop) return;
     await this.panel.refresh();
-    if (this.panel.status?.isRepo && this.deps.prefs.value.syncOnLaunch) void this.panel.fetch();
+    if (this.panel.status?.isRepo && this.deps.prefs.value.syncOnLaunch) void this.panel.fetch(true);
     this.scheduleBackground();
+    window.addEventListener("focus", this.checkOnFocus);
   }
 
   scheduleBackground(): void {
@@ -61,7 +63,16 @@ export class SyncController {
     }, REFRESH_DEBOUNCE_MS);
   }
 
+  /** Coming back to the window is when a stale view of the remote matters most. Fetch only. */
+  private readonly checkOnFocus = (): void => {
+    const { prefs, root } = this.deps;
+    const last = prefs.value.vaults[root]?.lastSync ?? 0;
+    if (!prefs.value.backgroundMinutes || Date.now() - last < FOCUS_CHECK_AFTER_MS) return;
+    if (this.panel.status?.isRepo && this.panel.state.kind !== "busy") void this.panel.fetch(true);
+  };
+
   dispose(): void {
+    window.removeEventListener("focus", this.checkOnFocus);
     clearInterval(this.backgroundTimer);
     clearTimeout(this.refreshTimer);
   }

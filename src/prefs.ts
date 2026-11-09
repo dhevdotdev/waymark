@@ -6,6 +6,8 @@ interface VaultState {
   active: number;
   lastSync: number | null;
   openFolders?: string[];
+  /** Notes opened lately, newest first, for the new-tab page. */
+  recent?: { path: string; at: number }[];
 }
 
 export interface Prefs {
@@ -17,6 +19,8 @@ export interface Prefs {
   sound: boolean;
   syncOnLaunch: boolean;
   backgroundMinutes: number;
+  /** Set once the remote-check defaults have been applied, so turning a check off afterwards sticks. */
+  remoteChecksApplied: boolean;
   sidebar: boolean;
   rail: boolean;
   railPane: "outline" | "links" | "info";
@@ -30,8 +34,9 @@ const DEFAULTS: Prefs = {
   family: "catppuccin",
   appearance: "system",
   sound: true,
-  syncOnLaunch: false,
-  backgroundMinutes: 0,
+  syncOnLaunch: true,
+  backgroundMinutes: 15,
+  remoteChecksApplied: true,
   sidebar: true,
   rail: true,
   railPane: "outline",
@@ -63,6 +68,10 @@ function parsePrefs(raw: unknown): Prefs {
     const choices = CHOICES[key] as readonly unknown[] | undefined;
     if (sameShape && (!choices || choices.includes(value))) target[key] = value;
   }
+  if (saved.remoteChecksApplied !== true) {
+    prefs.syncOnLaunch = DEFAULTS.syncOnLaunch;
+    prefs.backgroundMinutes = DEFAULTS.backgroundMinutes;
+  }
   return prefs;
 }
 
@@ -74,7 +83,11 @@ export class PrefStore {
   private timer = 0;
 
   async load(): Promise<void> {
-    if (this.ephemeral) return;
+    if (this.ephemeral) {
+      this.value.syncOnLaunch = false;
+      this.value.backgroundMinutes = 0;
+      return;
+    }
     let raw: unknown = {};
     try {
       raw = isDesktop ? await native.readPrefs() : JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}");

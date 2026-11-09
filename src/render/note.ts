@@ -22,9 +22,14 @@ export interface RenderContext {
   assetUrl: (path: string) => string;
 }
 
-export async function renderNote(source: string, path: string, deps: RenderContext): Promise<RenderedNote> {
+export async function renderNote(
+  source: string,
+  path: string,
+  deps: RenderContext,
+  options: { interactive?: boolean } = {},
+): Promise<RenderedNote> {
   const t0 = performance.now();
-  const { data, body } = parseFrontmatter(source);
+  const { data, body, offset } = parseFrontmatter(source);
   const text = stripComments(body);
   const g0 = performance.now();
   await deps.highlighter.prepare(text);
@@ -35,6 +40,7 @@ export async function renderNote(source: string, path: string, deps: RenderConte
     assetUrl: deps.assetUrl,
     highlight: deps.highlighter.highlight,
     headings: [],
+    taskLineOffset: options.interactive ? offset : null,
   };
   const html = md.render(text, env as never);
   const fragment = sanitize(html);

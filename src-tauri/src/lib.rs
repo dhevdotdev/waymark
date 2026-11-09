@@ -4,15 +4,18 @@ mod vault;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer, notify::RecursiveMode};
 use serde::Serialize;
 use tauri::http::{Response, StatusCode};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 use git::{GitError, Status};
 use vault::{Vault, VaultInfo};
+
+static QUITTING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 struct Watcher(Mutex<Option<Debouncer<notify_debouncer_mini::notify::RecommendedWatcher>>>);
@@ -209,6 +212,41 @@ async fn git_push(vault: State<'_, Vault>) -> CmdResult<Status> {
         git::push(&root)
     })
     .await
+}
+
+#[tauri::command]
+async fn write_note(
+    vault: State<'_, Vault>,
+    path: String,
+    text: String,
+    expected: Option<String>,
+) -> CmdResult<vault::WriteOutcome> {
+    let root = vault.root().map_err(plain_err)?;
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        vault::write_note(&root, &path, &text, expected.as_deref()).map_err(plain_err)
+    })
+    .await
+}
+
+/// Called once the frontend has saved anything pending, so quitting can finish.
+#[tauri::command]
+fn finish_quit(app: AppHandle) {
+    app.exit(0);
+}
+
+/// Gives the frontend a moment to save before the app goes away. The timer covers a frontend that never answers.
+fn quit_after_saving(app: &AppHandle) {
+    if QUITTING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let _ = app.emit("save-before-quit", ());
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(1500));
+        handle.exit(0);
+    });
 }
 
 #[tauri::command]
@@ -466,6 +504,8 @@ pub fn run() {
             list_files,
             read_text,
             read_many,
+            write_note,
+            finish_quit,
             reveal,
             open_terminal,
             git_status,
@@ -489,6 +529,22 @@ pub fn run() {
             selftest_report,
             selftest_log
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Waymark");
+        .build(tauri::generate_context!())
+        .expect("error while running Waymark")
+        .run(|app, event| match event {
+            RunEvent::ExitRequested {
+                code: None, api, ..
+            } => {
+                api.prevent_exit();
+                quit_after_saving(app);
+            }
+            RunEvent::WindowEvent {
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } => {
+                api.prevent_close();
+                quit_after_saving(app);
+            }
+            _ => {}
+        });
 }

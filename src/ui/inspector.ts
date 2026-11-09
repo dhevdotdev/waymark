@@ -1,6 +1,7 @@
 import type { RenderedNote } from "../render/note";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
+import { FloatingOutline } from "./floating-outline";
 import { icons } from "./icons";
 import { LocalGraph } from "./local-graph";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
@@ -17,6 +18,7 @@ export interface InspectorHost extends NoteHistoryHost {
 /** The right panel: outline, links, note details and the local graph. */
 export class Inspector {
   private readonly history: NoteHistory;
+  private readonly floating = new FloatingOutline();
   private localGraph: LocalGraph | null = null;
   private spyActive: HTMLElement | null = null;
   private rendered: RenderedNote | null = null;
@@ -29,6 +31,7 @@ export class Inspector {
     pane: RailPane,
   ) {
     this.history = new NoteHistory(host);
+    els.reader.append(this.floating.root);
     this.setPane(pane);
   }
 
@@ -89,6 +92,7 @@ export class Inspector {
     }
     if (current === this.spyActive) return;
     this.spyActive = current;
+    this.floating.setActive(links.indexOf(current));
     for (const link of links) link.classList.toggle("is-active", link === current);
     if (outline.hidden) return;
     const view = railBody.getBoundingClientRect();
@@ -114,6 +118,7 @@ export class Inspector {
   private renderOutline(rendered: RenderedNote): void {
     const { outline } = this.els;
     const items = rendered.headings.filter((h) => h.level === 2 || h.level === 3);
+    this.floating.render(items);
     outline.replaceChildren();
     if (!items.length) {
       outline.append(this.empty("This note has no headings."));

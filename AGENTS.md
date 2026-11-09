@@ -1,6 +1,6 @@
 # Waymark
 
-A Mac reader for Markdown vaults kept in Git, built with Tauri 2, TypeScript and plain CSS. Notes stay ordinary files. Waymark reads them and syncs through the user's own `git`. It has no editor.
+A Mac client for Markdown vaults kept in Git, built with Tauri 2, TypeScript and plain CSS. Notes stay ordinary files that any Markdown app can open. Waymark reads and edits them as plain text and syncs through the user's own `git`.
 
 ## Commands
 
@@ -14,6 +14,7 @@ A Mac reader for Markdown vaults kept in Git, built with Tauri 2, TypeScript and
 | Open every fixture note, report render cost | `pnpm test:sweep` |
 | Compare every surface pixel by pixel with another commit | `pnpm test:visual <ref>` |
 | Build the app and run its self-test | `pnpm test:native` |
+| Sign the built app and install it, keeping macOS folder permissions | `pnpm install:app` |
 
 Rust needs `source $HOME/.cargo/env` in a fresh shell. To see a change working, follow `.agents/skills/verify-waymark/SKILL.md`.
 
@@ -23,7 +24,8 @@ These are product promises. Do not trade them for convenience.
 
 - Never reset, stash, rebase, force-push or merge divergent histories. Incoming commits apply only as fast-forwards. Anything else is explained and handed to the user's terminal.
 - No automatic commits or pushes. Background work may only fetch.
-- Never write to a vault's notes, `.obsidian/`, ignore rules or Git config. Preferences live in the app's own support folder.
+- Never write to `.obsidian/`, ignore rules or Git config. Preferences live in the app's own support folder.
+- A note changes only because the user edited it, and only through `write_note`, which refuses to replace text the user has not seen. Never add a blind overwrite. Edits must keep every byte the user did not touch, line endings included.
 - Note content is untrusted. It gets no script execution, no remote loads and no filesystem access beyond the vault. Every path from the frontend goes through `src-tauri/src/vault.rs`.
 - Redact credentials from anything that reaches the UI or a log.
 - The app imposes no organisation. No filename, folder, heading or frontmatter key has special meaning. `aliases` is the one exception, because it is how Obsidian links resolve.

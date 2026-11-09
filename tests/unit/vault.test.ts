@@ -50,7 +50,7 @@ describe("headingKey", () => {
 describe("stripComments", () => {
   it("removes inline and block comments", () => {
     expect(stripComments("a %%hidden%% b")).toBe("a  b");
-    expect(stripComments("x\n%%\nsecret\n%%\ny")).toBe("x\n\ny");
+    expect(stripComments("x\n%%\nsecret\n%%\ny")).toBe("x\n\n\n\ny");
   });
   it("keeps %% inside code", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell parameter expansion is the input under test.

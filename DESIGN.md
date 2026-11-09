@@ -1,6 +1,6 @@
 # Waymark design rationale
 
-Waymark is a reader for an Obsidian vault kept in Git. The document is the product, and the app chrome exists to get you to the next document.
+Waymark is a client for an Obsidian vault kept in Git, and reading comes first. The document is the product, and the app chrome exists to get you to the next document.
 
 ## Principles
 
@@ -22,7 +22,12 @@ Every state has a visible way in and a visible way out.
 - A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
 - The palette keeps one height while typing, and headings appear only before a query, so results never jump.
 - The Dock icon follows the theme family while Waymark runs, recoloured from one artwork by `scripts/theme-icons.mjs`. macOS shows the bundled Catppuccin icon whenever the app is closed.
-- Task items draw a box where the bullet would be, read-only because Waymark never writes to a note. Done items are dimmed, not struck through, so they stay easy to read.
+- Task boxes sit where the bullet would be and toggle the task in the file. ⌘Z undoes the last one. Done items are dimmed, not struck through, so they stay easy to read.
+- Read and Edit are a switch at the right of the pane head, because two modes need to be visible. ⌘E flips between them, and reading stays the default.
+- Editing keeps the reading column and type. Syntax appears only on the line being edited, a tick means the disk has it, and the status bar shows line, column and word count.
+- With the inspector closed, a dash per heading sits on the right edge. Hovering opens the titles. The dashes step aside while editing.
+- A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.
+- Selecting text while editing offers a small formatting bubble. It never appears without a selection.
 - Close controls lead their label on tabs and trail stops, in a 20px target with a 13px icon, the same size as the new-tab plus. Every trail stop has a quiet pill, so its always-visible remove control belongs to something.
 - Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.

@@ -1,6 +1,6 @@
 # Waymark
 
-A Mac reader for an Obsidian vault kept in Git. Notes stay ordinary Markdown files. Waymark reads them, never edits them, and syncs through your own `git`.
+A Mac client for an Obsidian vault kept in Git. Notes stay ordinary Markdown files. Waymark reads them, edits them as plain text with a live preview, and syncs through your own `git`.
 
 ## Install the build
 

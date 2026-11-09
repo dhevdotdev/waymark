@@ -40,9 +40,48 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
   check("a family with no icon is refused", !(await accepted("no-such-family")));
 }
 
+/** Proves the write path and the editor in the packaged app, where CSP and IPC apply. */
+async function checkEditing({ app, reader, vault, check, until }: SelfTestContext): Promise<void> {
+  const note = "Selftest edits.md";
+  const body = "# Edits\n\n- [ ] first\n- [x] second\n\nPlain text.\n";
+  const created = await vault.save(note, body, null);
+  check("a new note can be written", created.kind === "saved", created);
+  await until(() => vault.index.notes.includes(note));
+  await app.open(note);
+  await until(() => document.querySelector("button.task-box") !== null);
+  document.querySelector<HTMLElement>("button.task-box")?.click();
+  await until(() => vault.texts.get(note)?.includes("- [x] first") ?? false);
+  check("clicking a task writes it to disk", (await vault.source.readText(note)).includes("- [x] first"));
+  await reader.editing.open();
+  const editor = document.querySelector<HTMLElement>(".cm-content");
+  check("the editor opens", editor !== null);
+  check(
+    "the editor's styles load under CSP",
+    editor?.closest(".cm-editor") ? getComputedStyle(editor.closest(".cm-editor")!).display === "flex" : false,
+  );
+  editor?.focus();
+  document.execCommand("insertText", false, "Typed in the app. ");
+  await until(
+    () =>
+      document.querySelector<HTMLElement>(".edit-state")?.dataset.state === "saved" &&
+      (vault.texts.get(note)?.includes("Typed in the app") ?? false),
+  );
+  const disk = await vault.source.readText(note);
+  check("typing reaches the disk", disk.includes("Typed in the app"), disk.length);
+  check("the rest of the note is untouched", disk.includes("- [x] second\n\nPlain text.\n"));
+  await reader.editing.finish();
+  check("reading shows the edit", document.querySelector(".doc")?.textContent?.includes("Typed in the app") ?? false);
+  const refused = await vault.save("../outside.md", "x", null).then(
+    () => false,
+    () => true,
+  );
+  check("a write outside the vault is refused", refused);
+}
+
 async function runRead(ctx: SelfTestContext): Promise<void> {
   const { app, reader, vault, check, wait, until, log, report } = ctx;
   await checkDockIcons(ctx);
+  await checkEditing(ctx);
   const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
   if (sample) {
     const url = vault.source.assetUrl(sample);
@@ -152,6 +191,20 @@ async function runGit(ctx: SelfTestContext, played: string[]): Promise<void> {
   check("incoming changes play the incoming cue", played.includes("incoming"), played);
 }
 
+async function runCommit({ panel, vault, check, until }: SelfTestContext): Promise<void> {
+  await panel.refresh();
+  const saved = await vault.save("Written here.md", "# Written here\n", null);
+  check("the note is saved", saved.kind === "saved", saved);
+  await panel.refresh();
+  await panel.commitAndSync("From Waymark");
+  const after = await git.status();
+  check("commit and sync leaves nothing pending", after.ahead === 0 && after.behind === 0 && after.files.length === 0, after);
+  check("the sync finished cleanly", panel.state.kind === "idle", panel.state);
+  await until(() => vault.texts.get("Welcome.md")?.includes("updated remotely") ?? false, 4000);
+  check("incoming commits came in first", vault.texts.get("Welcome.md")?.includes("updated remotely") ?? false);
+  check("the commit has the message", (await git.log(null, 1, 0))[0]?.subject === "From Waymark");
+}
+
 async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]): Promise<void> {
   const { reader, vault, panel, check, until, wait } = ctx;
   await panel.refresh();
@@ -184,6 +237,8 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
   }
   if (mode === "blocked") check("local edit preserved", (vault.texts.get("Welcome.md") ?? "").includes("my local edit"));
   check("a refused sync plays the problem cue once", played.filter((c) => c === "problem").length === 1, played);
+  await panel.commitAndSync("should not land");
+  check("commit and sync stops before committing", (await git.status()).head === head);
 }
 
 /**
@@ -224,6 +279,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   app.sound.onPlay = (cue: string) => played.push(cue);
 
   if (mode === "git") await runGit(ctx, played);
+  if (mode === "commit") await runCommit(ctx);
   if (mode === "diverged" || mode === "blocked") await runRefusal(ctx, mode, played);
 
   report.results = results;

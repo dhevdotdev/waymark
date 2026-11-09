@@ -1,8 +1,11 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import { renderDiff } from "./diff";
+import { EXPLAIN, el, openSheet, relative, remoteName } from "./git-panel-parts";
 import type { Cue } from "./sound";
 
 export interface GitHost {
+  /** Saves any note being edited. False means the user still has to choose what to keep. */
+  flushEdits(): Promise<boolean>;
   onVisible?: (open: boolean) => void;
   play(cue: Cue): void;
   toast(message: string): void;
@@ -16,68 +19,6 @@ export interface GitHost {
 
 export type SyncState = { kind: "idle" } | { kind: "busy"; label: string } | { kind: "error"; error: GitError };
 
-const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean }> = {
-  offline: {
-    title: "Offline",
-    body: "The remote could not be reached. Your notes are all here and readable; sync again when you are back online.",
-  },
-  auth: {
-    title: "The remote refused access",
-    body: "Waymark uses the same credentials as git in Terminal: your SSH agent for SSH remotes and the macOS Keychain for HTTPS.",
-  },
-  diverged: {
-    title: "Histories have diverged",
-    body: "This copy and the remote each have commits the other lacks. Waymark never merges or rebases for you. Resolve it in a terminal or your Git client, then sync again.",
-    terminal: true,
-  },
-  localChangesBlock: {
-    title: "Local edits are in the way",
-    body: "Incoming commits change files you have edited here. Waymark will not overwrite them. Commit your edits first, or resolve it in a terminal.",
-    terminal: true,
-  },
-  rejected: {
-    title: "Push was rejected",
-    body: "The remote has commits you do not have yet. Sync first; Waymark never force-pushes.",
-  },
-  inProgress: {
-    title: "An operation is unfinished",
-    body: "A merge or rebase was started outside Waymark and is not finished. Complete or abort it in a terminal.",
-    terminal: true,
-  },
-  noUpstream: {
-    title: "No upstream branch",
-    body: "This branch does not track a remote branch. Set one in a terminal with git push -u.",
-    terminal: true,
-  },
-  timeout: { title: "Git took too long", body: "The operation was stopped after waiting. Check your connection and try again." },
-  notARepo: {
-    title: "Not a Git repository",
-    body: "This vault is a plain folder. Waymark reads it normally, but sync and history need Git.",
-  },
-  other: { title: "Git reported a problem", body: "" },
-};
-
-export function relative(at: number | string | null): string {
-  if (at === null) return "never";
-  const t = typeof at === "string" ? Date.parse(at) : at;
-  const s = Math.round((Date.now() - t) / 1000);
-  if (s < 45) return "just now";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h} h ago`;
-  const d = Math.round(h / 24);
-  if (d < 30) return `${d} d ago`;
-  return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text !== undefined) e.textContent = text;
-  return e;
-}
-
 /**
  * The sync panel: remote, branch, pending changes and history. Every write
  * (stage, commit, push, update) is an explicit button press.
@@ -90,6 +31,7 @@ export class GitPanel {
   private historyPath: string | null = null;
   private commits: Commit[] = [];
   private busy = false;
+  private message: string | null = null;
 
   constructor(private host: GitHost) {}
 
@@ -156,6 +98,7 @@ export class GitPanel {
 
   /** The deliberate sync: fetch, then fast-forward if that is safe. */
   async sync(): Promise<void> {
+    if (!(await this.readyForGit())) return;
     const fetched = await this.fetch(true);
     if (!fetched || !this.status) return;
     const st = this.status;
@@ -168,16 +111,92 @@ export class GitPanel {
       return;
     }
     if (st.behind > 0 && st.ahead > 0) {
-      this.state = {
-        kind: "error",
-        error: new GitError("diverged", `This copy has ${st.ahead} and the remote has ${st.behind} commits the other lacks.`),
-      };
-      this.host.play("problem");
-      this.host.onStatus(this.status, this.state);
-      if (this.root) this.render();
+      this.divergedError(st);
       return;
     }
     this.host.play("synced");
+  }
+
+  private async readyForGit(): Promise<boolean> {
+    const ready = await this.host.flushEdits();
+    if (!ready) this.host.toast("Choose what to keep in the note you are editing first.");
+    return ready;
+  }
+
+  private divergedError(st: GitStatus): void {
+    this.state = {
+      kind: "error",
+      error: new GitError("diverged", `This copy has ${st.ahead} and the remote has ${st.behind} commits the other lacks.`),
+    };
+    this.host.play("problem");
+    this.host.onStatus(this.status, this.state);
+    if (this.root) this.render();
+  }
+
+  /**
+   * One press to publish: bring in the remote first, then commit and push.
+   * Pulling before committing is what keeps histories from diverging, and
+   * anything that would need a merge stops here with nothing committed.
+   */
+  async commitAndSync(message: string, publish = true): Promise<void> {
+    if (!(await this.readyForGit())) return;
+    const hasRemote = publish && Boolean(this.status?.upstream);
+    let online = hasRemote;
+    if (hasRemote && !(await this.fetch(true))) {
+      if (this.state.kind !== "error" || this.state.error.kind !== "offline") return;
+      online = false;
+    }
+    const before = this.status;
+    if (online && before && before.behind > 0) {
+      if (before.ahead > 0) {
+        this.divergedError(before);
+        return;
+      }
+      const updated = await this.run(`Updating ${before.behind} commit${before.behind === 1 ? "" : "s"}`, () =>
+        git.fastForward(),
+      );
+      if (!updated) return;
+      this.host.play("incoming");
+    }
+    if (!(await this.commitChanges(message))) return;
+    if (!online) {
+      this.host.toast(hasRemote ? "Committed here. You are offline, so it will need a sync later." : "Committed.");
+      return;
+    }
+    if (!this.status?.ahead) {
+      this.host.play("synced");
+      return;
+    }
+    const count = this.status.ahead;
+    const pushed = await this.run(
+      "Pushing",
+      () => git.push(),
+      () => this.host.setLastSync(Date.now()),
+    );
+    if (pushed) {
+      this.host.play("pushed");
+      this.host.toast(`Synced ${count} commit${count === 1 ? "" : "s"}`);
+    }
+  }
+
+  /** Commits what is staged, or every change when nothing is. */
+  private async commitChanges(message: string): Promise<boolean> {
+    const files = this.status?.files ?? [];
+    if (!files.length) return true;
+    if (!files.some((f) => f.staged !== "." && f.staged !== "?")) {
+      if (!(await this.run("Staging", () => git.stage(files.map((f) => f.path))))) return false;
+    }
+    if (!(await this.run("Committing", () => git.commit(message)))) return false;
+    this.message = null;
+    this.host.play("commit");
+    return true;
+  }
+
+  /** Opens the panel ready to write a commit message. */
+  openCommit(): void {
+    this.tab = "changes";
+    this.open();
+    setTimeout(() => this.root?.querySelector<HTMLTextAreaElement>(".commit-box textarea")?.select());
   }
 
   toggle(anchor: HTMLElement): void {
@@ -422,10 +441,7 @@ export class GitPanel {
   private renderChanges(body: HTMLElement, st: GitStatus): void {
     if (!st.files.length) {
       const empty = el("div", "empty-state");
-      empty.append(
-        el("strong", "", "Nothing to commit"),
-        el("p", "", "Edits made in Obsidian or any other editor appear here for review."),
-      );
+      empty.append(el("strong", "", "Nothing to commit"), el("p", "", "Notes you edit appear here, ready to commit."));
       body.append(empty);
       return;
     }
@@ -451,39 +467,50 @@ export class GitPanel {
 
     const box = el("form", "commit-box");
     const msg = el("textarea");
-    msg.placeholder = staged.length ? "Describe what changed" : "Stage changes to commit them";
+    msg.placeholder = "Describe what changed";
     msg.rows = 3;
-    msg.disabled = !staged.length;
-    const commit = el(
-      "button",
-      "btn btn-primary",
-      staged.length ? `Commit ${staged.length} file${staged.length === 1 ? "" : "s"}` : "Commit",
-    );
-    commit.type = "submit";
-    commit.disabled = !staged.length;
-    box.append(msg, commit);
-    const doCommit = async () => {
+    msg.value = this.message ?? this.defaultMessage(st);
+    msg.addEventListener("input", () => {
+      this.message = msg.value;
+    });
+    const row = el("div", "commit-actions");
+    const hasRemote = Boolean(st.upstream);
+    const publish = el("button", "btn btn-primary", hasRemote ? "Commit & Sync" : "Commit");
+    publish.type = "submit";
+    publish.disabled = this.busy;
+    row.append(publish);
+    if (hasRemote) {
+      const localOnly = el("button", "btn", "Commit only");
+      localOnly.type = "button";
+      localOnly.disabled = this.busy;
+      localOnly.onclick = () => void send(false);
+      row.append(localOnly);
+    }
+    box.append(msg, row);
+    const send = async (share: boolean) => {
       if (!msg.value.trim()) {
         msg.focus();
         return;
       }
-      const ok = await this.run("Committing", () => git.commit(msg.value));
-      if (ok) {
-        this.host.play("commit");
-        this.host.toast("Committed. Push when you are ready.");
-      }
+      await this.commitAndSync(msg.value, share);
     };
     box.onsubmit = (e) => {
       e.preventDefault();
-      void doCommit();
+      void send(true);
     };
     msg.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && e.metaKey) {
         e.preventDefault();
-        void doCommit();
+        void send(true);
       }
     });
     body.append(box);
+  }
+
+  private defaultMessage(st: GitStatus): string {
+    const notes = st.files.filter((f) => f.path.endsWith(".md"));
+    if (st.files.length === 1 && notes.length === 1) return `Update ${this.host.title(notes[0].path)}`;
+    return `Update ${st.files.length} ${notes.length === st.files.length ? "notes" : "files"}`;
   }
 
   private async push(): Promise<void> {
@@ -586,52 +613,4 @@ export class GitPanel {
       this.host.toast((err as Error).message);
     }
   }
-}
-
-function remoteName(url: string | null): string {
-  if (!url) return "No remote";
-  const m = /[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/.exec(url);
-  return m ? m[1] : url;
-}
-
-/** A large read-only sheet for diffs and past revisions. Escape or a click outside closes it. */
-let closeActiveSheet: (() => void) | null = null;
-
-function openSheet(title: string, subtitle: string, content: HTMLElement): void {
-  closeActiveSheet?.();
-  const overlay = el("div", "overlay sheet-overlay");
-  const sheet = el("div", "sheet");
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-label", title);
-  const head = el("header", "sheet-head");
-  const titles = el("div");
-  titles.append(el("h2", "sheet-title", title), el("div", "sheet-sub", subtitle));
-  const close = el("button", "icon-btn");
-  close.setAttribute("aria-label", "Close");
-  close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
-  head.append(titles, close);
-  const body = el("div", "sheet-body");
-  body.append(content);
-  sheet.append(head, body);
-  overlay.append(sheet);
-  const dismiss = () => {
-    closeActiveSheet = null;
-    overlay.classList.add("is-leaving");
-    setTimeout(() => overlay.remove(), 180);
-    window.removeEventListener("keydown", onKey, true);
-  };
-  closeActiveSheet = dismiss;
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      dismiss();
-    }
-  };
-  close.onclick = dismiss;
-  overlay.addEventListener("pointerdown", (e) => {
-    if (e.target === overlay) dismiss();
-  });
-  window.addEventListener("keydown", onKey, true);
-  document.body.append(overlay);
-  close.focus({ preventScroll: true });
 }

@@ -34,6 +34,14 @@
 
 **Blocked**: incoming commits would overwrite uncommitted local edits.
 
+**Draft**: the text being edited and the version known to be on disk.
+
+**Live preview**: editing the file's plain text while it looks rendered, with syntax shown only on the line being edited.
+
+**Conflict**: a note changed on disk while it had unsaved edits. Autosave stops until the user chooses.
+
+**Commit & Sync**: one press that brings in the remote, commits and pushes, in that order.
+
 **Fixture vault**: the generated, synthetic vault that tests run against.
 
 **Self-test**: checks that run inside the packaged app against a disposable vault.

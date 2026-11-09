@@ -37,6 +37,8 @@ Pure TypeScript with no DOM, tested directly.
 | `tree.ts` | Folder structure for the sidebar. |
 | `trail.ts` | One tab's map of where it has been. |
 | `workspace.ts` | The open tabs. |
+| `draft.ts` | The text being edited and what is on disk. |
+| `tasks.ts` | Task lines: toggling, progress and line endings. |
 
 ## Opening a note
 
@@ -48,6 +50,14 @@ Pure TypeScript with no DOM, tested directly.
 4. `NoteView` mounts it, then the tab strip, trail, tree and inspector update.
 5. Diagrams render last, so a slow Mermaid block never delays the text.
 
+## Changing a note
+
+`NoteEditing` (`src/ui/note-editing.ts`) owns every change to a note: clicking a task and editing one note at a time. A `Draft` (`src/vault/draft.ts`) holds the text and the version known to be on disk, saves one write at a time, and stops when the file changed elsewhere. `VaultStore.save` writes through `write_note` and updates the indexes once the disk has the text.
+
+`live-preview.ts` only decorates. It hides and styles syntax but never changes the document, so the file on disk stays exactly what was typed. CodeMirror is imported on first edit and stays out of the startup bundle.
+
+`GitPanel.commitAndSync` saves the draft, fetches, fast-forwards, commits and pushes in that order, so nothing is committed on top of a stale branch.
+
 ## Startup
 
 The restored note appears after one file read. The rest of the vault is read and indexed afterwards, and the note is redrawn in place so links gain their targets. Nothing waits on the network.
@@ -58,7 +68,7 @@ The restored note appears after one file read. The rest of the vault is read and
 
 ## Git and files (`src-tauri/`)
 
-- `vault.rs` is the path guard. Paths are checked as written and again after symlinks resolve.
+- `vault.rs` is the path guard. Paths are checked as written and again after symlinks resolve. It also holds `write_note`, which only replaces text the caller expected and writes through a temporary file and a rename.
 - `git/runner.rs` runs the system `git`. A process runs in one of three modes. `Read` and `Network` have time limits. `Write` is never killed, because stopping it midway can leave a half-updated checkout.
 - `git/mod.rs` holds the operations. Each returns fresh status, so the UI cannot show a stale view after an action.
 - `lib.rs` exposes the commands. Commands that change the repository take a write gate, so two writes never race for Git's index lock. It also runs the watcher and serves `vault://`.

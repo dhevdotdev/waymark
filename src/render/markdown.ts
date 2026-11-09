@@ -10,6 +10,8 @@ export interface RenderEnv {
   currentPath: string;
   assetUrl: (path: string) => string;
   highlight: (code: string, lang: string) => string | null;
+  /** Lines above the rendered text in the file, or null when tasks here should not be clickable. */
+  taskLineOffset?: number | null;
   headings: { level: number; text: string; id: string }[];
 }
 
@@ -46,8 +48,12 @@ export function createMarkdown(): MarkdownIt {
   md.core.ruler.after("inline", "task_lists", taskListRule);
   md.core.ruler.push("heading_ids", headingRule);
 
-  md.renderer.rules.task_box = (tokens, i) =>
-    `<span class="task-box" role="checkbox" aria-checked="${tokens[i].meta?.done === true}" aria-disabled="true"></span>`;
+  md.renderer.rules.task_box = (tokens, i, _opts, env) => {
+    const { done, line } = tokens[i].meta as { done: boolean; line: number };
+    const offset = (env as unknown as RenderEnv).taskLineOffset ?? null;
+    if (offset === null) return `<span class="task-box" role="checkbox" aria-checked="${done}" aria-disabled="true"></span>`;
+    return `<button class="task-box" type="button" role="checkbox" aria-checked="${done}" aria-label="Task" data-task-line="${line + offset}"></button>`;
+  };
   md.renderer.rules.wikilink = (tokens, i, _opts, env) => renderWikilink(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.fence = (tokens, i, _opts, env) => renderFence(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.blockquote_open = (tokens, i, opts, _env, self) => {
@@ -121,7 +127,7 @@ function taskListRule(state: StateCore): void {
     const done = marker[1] !== " ";
     first.content = first.content.slice(marker[0].length);
     const box = new state.Token("task_box", "", 0);
-    box.meta = { done };
+    box.meta = { done, line: item.map?.[0] ?? 0 };
     children.unshift(box);
     item.attrJoin("class", done ? "task is-done" : "task");
   });

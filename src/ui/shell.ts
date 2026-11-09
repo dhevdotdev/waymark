@@ -12,6 +12,9 @@ export interface ShellElements {
   paneHead: HTMLElement;
   crumbs: HTMLElement;
   paneMeta: HTMLElement;
+  editState: HTMLElement;
+  modeSwitch: HTMLElement;
+  statusStats: HTMLElement;
   outline: HTMLElement;
   links: HTMLElement;
   info: HTMLElement;
@@ -75,7 +78,7 @@ function template(options: ShellOptions): string {
         <div class="sidebar-resize" aria-hidden="true"></div>
       </nav>
       <main class="reader">
-        <div class="pane-head"><div class="crumbs"></div><span class="pane-meta"></span></div>
+        <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
         <div class="scroller" tabindex="-1"><article class="doc"></article></div>
       </main>
       <aside class="rail" aria-label="Inspector">
@@ -99,6 +102,7 @@ function template(options: ShellOptions): string {
           <button class="sync-btn" data-act="sync-panel" aria-label="Sync status"><span class="sync-dot"></span><span class="sync-label">Local</span></button>
         </div>
         <div class="status-trail">
+          <span class="status-stats" hidden></span>
           <button class="icon-btn" data-act="graph" data-tip="Graph" data-key="⌘G" aria-label="Graph view">${icons.graph}</button>
           <button class="icon-btn" data-act="settings" data-tip="Appearance and sync" data-key="⌘," aria-label="Appearance and sync">${icons.sliders}</button>
         </div>
@@ -121,6 +125,9 @@ export function mountShell(host: HTMLElement, options: ShellOptions): ShellEleme
     paneHead: q(".pane-head"),
     crumbs: q(".crumbs"),
     paneMeta: q(".pane-meta"),
+    editState: q(".edit-state"),
+    modeSwitch: q(".mode-switch"),
+    statusStats: q(".status-stats"),
     outline: q(".rail-outline"),
     links: q(".rail-links"),
     info: q(".rail-info"),

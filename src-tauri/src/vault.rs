@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -76,6 +77,86 @@ fn contained(root: &Path, rel: &str, allowed: fn(&str) -> bool) -> Result<PathBu
         Ok(inside) if parts_allowed(inside) => Ok(canonical),
         _ => Err(refused()),
     }
+}
+
+/// What happened to a note write. Anything but `Saved` left the disk untouched.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum WriteOutcome {
+    Saved,
+    Changed { current: String },
+    Missing,
+}
+
+/// Replaces a Markdown note, only if the file still holds `expected`. With no
+/// `expected` the note must not exist yet, so a write can never land on text
+/// the caller has not seen.
+pub fn write_note(
+    root: &Path,
+    rel: &str,
+    text: &str,
+    expected: Option<&str>,
+) -> Result<WriteOutcome, String> {
+    let refused = || format!("Refusing to write outside the vault's notes: {rel}");
+    let rel_path = Path::new(rel);
+    let is_note = rel_path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("md"));
+    let plain = rel_path
+        .components()
+        .all(|c| matches!(c, Component::Normal(part) if !part.to_string_lossy().starts_with('.')));
+    if !is_note || !plain {
+        return Err(refused());
+    }
+    let target = if root.join(rel_path).symlink_metadata().is_ok() {
+        resolve_in(root, rel)?
+    } else {
+        if expected.is_some() {
+            return Ok(WriteOutcome::Missing);
+        }
+        let parent = rel_path.parent().filter(|p| !p.as_os_str().is_empty());
+        let dir = match parent {
+            Some(p) => resolve_in(root, p.to_str().ok_or_else(refused)?)?,
+            None => root.canonicalize().map_err(|e| e.to_string())?,
+        };
+        dir.join(rel_path.file_name().ok_or_else(refused)?)
+    };
+    if target.exists() {
+        let current =
+            std::fs::read_to_string(&target).map_err(|e| format!("Could not read {rel}: {e}"))?;
+        if expected != Some(current.as_str()) {
+            return Ok(WriteOutcome::Changed { current });
+        }
+        if current == text {
+            return Ok(WriteOutcome::Saved);
+        }
+    }
+    replace_atomically(&target, text).map_err(|e| format!("Could not save {rel}: {e}"))?;
+    Ok(WriteOutcome::Saved)
+}
+
+/// Writes beside the note and renames over it, so a crash leaves the old text or the new, never half.
+fn replace_atomically(target: &Path, text: &str) -> std::io::Result<()> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let temp = target.with_file_name(format!(".waymark-{}-{stamp}.tmp", std::process::id()));
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        if let Ok(existing) = std::fs::metadata(target) {
+            std::fs::set_permissions(&temp, existing.permissions())?;
+        }
+        std::fs::rename(&temp, target)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
 }
 
 pub fn info(root: &Path) -> VaultInfo {
@@ -171,6 +252,99 @@ mod tests {
         std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("link.md"))
             .unwrap();
         assert!(resolve_in(dir.path(), "link.md").is_err());
+    }
+
+    fn note(content: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.md");
+        std::fs::write(&path, content).unwrap();
+        (dir, path)
+    }
+
+    #[test]
+    fn writes_only_over_the_text_it_expected() {
+        let (dir, path) = note("old");
+        assert_eq!(
+            write_note(dir.path(), "a.md", "new", Some("old")),
+            Ok(WriteOutcome::Saved)
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+    }
+
+    #[test]
+    fn a_change_on_disk_is_never_overwritten() {
+        let (dir, path) = note("theirs");
+        assert_eq!(
+            write_note(dir.path(), "a.md", "mine", Some("what I saw")),
+            Ok(WriteOutcome::Changed {
+                current: "theirs".into()
+            })
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "theirs");
+    }
+
+    #[test]
+    fn creating_never_lands_on_an_existing_note() {
+        let (dir, path) = note("theirs");
+        assert!(matches!(
+            write_note(dir.path(), "a.md", "mine", None),
+            Ok(WriteOutcome::Changed { .. })
+        ));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "theirs");
+        assert_eq!(
+            write_note(dir.path(), "b.md", "fresh", None),
+            Ok(WriteOutcome::Saved)
+        );
+    }
+
+    #[test]
+    fn a_deleted_note_is_reported_and_not_recreated() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            write_note(dir.path(), "gone.md", "mine", Some("old")),
+            Ok(WriteOutcome::Missing)
+        );
+        assert!(!dir.path().join("gone.md").exists());
+    }
+
+    #[test]
+    fn writes_are_confined_to_notes_in_the_vault() {
+        let (dir, _) = note("x");
+        std::fs::create_dir_all(dir.path().join(".obsidian")).unwrap();
+        for path in [
+            "../outside.md",
+            "/tmp/outside.md",
+            ".obsidian/a.md",
+            "a.txt",
+            "Notes/../../b.md",
+            ".gitignore",
+        ] {
+            assert!(write_note(dir.path(), path, "y", None).is_err(), "{path}");
+        }
+    }
+
+    #[test]
+    fn writes_refuse_a_symlink_that_leaves_the_vault() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let secret = outside.path().join("secret.md");
+        std::fs::write(&secret, "keep").unwrap();
+        std::os::unix::fs::symlink(&secret, dir.path().join("link.md")).unwrap();
+        assert!(write_note(dir.path(), "link.md", "y", Some("keep")).is_err());
+        assert_eq!(std::fs::read_to_string(&secret).unwrap(), "keep");
+    }
+
+    #[test]
+    fn a_save_keeps_permissions_and_leaves_no_temp_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let (dir, path) = note("old");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        write_note(dir.path(), "a.md", "new", Some("old")).unwrap();
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
     #[test]

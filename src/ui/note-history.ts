@@ -1,5 +1,5 @@
 import { type Commit, type FileChange, type GitStatus, git, isDesktop } from "../platform";
-import { relative } from "./git-panel";
+import { relative } from "./git-panel-parts";
 
 const HISTORY_LIMIT = 100;
 
