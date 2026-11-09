@@ -25,7 +25,7 @@ jobs:
       - run: pnpm arch
       - run: pnpm knip
       - run: pnpm coverage --reporter=default --reporter=junit --outputFile.junit=test-results.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results
