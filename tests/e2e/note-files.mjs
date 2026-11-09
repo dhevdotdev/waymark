@@ -26,6 +26,19 @@ await writeFile(file("Target.md"), TARGET);
 await writeFile(file("Mover.md"), "moves\n");
 await writeFile(file("Doomed.md"), "going\n");
 await writeFile(file("Writing.md"), "# Writing\n\nFirst line here.\n");
+mkdirSync(file("Trips/Later"), { recursive: true });
+mkdirSync(file("Scrap"));
+const PLAN = "Day: [[Trips/Day]] and [next](Day.md), home [back](../Home.md).\n";
+const HOME = "[[Trips/Plan]] [[Plan]] [m](Trips/Later/Deep.md) ![[Trips/dot.png]]\n";
+await writeFile(file("Trips/Plan.md"), PLAN);
+await writeFile(file("Trips/Day.md"), "day\n");
+await writeFile(file("Trips/Later/Deep.md"), "[up](../Plan.md)\n");
+await writeFile(file("Trips/dot.png"), Buffer.from("iVBORw0KGgo=", "base64"));
+await writeFile(file("Home.md"), HOME);
+await writeFile(file("Scrap/One.md"), "one\n");
+await writeFile(file("Scrap/Two.md"), "two\n");
+await writeFile(file("Refers.md"), "[[One]] and [t](Scrap/Two.md)\n");
+await writeFile(file("Rel/A/Old.md".replace("Rel/A/", "")), "old\n");
 const obsidianBefore = await disk(".obsidian/app.json");
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -316,6 +329,77 @@ try {
     "pasting a URL over a selection makes a link",
     (await disk("Writing.md")).includes("[First line here.](https://example.com/x)"),
   );
+  const folderMenu = async (folder, item) => {
+    await page.locator(`.tree-head[data-folder="${folder}"]`).click({ button: "right" });
+    await pause(100);
+    await page.locator(`.context-item:has-text("${item}")`).click();
+    await pause(150);
+  };
+
+  await openNote("Trips/Plan");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(200);
+  await folderMenu("Trips", "Rename");
+  await page.fill(".prompt input", "Scrap");
+  await page.keyboard.press("Enter");
+  await pause(100);
+  check("a folder cannot take the name of another", await page.locator(".prompt-note.is-problem").isVisible());
+  await page.fill(".prompt input", "a/b");
+  await page.keyboard.press("Enter");
+  await pause(100);
+  check("a folder name with a slash is refused", await page.locator(".prompt-note.is-problem").isVisible());
+  await page.fill(".prompt input", "Journeys");
+  await page.keyboard.press("Enter");
+  await pause(900);
+  check(
+    "renaming a folder moves everything in it",
+    existsSync(file("Journeys/Later/Deep.md")) && existsSync(file("Journeys/dot.png")),
+  );
+  check("the old folder is gone", !existsSync(file("Trips")));
+  check(
+    "links from outside follow, by path, by name and to attachments",
+    (await disk("Home.md")) === "[[Journeys/Plan]] [[Plan]] [m](Journeys/Later/Deep.md) ![[Journeys/dot.png]]\n",
+    await disk("Home.md"),
+  );
+  check(
+    "a path link inside follows and relative links between moved notes stay as they were",
+    (await disk("Journeys/Plan.md")) === "Day: [[Journeys/Day]] and [next](Day.md), home [back](../Home.md).\n",
+    await disk("Journeys/Plan.md"),
+  );
+  check("the note being edited stays open at its new path", await page.locator(".cm-content").isVisible());
+  await page.locator(".cm-line").first().click();
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.type("after the move");
+  await saved();
+  await pause(150);
+  check("saving goes to the new path", (await disk("Journeys/Plan.md")).includes("after the move"));
+  check("the tree shows the new name", await page.locator('.tree-head[data-folder="Journeys"]').isVisible());
+  check("no trace of the old folder is left in the tree", (await page.locator('.tree-head[data-folder="Trips"]').count()) === 0);
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc-title");
+  await pause(300);
+  await page.locator(".doc a.wikilink", { hasText: "next" }).click();
+  await pause(400);
+  check("a Markdown link opens its note in reading", (await page.textContent(".doc-title")).includes("Day"));
+
+  await openNote("Scrap/One");
+  await folderMenu("Scrap", "Move to Trash");
+  check(
+    "deleting a folder says what goes and what breaks",
+    /2 notes/.test(await page.textContent(".prompt-note")) && /1 note outside link/.test(await page.textContent(".prompt-note")),
+    await page.textContent(".prompt-note"),
+  );
+  await page.locator('.prompt button:has-text("Cancel")').click();
+  await pause(150);
+  check("cancelling keeps the folder", existsSync(file("Scrap/One.md")));
+  await folderMenu("Scrap", "Move to Trash");
+  await page.locator('.prompt button:has-text("Move to Trash")').click();
+  await pause(600);
+  check("the folder is removed", !existsSync(file("Scrap")));
+  check("nothing outside it was touched", existsSync(file("Refers.md")) && (await disk("Refers.md")).includes("[[One]]"));
+  check("the tab showing it goes blank", (await page.locator(".doc-title").count()) === 0);
+
   check("Obsidian's settings are never touched", (await disk(".obsidian/app.json")) === obsidianBefore);
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {

@@ -1,4 +1,5 @@
 mod dock_icon;
+mod folders;
 mod git;
 mod trash;
 mod vault;
@@ -257,6 +258,29 @@ async fn trash_note(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
     let gate = vault.write_gate();
     blocking(move || {
         let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        trash::move_to_trash(&target).map_err(plain_err)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn rename_folder(vault: State<'_, Vault>, from: String, to: String) -> CmdResult<()> {
+    let root = vault.root().map_err(plain_err)?;
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        folders::rename_folder(&root, &from, &to).map_err(plain_err)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn trash_folder(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
+    let root = vault.root().map_err(plain_err)?;
+    let gate = vault.write_gate();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        let target = folders::real_folder(&root, &path).map_err(plain_err)?;
         trash::move_to_trash(&target).map_err(plain_err)
     })
     .await
@@ -575,6 +599,8 @@ pub fn run() {
             vault_settings,
             rename_note,
             trash_note,
+            rename_folder,
+            trash_folder,
             write_attachment,
             finish_quit,
             reveal,

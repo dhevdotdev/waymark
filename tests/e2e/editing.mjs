@@ -46,6 +46,30 @@ const TABLE = `# Table
 
 After.
 `;
+const BLOCKS = `# Blocks
+
+Inline $a^2+b^2$ math here.
+
+A price of $5 stays.
+
+And \`$code$\` stays.
+
+\`\`\`java
+class A { int x = 1; String s = "two"; }
+\`\`\`
+
+\`\`\`mermaid
+graph TD; A-->B;
+\`\`\`
+
+Between them.
+
+$$
+\\int_0^1 x\\,dx
+$$
+
+After blocks.
+`;
 const CRLF = "# Windows\r\n\r\nfirst line\r\nsecond line\r\n";
 
 /* CodeMirror binds undo to the platform's own modifier, and CI runs on Linux. */
@@ -60,6 +84,12 @@ await writeFile(file("Both.md"), "# Both\n\nbase text\n");
 await writeFile(file("Crlf.md"), CRLF);
 await writeFile(file("Table.md"), TABLE);
 await writeFile(file("Mixed.md"), "one\r\ntwo\nthree\r\n");
+await writeFile(file("Blocks.md"), BLOCKS);
+await writeFile(
+  file("Long code.md"),
+  `# Long\n\n\`\`\`java\nclass Long {\n${Array.from({ length: 500 }, (_, i) => `  int field${i} = ${i};`).join("\n")}\n}\n\`\`\`\n\nEnd of long.\n`,
+);
+await writeFile(file("Broken blocks.md"), "```mermaid\nthis is not -> a diagram ((\n```\n\n$$\n\\frac{\n$$\n\nStill works\n");
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
@@ -71,6 +101,8 @@ const openNote = async (name) => {
   await pause(500);
 };
 const box = (n) => page.locator("button.task-box").nth(n);
+/* Only the editor's own lines: KaTeX keeps the TeX in hidden MathML inside a drawn block. */
+const editText = () => page.$$eval(".cm-line", (lines) => lines.map((l) => l.textContent).join("\n"));
 const saved = () =>
   page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "saved", null, { timeout: 5000 });
 const externalChange = (name) => page.evaluate((n) => window.waymark.reader.onVaultChanged([n]), name);
@@ -422,6 +454,124 @@ try {
   await page.waitForSelector(".doc-title");
   await pause(300);
   check("reading shows the edited table", (await page.locator(".doc table").first().textContent()).includes("Adax"));
+
+  await openNote("Broken blocks");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-preview-block .diagram.is-error", { timeout: 15000 });
+  await pause(200);
+  check(
+    "a broken diagram says so and keeps its source visible",
+    await page.locator(".cm-preview-block .diagram-source").isVisible(),
+  );
+  check("starting at the top leaves a diagram there drawn", !(await editText()).includes("```mermaid"));
+  check("broken math does not stop the editor", (await page.locator(".cm-math-block").count()) === 1);
+  await page.locator(".cm-line", { hasText: "Still works" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("!");
+  await saved();
+  await pause(150);
+  check("typing still works beside them", (await disk("Broken blocks.md")).includes("Still works!"));
+
+  await openNote("Long code");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-code-token");
+  await pause(200);
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
+  await pause(400);
+  check(
+    "the end of a long code block is coloured too",
+    await page.locator(".cm-line", { hasText: "field499" }).locator(".cm-code-token").first().isVisible(),
+  );
+  await page.locator(".cm-line", { hasText: "field499" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("x");
+  await pause(300);
+  check(
+    "a line typed in a long block keeps its colours",
+    await page.locator(".cm-line", { hasText: "field499" }).locator(".cm-code-token").first().isVisible(),
+  );
+  await saved();
+
+  await openNote("Blocks");
+  const readColours = await page.$$eval(".code .shiki span[style]", (spans) =>
+    [...new Set(spans.map((s) => getComputedStyle(s).color))].sort(),
+  );
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await page.waitForSelector(".cm-preview-block svg", { timeout: 15000 });
+  await pause(300);
+  const line2 = (text) => page.locator(".cm-line", { hasText: text });
+  const editColours = await page.$$eval(".cm-code-token", (spans) =>
+    [...new Set(spans.map((s) => getComputedStyle(s).color))].sort(),
+  );
+  check("code has colours in Edit", editColours.length >= 3, editColours.join(" "));
+  check(
+    "they are the colours Read uses",
+    editColours.every((c) => readColours.includes(c)),
+    `${editColours} / ${readColours}`,
+  );
+  check("a diagram is drawn", await page.locator(".cm-preview-block .diagram-svg > svg").isVisible());
+  check("display math is drawn", await page.locator(".cm-math-block .katex-html").isVisible());
+  check("inline math is drawn", await page.locator(".cm-math-inline .katex-html").isVisible());
+  check("the sources stay out of sight", !(await editText()).includes("graph TD") && !(await editText()).includes("int_0"));
+  check("a lone dollar and code are not math", (await editText()).includes("$5") && (await editText()).includes("$code$"));
+  check("drawing changes nothing on disk", (await disk("Blocks.md")) === BLOCKS);
+
+  await line2("Inline").click();
+  await pause(200);
+  check("math shows its source on the cursor's line", (await editText()).includes("$a^2+b^2$"));
+  await line2("After blocks").click();
+  await pause(200);
+  check("and is drawn again after leaving it", !(await editText()).includes("$a^2+b^2$"));
+
+  await page.locator(".cm-preview-block .diagram").click();
+  await pause(250);
+  check("clicking a diagram shows its source", (await editText()).includes("graph TD"));
+  await line2("After blocks").click();
+  await pause(300);
+  check("leaving it draws it again without a new render", await page.locator(".cm-preview-block .diagram-svg > svg").isVisible());
+
+  await page.locator(".cm-math-block").click();
+  await pause(250);
+  check("clicking math shows its source", (await editText()).includes("int_0"));
+  await page.keyboard.type("+1");
+  await saved();
+  await pause(150);
+  check("math can be edited as text", (await disk("Blocks.md")).includes("+1") && (await disk("Blocks.md")).includes("$$"));
+  await line2("Between them").click();
+  await pause(200);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await pause(250);
+  check("the arrow keys walk into a block", (await editText()).includes("int_0"));
+
+  await line2("After blocks").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("```python\nx = 'text'\n```\n");
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll(".cm-line")].some((l) => l.textContent.includes("x =") && l.querySelector(".cm-code-token")),
+    null,
+    { timeout: 5000 },
+  );
+  check("a new code block gets colours for its language", true);
+  const firstToken = () => page.locator(".cm-code-token").first().getAttribute("style");
+  const tokenBefore = await firstToken();
+  await page.click('[data-act="settings"]');
+  await pause(250);
+  await page.click('[data-family="rose-pine"]');
+  await pause(700);
+  check("switching theme recolours code while editing", (await firstToken()) !== tokenBefore, await firstToken());
+  check("switching theme leaves the editor open", await page.locator(".cm-content").isVisible());
+  await page.click('[data-family="catppuccin"]');
+  await page.keyboard.press("Escape");
+  await pause(500);
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc-title");
+  await pause(300);
+  check("reading still draws the same note", (await page.locator(".doc .diagram-svg > svg").count()) === 1);
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, error.message.split("\n").slice(0, 3).join(" "));

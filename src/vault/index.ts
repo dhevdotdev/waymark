@@ -10,6 +10,48 @@ function stripExt(name: string): string {
   return name.toLowerCase().endsWith(NOTE_EXT) ? name.slice(0, -NOTE_EXT.length) : name;
 }
 
+export function folderOf(path: string): string {
+  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+}
+
+/** Follows a relative path from a folder. Null means it climbs out of the vault. */
+export function joinPath(folder: string, relative: string): string | null {
+  const parts = folder ? folder.split("/") : [];
+  for (const part of relative.split("/")) {
+    if (part === "..") {
+      if (!parts.length) return null;
+      parts.pop();
+    } else if (part !== "." && part !== "") {
+      parts.push(part);
+    }
+  }
+  return parts.join("/");
+}
+
+/** A Markdown link's destination, as a source for a larger pattern. */
+export const MARKDOWN_DESTINATION = String.raw`(<[^>\n]+>|(?:[^()\s]|\([^()\s]*\))+)`;
+export const MARKDOWN_TITLE = String.raw`(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?`;
+
+export interface LocalTarget {
+  /** The path as the file system knows it, with percent escapes undone. */
+  path: string;
+  /** Any `#heading`, exactly as written. */
+  fragment: string;
+}
+
+/** What a Markdown link's destination names inside the vault, or null for a URL, a heading in this note or malformed escapes. */
+export function localTarget(destination: string): LocalTarget | null {
+  const raw = destination.startsWith("<") ? destination.slice(1, -1) : destination;
+  if (!raw || raw.startsWith("#") || raw.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(raw)) return null;
+  const hash = raw.indexOf("#");
+  const encoded = hash < 0 ? raw : raw.slice(0, hash);
+  try {
+    return { path: decodeURI(encoded), fragment: hash < 0 ? "" : raw.slice(hash) };
+  } catch {
+    return null;
+  }
+}
+
 const fold = (s: string) => s.normalize("NFC").toLowerCase();
 
 /**
@@ -69,6 +111,15 @@ export class VaultIndex {
     if (named.length) return pick(named);
     if (wantNote) return pick(this.aliases.get(key) ?? []);
     return { kind: "missing" };
+  }
+
+  /** Resolves a Markdown link written in the note at `source`. It means a path from that note's folder before it means a name in the vault. */
+  resolveFrom(target: string, source: string, wantNote = true): Resolution {
+    if (target.startsWith("/")) return this.resolve(target, wantNote);
+    const joined = joinPath(folderOf(source), target);
+    const exact = joined === null ? undefined : this.byPath.get(fold(wantNote ? stripExt(joined) : joined));
+    if (exact) return { kind: "found", path: exact };
+    return target.startsWith(".") ? { kind: "missing" } : this.resolve(target, wantNote);
   }
 
   title(path: string): string {

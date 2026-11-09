@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
@@ -45,7 +45,7 @@ async function writeNote(root: string, body: { path: string; text: string; expec
   return { kind: "saved" };
 }
 
-const FILE_ACTIONS = new Set(["/rename", "/trash", "/attachment"]);
+const FILE_ACTIONS = new Set(["/rename", "/trash", "/trash-folder", "/attachment"]);
 
 function insideVault(root: string, rel: string): string {
   const abs = path.resolve(root, rel);
@@ -65,6 +65,8 @@ async function respondToFileAction(root: string, url: URL, req: IncomingMessage,
     await writeFile(target, body, { flag: "wx" });
   } else if (url.pathname === "/trash") {
     await unlink(insideVault(root, JSON.parse(body.toString()).path));
+  } else if (url.pathname === "/trash-folder") {
+    await rm(insideVault(root, JSON.parse(body.toString()).path), { recursive: true });
   } else {
     const { from, to } = JSON.parse(body.toString());
     const target = insideVault(root, to);

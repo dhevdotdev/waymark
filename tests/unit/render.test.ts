@@ -24,6 +24,20 @@ describe("renderNote", () => {
     expect(JSON.parse(links[4].getAttribute("data-candidates")!)).toEqual(["Inbox/B.md", "Notes/B.md"]);
   });
 
+  it("makes Markdown links inside the vault work like wikilinks", async () => {
+    const { div } = await render(
+      "[a](../Notes/A.md#Part) [b](B.md) [c](../Nope.md) [d](../Attachments/pic.png) [e](https://x.dev)",
+    );
+    const [a, b, c, d, e] = div.querySelectorAll("p a");
+    expect(a.getAttribute("data-path")).toBe("Notes/A.md");
+    expect(a.getAttribute("data-anchor")).toBe("Part");
+    expect(b.getAttribute("data-path")).toBe("Notes/B.md");
+    expect(c.classList.contains("is-missing")).toBe(true);
+    expect(c.hasAttribute("href")).toBe(false);
+    expect(d.getAttribute("data-attachment")).toBe("Attachments/pic.png");
+    expect(e.classList.contains("external")).toBe(true);
+  });
+
   it("renders callouts with fold state and keeps their lists as written", async () => {
     const { div } = await render("> [!abstract] Terms\n> - **One:** first\n> - **Two:** second\n\n> [!note]- Hidden\n> body");
     const [terms, folded] = div.querySelectorAll(".callout");

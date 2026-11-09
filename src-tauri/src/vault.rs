@@ -196,7 +196,7 @@ pub fn settings(root: &Path) -> VaultSettings {
 
 const ATTACHMENT_TYPES: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "avif", "pdf"];
 
-fn plain_relative(path: &Path) -> bool {
+pub(crate) fn plain_relative(path: &Path) -> bool {
     path.components()
         .all(|c| matches!(c, Component::Normal(part) if !part.to_string_lossy().starts_with('.')))
 }
@@ -208,7 +208,7 @@ fn has_extension(path: &Path, allowed: &[&str]) -> bool {
 }
 
 /// The folder a new file goes in, created if needed and confirmed to be inside the vault.
-fn prepared_parent(root: &Path, rel: &Path) -> Result<PathBuf, String> {
+pub(crate) fn prepared_parent(root: &Path, rel: &Path) -> Result<PathBuf, String> {
     let Some(parent) = rel.parent().filter(|p| !p.as_os_str().is_empty()) else {
         return root.canonicalize().map_err(|e| e.to_string());
     };

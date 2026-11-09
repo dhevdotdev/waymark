@@ -32,6 +32,13 @@ const LANGS: Record<string, () => Promise<unknown>> = {
   diff: () => import("shiki/langs/diff.mjs"),
 };
 
+const GRAMMARS: Record<string, string> = {
+  properties: "ini",
+  protobuf: "proto",
+  makefile: "make",
+  dockerfile: "docker",
+};
+
 const ALIASES: Record<string, string> = {
   js: "javascript",
   ts: "typescript",
@@ -65,10 +72,20 @@ const THEMES: Record<string, () => Promise<unknown>> = {
   "vitesse-dark": () => import("shiki/themes/vitesse-dark.mjs"),
 };
 
+const MAX_REMEMBERED_BLOCKS = 300;
+
+/** One coloured run of a code block, by offset into its text. */
+export interface CodeToken {
+  from: number;
+  to: number;
+  style: string;
+}
+
 export class Highlighter {
   private core: HighlighterCore | null = null;
   private loaded = new Set<string>();
   private loadedThemes = new Set<string>();
+  private remembered = new Map<string, CodeToken[]>();
   private themes = { light: "catppuccin-latte", dark: "catppuccin-mocha" };
 
   async init(): Promise<void> {
@@ -89,10 +106,11 @@ export class Highlighter {
       this.loadedThemes.add(name);
     }
     this.themes = { light, dark };
+    this.remembered.clear();
   }
 
-  /** Loads the grammars a note needs before its synchronous render pass. */
-  async prepare(markdown: string): Promise<void> {
+  /** Loads the grammars a note needs before its synchronous render pass. Returns whether any were new. */
+  async prepare(markdown: string): Promise<boolean> {
     const wanted = new Set<string>();
     for (const m of markdown.matchAll(/^\s*(?:```|~~~)\s*([\w+#-]+)/gm)) {
       const lang = canonical(m[1].toLowerCase());
@@ -105,26 +123,33 @@ export class Highlighter {
         this.loaded.add(lang);
       }),
     );
+    return wanted.size > 0;
   }
 
   highlight = (code: string, lang: string): string | null => {
     const id = canonical(lang);
     if (!this.core || !id || !this.loaded.has(id)) return null;
-    const grammar =
-      id === "properties"
-        ? "ini"
-        : id === "protobuf"
-          ? "proto"
-          : id === "makefile"
-            ? "make"
-            : id === "dockerfile"
-              ? "docker"
-              : id;
-    return this.core.codeToHtml(code, {
-      lang: grammar,
-      themes: this.themes,
-      defaultColor: false,
-    });
+    return this.core.codeToHtml(code, { lang: GRAMMARS[id] ?? id, themes: this.themes, defaultColor: false });
+  };
+
+  /** The same colours as `highlight`, as runs an editor can lay over text it owns. Null until the grammar is loaded. */
+  tokens = (code: string, lang: string): CodeToken[] | null => {
+    const id = canonical(lang);
+    if (!this.core || !id || !this.loaded.has(id)) return null;
+    const key = `${id}\0${code}`;
+    const known = this.remembered.get(key);
+    if (known) return known;
+    const { tokens } = this.core.codeToTokens(code, { lang: GRAMMARS[id] ?? id, themes: this.themes, defaultColor: false });
+    const runs = tokens.flat().map((token) => ({
+      from: token.offset,
+      to: token.offset + token.content.length,
+      style: Object.entries(token.htmlStyle ?? {})
+        .map(([name, value]) => `${name}:${value}`)
+        .join(";"),
+    }));
+    this.remembered.set(key, runs);
+    if (this.remembered.size > MAX_REMEMBERED_BLOCKS) this.remembered.delete(this.remembered.keys().next().value!);
+    return runs;
   };
 }
 

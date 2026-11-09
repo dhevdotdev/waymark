@@ -137,6 +137,7 @@ export class Reader {
     this.editing = new NoteEditing({
       els,
       vault,
+      highlighter: deps.highlighter,
       toast,
       notePath: () => this.notePath,
       reshow: () => this.show({ keepScroll: true, keyboard: true }),
@@ -153,6 +154,7 @@ export class Reader {
       root: deps.root,
       workspace: this.workspace,
       editing: this.editing,
+      folderRenamed: (from, to) => this.sidebar.tree.folderRenamed(from, to),
       toast,
       notePath: () => this.notePath,
       open: (path, newTab) => this.open(path, { newTab, focus: true }),

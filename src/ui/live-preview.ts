@@ -1,17 +1,32 @@
 import { syntaxTree } from "@codemirror/language";
-import type { EditorState, Range } from "@codemirror/state";
+import { type EditorState, type Range, StateEffect } from "@codemirror/state";
 import { Decoration, type DecorationSet, type EditorView, ViewPlugin, type ViewUpdate, WidgetType } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
+import type { CodeToken } from "../render/highlight";
+import { MathWidget } from "./editor-blocks";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
 const WIKILINK = /(?<!!)\[\[([^\]\n|#]*)(#[^\]\n|]*)?(?:\|([^\]\n]*))?\]\]/g;
 const EMBED = /!\[\[([^\]\n|#]+)(?:[|#][^\]\n]*)?\]\]|!\[[^\]\n]*\]\(([^)\s]+)\)/g;
+const INLINE_MATH = /(?<![\\\d$])\$(?!\$)([^\s\\$]|\S.*?[^\s\\])\$(?![\d$])/g;
 const HEADING = /^(?:ATX|Setext)Heading(\d)$/;
 const INLINE_STYLE: Record<string, string> = { Emphasis: "cm-em", StrongEmphasis: "cm-strong", Strikethrough: "cm-strike" };
 const HIDDEN_MARK = new Set(["EmphasisMark", "StrikethroughMark"]);
 const CODE = new Set(["InlineCode", "FencedCode", "CodeBlock", "CodeText"]);
 const LIST = new Set(["BulletList", "OrderedList"]);
 const TABLE_LINE = new Set(["TableHeader", "TableRow", "TableDelimiter"]);
+
+export interface PreviewOptions {
+  assetUrl: (target: string) => string | null;
+  codeTokens: (code: string, lang: string) => CodeToken[] | null;
+}
+
+/** Asks for the preview to be drawn again, because something outside the document changed how it looks. */
+export const redrawPreview = StateEffect.define<null>();
+
+const WHOLE_CODE_BLOCK_LINES = 120;
+const CODE_LINES_ABOVE_VIEW = 40;
+const CODE_WINDOW_STEP = 20;
 
 const hide = Decoration.replace({});
 const line = (cls: string) => Decoration.line({ class: cls });
@@ -78,7 +93,7 @@ class Builder {
 
   constructor(
     private readonly view: EditorView,
-    private readonly assetUrl: (target: string) => string | null,
+    private readonly options: PreviewOptions,
   ) {
     this.state = view.state;
     if (view.hasFocus) {
@@ -167,6 +182,40 @@ class Builder {
     if (!open) for (const m of node.getChildren("CodeMark")) this.out.push(hide.range(m.from, m.to));
     const info = node.getChild("CodeInfo");
     if (info) this.out.push(mark("cm-code-info").range(info.from, info.to));
+    this.codeColours(node);
+  }
+
+  private codeColours(node: SyntaxNode): void {
+    const info = node.getChild("CodeInfo");
+    const text = node.getChild("CodeText");
+    if (!info || !text || text.getChild("QuoteMark")) return;
+    const { doc } = this.state;
+    const lang = doc.sliceString(info.from, info.to).trim().split(/\s+/)[0].toLowerCase();
+    const { from, to } = this.codeToColour(text);
+    for (const token of this.options.codeTokens(doc.sliceString(from, to), lang) ?? []) {
+      if (!token.style || token.from === token.to) continue;
+      this.out.push(
+        Decoration.mark({ class: "cm-code-token", attributes: { style: token.style } }).range(from + token.from, from + token.to),
+      );
+    }
+  }
+
+  /**
+   * Colouring a long block on every keystroke is visibly slow, so only the part
+   * on screen is coloured, with some lines above it to pick up the grammar's
+   * state. Edges land on fixed steps so that scrolling reuses earlier work.
+   */
+  private codeToColour(text: SyntaxNode): { from: number; to: number } {
+    const { doc } = this.state;
+    const first = doc.lineAt(text.from).number;
+    const last = doc.lineAt(text.to).number;
+    if (last - first < WHOLE_CODE_BLOCK_LINES) return text;
+    const { viewport } = this.view;
+    const above = doc.lineAt(Math.max(viewport.from, text.from)).number - CODE_LINES_ABOVE_VIEW;
+    const below = doc.lineAt(Math.min(viewport.to, text.to)).number;
+    const start = Math.max(first, Math.floor(above / CODE_WINDOW_STEP) * CODE_WINDOW_STEP);
+    const end = Math.min(last, Math.ceil(below / CODE_WINDOW_STEP) * CODE_WINDOW_STEP);
+    return { from: Math.max(text.from, doc.line(start).from), to: Math.min(text.to, doc.line(end).to) };
   }
 
   private quoteMark(from: number, to: number): void {
@@ -236,6 +285,7 @@ class Builder {
       if (row.from >= this.frontmatterEnd) {
         this.wikilinksIn(row.from, row.text);
         this.embedsIn(row.from, row.text);
+        this.mathIn(row.from, row.text);
       }
       pos = row.to + 1;
     }
@@ -251,8 +301,17 @@ class Builder {
     for (const match of text.matchAll(EMBED)) {
       const at = start + match.index;
       if (this.isActive(at) || this.inCode(at + 2)) continue;
-      const url = this.assetUrl(match[1] ?? decodeURI(match[2]));
+      const url = this.options.assetUrl(match[1] ?? decodeURI(match[2]));
       if (url) this.out.push(Decoration.replace({ widget: new ImageWidget(url) }).range(at, at + match[0].length));
+    }
+  }
+
+  private mathIn(start: number, text: string): void {
+    if (!text.includes("$")) return;
+    for (const match of text.matchAll(INLINE_MATH)) {
+      const at = start + match.index;
+      if (this.isActive(at) || this.inCode(at + 1)) continue;
+      this.out.push(Decoration.replace({ widget: new MathWidget(match[1], false) }).range(at, at + match[0].length));
     }
   }
 
@@ -274,8 +333,8 @@ class Builder {
   }
 }
 
-function build(view: EditorView, assetUrl: (target: string) => string | null): DecorationSet {
-  const builder = new Builder(view, assetUrl);
+function build(view: EditorView, options: PreviewOptions): DecorationSet {
+  const builder = new Builder(view, options);
   builder.frontmatter();
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(view.state).iterate({ from, to, enter: (node) => builder.node(node) });
@@ -285,17 +344,18 @@ function build(view: EditorView, assetUrl: (target: string) => string | null): D
 }
 
 /** Draws Markdown as it will read, showing the syntax only on the lines being edited. The text itself never changes. */
-export function livePreview(assetUrl: (target: string) => string | null) {
+export function livePreview(options: PreviewOptions) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
       constructor(view: EditorView) {
-        this.decorations = build(view, assetUrl);
+        this.decorations = build(view, options);
       }
       update(update: ViewUpdate): void {
         const treeMoved = syntaxTree(update.startState) !== syntaxTree(update.state);
-        if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged || treeMoved) {
-          this.decorations = build(update.view, assetUrl);
+        const asked = update.transactions.some((tr) => tr.effects.some((effect) => effect.is(redrawPreview)));
+        if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged || treeMoved || asked) {
+          this.decorations = build(update.view, options);
         }
       }
     },

@@ -44,6 +44,16 @@ export class FileTree {
     this.onChange();
   }
 
+  /** Keeps a renamed folder, and the folders inside it, as open as they were. */
+  folderRenamed(from: string, to: string): void {
+    for (const path of [...this.opened]) {
+      if (path !== from && !path.startsWith(`${from}/`)) continue;
+      this.opened.delete(path);
+      this.opened.add(to + path.slice(from.length));
+    }
+    this.onChange();
+  }
+
   /** Opens a folder and its parents and moves focus to it. */
   focusFolder(path: string): void {
     for (const folder of ancestors(`${path}/`)) this.setOpen(folder, true);

@@ -161,7 +161,9 @@ export class App {
     this.codeFamily = family.id;
     if (isDesktop) native.setDockIcon(family.id).catch((error: unknown) => console.warn("Dock icon not changed", error));
     void this.syncCodeTheme().then(() => {
-      if (!first) this.reader?.rerender();
+      if (first) return;
+      this.reader?.rerender();
+      this.reader?.editing.redrawCode();
     });
   }
 

@@ -1,6 +1,6 @@
 import { isDesktop, native } from "../platform";
 import type { PrefStore } from "../prefs";
-import { nameProblem, rewriteLinks } from "../vault/link-rewrite";
+import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
 import type { VaultStore } from "../vault/store";
 import type { Workspace } from "../vault/workspace";
 import { showContextMenu } from "./context-menu";
@@ -16,6 +16,7 @@ export interface NoteFilesHost {
   root: string;
   workspace: Workspace;
   editing: NoteEditing;
+  folderRenamed: (from: string, to: string) => void;
   toast: (message: string) => void;
   notePath: () => string;
   open: (path: string, newTab?: boolean) => Promise<void>;
@@ -33,6 +34,8 @@ const UNTITLED = "Untitled";
 const folderOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
 const inFolder = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
+const folderName = (folder: string) => folder.slice(folder.lastIndexOf("/") + 1);
+const isInside = (folder: string, path: string) => path.startsWith(`${folder}/`);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Creating, renaming, moving and deleting notes, and keeping links true afterwards. */
@@ -122,6 +125,53 @@ export class NoteFiles {
     toast("Moved to the Trash");
   }
 
+  async promptRenameFolder(folder: string): Promise<void> {
+    const notes = this.host.vault.index.notes.filter((note) => isInside(folder, note)).length;
+    const name = await promptText({
+      title: "Rename folder",
+      value: folderName(folder),
+      action: "Rename",
+      hint: `${plural(notes, "note")} inside. Links to them will be updated.`,
+      validate: (value) => this.folderNameProblem(folder, value),
+    });
+    if (name !== null && name !== folderName(folder)) await this.renameFolder(folder, inFolder(folderOf(folder), name));
+  }
+
+  async removeFolder(folder: string): Promise<void> {
+    const { vault, editing, workspace, toast, redraw } = this.host;
+    const notes = vault.index.notes.filter((note) => isInside(folder, note));
+    const files = vault.index.attachments.filter((file) => isInside(folder, file)).length;
+    const linking = new Set(notes.flatMap((note) => vault.links.backlinks(note)).filter((note) => !isInside(folder, note))).size;
+    const contents = files ? `${plural(notes.length, "note")} and ${plural(files, "other file")}` : plural(notes.length, "note");
+    const confirmed = await confirmAction({
+      title: `Move “${folderName(folder)}” to the Trash?`,
+      body: `This takes ${contents} with it. ${
+        linking
+          ? `${plural(linking, "note")} outside link in, and those links will stop working.`
+          : "You can put it back from the Trash in Finder."
+      }`,
+      action: "Move to Trash",
+    });
+    if (!confirmed) return;
+    const beingEdited = isInside(folder, editing.path);
+    if (beingEdited) {
+      await editing.flush();
+      editing.setFrozen(true);
+    }
+    try {
+      await vault.source.trashFolder(folder);
+    } catch (error) {
+      editing.setFrozen(false);
+      toast(error instanceof Error ? error.message : "The folder could not be moved to the Trash.");
+      return;
+    }
+    if (beingEdited) editing.discard();
+    await vault.applyChanges([]);
+    for (const note of notes) workspace.forgetNote(note);
+    await redraw();
+    toast("Moved to the Trash");
+  }
+
   private async defaultFolder(): Promise<string> {
     const { new_location, folder } = await this.obsidianNewNotePlace();
     if (new_location === "current") return folderOf(this.host.notePath());
@@ -149,12 +199,37 @@ export class NoteFiles {
     return clash ? "A note with that name is already in this folder." : null;
   }
 
+  private folderNameProblem(folder: string, name: string): string | null {
+    const problem = nameProblem(name);
+    if (problem) return problem;
+    const { notes, attachments } = this.host.vault.index;
+    const next = inFolder(folderOf(folder), name).toLowerCase();
+    if (next === folder.toLowerCase()) return null;
+    const clash = [...notes, ...attachments].some((file) => file.toLowerCase().startsWith(`${next}/`));
+    return clash ? "A folder with that name is already here." : null;
+  }
+
+  renameFolder(from: string, to: string): Promise<boolean> {
+    const { notes, attachments } = this.host.vault.index;
+    const moved = new Map(
+      [...notes, ...attachments].filter((file) => isInside(from, file)).map((file) => [file, to + file.slice(from.length)]),
+    );
+    return this.relocate(moved, async () => {
+      await this.host.vault.source.renameFolder(from, to);
+      this.host.folderRenamed(from, to);
+    });
+  }
+
+  private move(from: string, to: string): Promise<boolean> {
+    return this.relocate(new Map([[from, to]]), () => this.host.vault.source.renameNote(from, to));
+  }
+
   /**
-   * Moves the file, then updates every note that links to it. The new text is
-   * worked out first, while links still resolve as they did, and each update
+   * Moves files, then updates every note whose links they affect. The new text
+   * is worked out first, while links still resolve as they did, and each update
    * states the text it expects, like any save.
    */
-  private async move(from: string, to: string): Promise<boolean> {
+  private async relocate(moved: ReadonlyMap<string, string>, moveFiles: () => Promise<void>): Promise<boolean> {
     const { editing, toast } = this.host;
     if (this.moveRunning) return false;
     if (!(await editing.flush())) {
@@ -164,7 +239,7 @@ export class NoteFiles {
     this.moveRunning = true;
     editing.setFrozen(true);
     try {
-      return await this.moveAndRelink(from, to);
+      return await this.moveAndRelink(moved, moveFiles);
     } catch (error) {
       toast(error instanceof Error ? error.message : "The note could not be moved.");
       return false;
@@ -174,15 +249,18 @@ export class NoteFiles {
     }
   }
 
-  private async moveAndRelink(from: string, to: string): Promise<boolean> {
+  private async moveAndRelink(moved: ReadonlyMap<string, string>, moveFiles: () => Promise<void>): Promise<boolean> {
     const { vault, workspace, prefs, root, editing, toast, redraw } = this.host;
-    const planned = await this.planLinkUpdates(from, to);
-    await vault.source.renameNote(from, to);
-    editing.noteMoved(from, to);
-    await vault.applyChanges([to]);
-    workspace.replaceNote(from, to);
-    renameRecent(prefs, root, from, to);
-    const { count, failed } = await this.applyLinkUpdates(planned, from, to);
+    const planned = await this.planLinkUpdates(moved);
+    await moveFiles();
+    const notes = [...moved].filter(([from]) => vault.index.notes.includes(from));
+    for (const [from, to] of notes) editing.noteMoved(from, to);
+    await vault.applyChanges(notes.map(([, to]) => to));
+    for (const [from, to] of notes) {
+      workspace.replaceNote(from, to);
+      renameRecent(prefs, root, from, to);
+    }
+    const { count, failed } = await this.applyLinkUpdates(planned, moved);
     await editing.vaultChanged();
     await redraw();
     if (failed) toast(`Moved, but ${plural(failed, "note")} could not be updated.`);
@@ -190,29 +268,27 @@ export class NoteFiles {
     return true;
   }
 
-  private async planLinkUpdates(from: string, to: string): Promise<LinkUpdate[]> {
+  private async planLinkUpdates(moved: ReadonlyMap<string, string>): Promise<LinkUpdate[]> {
     const { vault } = this.host;
-    const newName = nameOf(to).toLowerCase();
-    const unique = !vault.index.notes.some((note) => note !== from && nameOf(note).toLowerCase() === newName);
-    const resolves = (target: string) => {
-      const found = vault.index.resolve(target);
-      return found.kind === "found" && found.path === from;
-    };
+    const moves = linkMoves(vault.index, moved);
     const updates: LinkUpdate[] = [];
-    for (const path of new Set([...vault.links.backlinks(from), from])) {
+    for (const path of vault.index.notes) {
       const text = await vault.read(path);
-      const next = rewriteLinks(text, from, to, unique, resolves);
+      const next = rewriteLinks(text, path, moves);
       if (next !== text) updates.push({ path, text, next });
     }
     return updates;
   }
 
-  private async applyLinkUpdates(updates: LinkUpdate[], from: string, to: string): Promise<{ count: number; failed: number }> {
+  private async applyLinkUpdates(
+    updates: LinkUpdate[],
+    moved: ReadonlyMap<string, string>,
+  ): Promise<{ count: number; failed: number }> {
     const { vault } = this.host;
     let count = 0;
     let failed = 0;
     for (const { path, text, next } of updates) {
-      const outcome = await vault.save(path === from ? to : path, next, text).catch(() => null);
+      const outcome = await vault.save(moved.get(path) ?? path, next, text).catch(() => null);
       if (outcome?.kind === "saved") count++;
       else failed++;
     }
@@ -248,7 +324,13 @@ export class NoteFiles {
     if (!note && !folder) return;
     e.preventDefault();
     if (folder) {
-      showContextMenu(e.clientX, e.clientY, [{ label: "New note here", run: () => void this.newNote(folder.dataset.folder) }]);
+      const path = folder.dataset.folder!;
+      showContextMenu(e.clientX, e.clientY, [
+        { label: "New note here", run: () => void this.newNote(path) },
+        { label: "Rename…", run: () => void this.promptRenameFolder(path) },
+        ...(isDesktop ? [{ label: "Reveal in Finder", run: () => void native.reveal(path) }] : []),
+        { label: "Move to Trash", run: () => void this.removeFolder(path) },
+      ]);
       return;
     }
     const path = note!.dataset.path!;

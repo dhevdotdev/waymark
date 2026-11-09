@@ -68,6 +68,7 @@ The restored note appears after one file read. The rest of the vault is read and
 
 ## Git and files (`src-tauri/`)
 
+- `folders.rs` renames and trashes whole folders, and refuses the vault itself, dot-folders and symlinks.
 - `vault.rs` is the path guard. Paths are checked as written and again after symlinks resolve. It also holds `write_note`, which only replaces text the caller expected and writes through a temporary file and a rename.
 - `git/runner.rs` runs the system `git`. A process runs in one of three modes. `Read` and `Network` have time limits. `Write` is never killed, because stopping it midway can leave a half-updated checkout. After two minutes Waymark stops waiting and reports it, so a stuck hook cannot wedge the sync panel.
 - `git/mod.rs` holds the operations. Each returns fresh status, so the UI cannot show a stale view after an action.

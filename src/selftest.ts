@@ -95,10 +95,61 @@ async function checkEditing({ app, reader, vault, check, until }: SelfTestContex
   await vault.applyChanges([]);
 }
 
+/** Code colours, diagrams and math in the editor, where CSP could stop any of them. */
+async function checkEditPreview({ app, reader, vault, check, until }: SelfTestContext): Promise<void> {
+  const note = "Selftest blocks.md";
+  const fence = "```";
+  const body = `# Blocks\n\nInline $x^2$ math.\n\n${fence}java\nclass A { int x = 1; }\n${fence}\n\n${fence}mermaid\ngraph TD; A-->B;\n${fence}\n\n$$\ny^2\n$$\n\nEnd.\n`;
+  await vault.save(note, body, null);
+  await until(() => vault.index.notes.includes(note));
+  await app.open(note);
+  await reader.editing.open();
+  await until(() => document.querySelector(".cm-preview-block .diagram-svg svg") !== null, 15000);
+  check("a diagram is drawn in the editor", document.querySelector(".cm-preview-block .diagram-svg svg") !== null);
+  const colours = new Set([...document.querySelectorAll(".cm-code-token")].map((token) => getComputedStyle(token).color));
+  check("code has several colours in the editor", colours.size >= 3, [...colours].join(" "));
+  check("display math is drawn in the editor", document.querySelector(".cm-math-block .katex-html") !== null);
+  check("inline math is drawn in the editor", document.querySelector(".cm-math-inline .katex-html") !== null);
+  await reader.editing.finish();
+  check("drawing them leaves the note as it was", (await vault.source.readText(note)) === body);
+  await vault.source.trashNote(note);
+  await vault.applyChanges([]);
+}
+
+/** Renaming and deleting folders in the packaged app, where the native commands run. */
+async function checkFolders({ reader, vault, check, until }: SelfTestContext): Promise<void> {
+  const inside = "Selftest folder/Inside.md";
+  const linker = "Selftest linker.md";
+  await vault.save(inside, "inside\n", null);
+  await vault.save(linker, "[[Selftest folder/Inside]] [m](Selftest%20folder/Inside.md)\n", null);
+  await until(() => vault.index.notes.includes(inside) && vault.index.notes.includes(linker));
+  await reader.files.renameFolder("Selftest folder", "Selftest moved");
+  const files = await vault.source.list();
+  check("a folder can be renamed", files.includes("Selftest moved/Inside.md") && !files.includes(inside));
+  check(
+    "links follow a renamed folder",
+    (await vault.source.readText(linker)) === "[[Selftest moved/Inside]] [m](Selftest%20moved/Inside.md)\n",
+  );
+  const refused = (path: string) =>
+    vault.source.trashFolder(path).then(
+      () => false,
+      () => true,
+    );
+  check("the vault itself cannot be trashed", await refused(""));
+  check("a hidden folder cannot be trashed", await refused(".git"));
+  check("a folder outside the vault cannot be trashed", await refused("../outside"));
+  await vault.source.trashFolder("Selftest moved");
+  check("a folder can be moved to the Trash", !(await vault.source.list()).includes("Selftest moved/Inside.md"));
+  await vault.source.trashNote(linker);
+  await vault.applyChanges([]);
+}
+
 async function runRead(ctx: SelfTestContext): Promise<void> {
   const { app, reader, vault, check, wait, until, log, report } = ctx;
   await checkDockIcons(ctx);
   await checkEditing(ctx);
+  await checkEditPreview(ctx);
+  await checkFolders(ctx);
   const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
   if (sample) {
     const url = vault.source.assetUrl(sample);

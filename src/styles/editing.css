@@ -90,6 +90,28 @@
   border-end-end-radius: var(--r-control);
   padding-block-end: 0.5rem;
 }
+.doc-editing .cm-code-token {
+  color: var(--shiki-light);
+}
+:root[data-scheme="dark"] .doc-editing .cm-code-token {
+  color: var(--shiki-dark);
+}
+.doc-editing .cm-preview-block {
+  padding-block: var(--s2);
+}
+.doc-editing .cm-preview-block .diagram {
+  margin: 0;
+}
+.doc-editing .diagram-expand {
+  display: none;
+}
+.doc-editing .cm-math-block {
+  overflow-x: auto;
+  text-align: center;
+}
+.doc-editing .cm-math-inline .katex {
+  font-size: 1em;
+}
 .doc-editing .cm-code-info,
 .doc-editing .cm-syntax,
 .doc-editing .cm-list-number {

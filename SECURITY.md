@@ -14,7 +14,9 @@ Report a problem privately to the repository owner through a GitHub security adv
 
 ## Writing notes
 
-In the app, the only code that changes a note is `write_note` in `src-tauri/src/vault.rs`. It accepts Markdown files inside the vault, refuses dot-folders and symlinks that leave the vault, and replaces a file only if it still holds the text the caller expected. Another app writing in the instant between that check and the rename cannot be detected. Note content cannot trigger a write: a task box only acts if this render created it, so one written as HTML in a note does nothing. The development server has a stand-in with the same rule, for browser tests only.
+In the app, the only code that changes a note's text is `write_note` in `src-tauri/src/vault.rs`. It accepts Markdown files inside the vault, refuses dot-folders and symlinks that leave the vault, and replaces a file only if it still holds the text the caller expected. Another app writing in the instant between that check and the rename cannot be detected. Note content cannot trigger a write: a task box only acts if this render created it, so one written as HTML in a note does nothing. The development server has a stand-in with the same rule, for browser tests only.
+
+Renaming and trashing a folder go through `real_folder` in `src-tauri/src/folders.rs`, which accepts only a real, visible folder inside the vault: never the vault itself, a dot-folder or a symlink. A rename refuses to land on anything that exists, and a delete goes to the macOS Trash.
 
 ## Frames
 

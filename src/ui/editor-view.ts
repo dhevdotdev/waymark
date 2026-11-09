@@ -11,11 +11,13 @@ import {
   type Transaction,
 } from "@codemirror/state";
 import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
+import { previewBlocks } from "./editor-blocks";
 import { editorInsert, type InsertOptions } from "./editor-insert";
-import { frontmatterEnd, livePreview } from "./live-preview";
+import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
 
 const External = Annotation.define<boolean>();
+const GRAMMAR_WAIT_MS = 400;
 
 export interface EditorStats {
   line: number;
@@ -24,8 +26,9 @@ export interface EditorStats {
   selected: number;
 }
 
-export interface EditorOptions extends InsertOptions {
-  assetUrl: (target: string) => string | null;
+export interface EditorOptions extends InsertOptions, PreviewOptions {
+  /** Loads code grammars the text needs. Resolves true if any were new. */
+  prepareCode: (text: string) => Promise<boolean>;
   text: string;
   lineSeparator: string;
   onChange: (text: string) => void;
@@ -42,6 +45,8 @@ export interface EditorHandle {
   placeCursorAt(x: number, y: number): void;
   /** Stops typing while text is being moved somewhere safe. */
   setFrozen(frozen: boolean): void;
+  /** Draws again after code colours changed. */
+  redraw(): void;
   destroy(): void;
 }
 
@@ -202,6 +207,17 @@ function stats(state: EditorState): EditorStats {
 export function createEditor(parent: HTMLElement, options: EditorOptions): EditorHandle {
   const editable = new Compartment();
   let focusedBeforeFreeze = false;
+  let grammarWait: ReturnType<typeof setTimeout> | undefined;
+  const blocks = previewBlocks(frontmatterEnd);
+  const redraw = () => view.dispatch({ effects: redrawPreview.of(null) });
+  const loadGrammars = () => {
+    options
+      .prepareCode(view.state.sliceDoc())
+      .then((loaded) => {
+        if (loaded && view.dom.isConnected) redraw();
+      })
+      .catch((error: unknown) => console.warn("Code colours not loaded", error));
+  };
   const frozenState = (frozen: boolean): Extension => [EditorState.readOnly.of(frozen), EditorView.editable.of(!frozen)];
   const view = new EditorView({
     parent,
@@ -213,7 +229,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         history(),
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
-        livePreview(options.assetUrl),
+        livePreview(options),
+        blocks.extension,
         editorInsert(options),
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
         search({ top: true }),
@@ -232,6 +249,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !update.transactions.some((tr) => tr.annotation(External))) {
             options.onChange(update.state.sliceDoc());
+          }
+          if (update.docChanged) {
+            clearTimeout(grammarWait);
+            grammarWait = setTimeout(loadGrammars, GRAMMAR_WAIT_MS);
           }
           if (update.docChanged || update.selectionSet) options.onStats(stats(update.state));
         }),
@@ -261,14 +282,17 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       });
     },
     placeCursorAt(x, y) {
-      const pos = view.posAtCoords({ x, y }, false);
-      view.dispatch({ selection: { anchor: pos } });
+      view.dispatch({ selection: { anchor: blocks.outsideBlocks(view.state, view.posAtCoords({ x, y }, false)) } });
     },
     setFrozen(frozen) {
       if (frozen) focusedBeforeFreeze = view.hasFocus;
       view.dispatch({ effects: editable.reconfigure(frozenState(frozen)) });
       if (!frozen && focusedBeforeFreeze) view.focus();
     },
-    destroy: () => view.destroy(),
+    redraw,
+    destroy() {
+      clearTimeout(grammarWait);
+      view.destroy();
+    },
   };
 }

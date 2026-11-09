@@ -1,3 +1,4 @@
+import type { Highlighter } from "../render/highlight";
 import { Draft, type DraftState } from "../vault/draft";
 import type { VaultStore } from "../vault/store";
 import { lineEnding, toggleTask } from "../vault/tasks";
@@ -7,6 +8,7 @@ import type { ShellElements } from "./shell";
 import { StatusStats } from "./status-stats";
 
 export interface EditingHost {
+  highlighter: Highlighter;
   els: ShellElements;
   vault: VaultStore;
   notePath: () => string;
@@ -78,6 +80,10 @@ export class NoteEditing {
     this.session?.editor.setFrozen(frozen);
   }
 
+  redrawCode(): void {
+    this.session?.editor.redraw();
+  }
+
   /** Leaves the editor without saving, because the note is being deleted. */
   discard(): void {
     this.session?.editor.destroy();
@@ -122,6 +128,8 @@ export class NoteEditing {
         return;
       }
       const { createEditor } = await import("./editor-view");
+      const { highlighter } = this.host;
+      await highlighter.prepare(text);
       if (notePath() !== path) return;
       const { scroller } = els;
       const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
@@ -149,6 +157,8 @@ export class NoteEditing {
           openUrl: this.host.openUrl,
           renderInline: (cell) => this.host.renderInline(cell, this.session?.path ?? path),
           assetUrl: (target) => this.assetUrl(target),
+          codeTokens: highlighter.tokens,
+          prepareCode: (next) => highlighter.prepare(next),
           linkTargets: (embed) => this.linkTargets(embed),
           headingsOf: (target) => this.headingsOf(target),
           addFile: (file) => this.addFile(file, session.path),

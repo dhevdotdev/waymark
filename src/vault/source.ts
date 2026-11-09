@@ -18,6 +18,9 @@ export interface VaultSource {
   /** Moves a note. Fails rather than landing on anything that exists. */
   renameNote(from: string, to: string): Promise<void>;
   trashNote(path: string): Promise<void>;
+  /** Moves a folder and everything in it. Fails rather than landing on anything that exists. */
+  renameFolder(from: string, to: string): Promise<void>;
+  trashFolder(path: string): Promise<void>;
   /** Adds an image or PDF. Fails rather than replacing a file. */
   writeAttachment(path: string, bytes: Uint8Array): Promise<void>;
   settings(): Promise<VaultSettings>;
@@ -49,6 +52,12 @@ export function devVaultSource(): VaultSource {
     },
     async trashNote(path) {
       await post("/@vault/trash", JSON.stringify({ path }), `Could not remove ${path}`);
+    },
+    async renameFolder(from, to) {
+      await post("/@vault/rename", JSON.stringify({ from, to }), `Could not rename ${from}`);
+    },
+    async trashFolder(path) {
+      await post("/@vault/trash-folder", JSON.stringify({ path }), `Could not remove ${path}`);
     },
     async writeAttachment(path, bytes) {
       await post(`/@vault/attachment?path=${encodeURIComponent(path)}`, bytes as BodyInit, `Could not add ${path}`);

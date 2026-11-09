@@ -11,6 +11,14 @@ const chain = () => {
 };
 
 describe("LinkGraph", () => {
+  it("counts a Markdown link to a note, relative or not, but not an image or URL", () => {
+    const graph = new LinkGraph(new VaultIndex(["A/a.md", "A/b.md", "C/c.md", "A/p.png"]));
+    graph.update("A/a.md", '[1](b.md) [2](../C/c.md "t") ![3](p.png) [4](https://x.dev/c.md) `[5](d.md)`');
+    expect(graph.backlinks("A/b.md")).toEqual(["A/a.md"]);
+    expect(graph.backlinks("C/c.md")).toEqual(["A/a.md"]);
+    expect([...graph.out.get("A/a.md")!].sort()).toEqual(["A/b.md", "C/c.md"]);
+  });
+
   it("reports backlinks", () => {
     expect(chain().backlinks("c.md")).toEqual(["b.md"]);
   });

@@ -2,7 +2,7 @@ import katex from "katex";
 import markdownit, { type MarkdownIt, type StateCore, type StateInline, type Token } from "markdown-it";
 import mark from "markdown-it-mark";
 import texmath from "markdown-it-texmath";
-import { headingId, headingKey, isAttachmentTarget, type VaultIndex } from "../vault/index";
+import { headingId, headingKey, isAttachmentTarget, localTarget, type VaultIndex } from "../vault/index";
 
 export interface RenderEnv {
   [key: string]: unknown;
@@ -36,13 +36,15 @@ const CALLOUT_ALIASES: Record<string, string> = {
 const TASK_MARKER = /^\[([ xX])\](?:\s+|$)/;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
+export const KATEX_OPTIONS = { throwOnError: false, output: "htmlAndMathml", trust: false } as const;
+
 export function createMarkdown(): MarkdownIt {
   const md = markdownit({ html: true, linkify: true, typographer: false });
   md.use(mark);
   md.use(texmath, {
     engine: katex,
     delimiters: "dollars",
-    katexOptions: { throwOnError: false, output: "htmlAndMathml", trust: false },
+    katexOptions: KATEX_OPTIONS,
   });
   md.inline.ruler.before("link", "wikilink", wikilinkRule);
   md.core.ruler.after("block", "callouts", calloutRule);
@@ -98,9 +100,39 @@ export function createMarkdown(): MarkdownIt {
       tokens[i].attrSet("class", "external");
       tokens[i].attrSet("data-external", "");
     }
+    linkInsideVault(tokens[i], href, env as unknown as RenderEnv);
     return defaultLink(tokens, i, opts, env, self);
   };
   return md;
+}
+
+/** Makes a Markdown link to a file in the vault behave like a wikilink to it. */
+function linkInsideVault(token: Token, href: string, env: RenderEnv): void {
+  const local = localTarget(href);
+  if (!local?.path) return;
+  const { index, currentPath, assetUrl } = env;
+  if (isAttachmentTarget(index, local.path)) {
+    const file = index.resolveFrom(local.path, currentPath, false);
+    if (file.kind !== "found") return;
+    token.attrSet("class", "attachment-link");
+    token.attrSet("href", assetUrl(file.path));
+    token.attrSet("data-attachment", file.path);
+    return;
+  }
+  const note = index.resolveFrom(local.path, currentPath);
+  if (local.fragment) token.attrSet("data-anchor", decodeURI(local.fragment.slice(1)));
+  if (note.kind === "found") {
+    token.attrSet("class", "wikilink");
+    token.attrSet("href", "#");
+    token.attrSet("data-path", note.path);
+  } else if (note.kind === "ambiguous") {
+    token.attrSet("class", "wikilink is-ambiguous");
+    token.attrSet("href", "#");
+    token.attrSet("data-candidates", JSON.stringify(note.candidates));
+  } else {
+    token.attrSet("class", "wikilink is-missing");
+    token.attrSet("title", `No note at “${local.path}”`);
+  }
 }
 
 function findOpen(tokens: Token[], closeIndex: number, type: string): Token | undefined {
