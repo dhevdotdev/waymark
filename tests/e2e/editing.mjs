@@ -455,6 +455,27 @@ try {
   await pause(300);
   check("reading shows the edited table", (await page.locator(".doc table").first().textContent()).includes("Adax"));
 
+  await openNote("Tasks");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(200);
+  await page.keyboard.press("Meta+f");
+  await pause(200);
+  await page.keyboard.type("third");
+  await pause(100);
+  const matches = () => page.locator(".cm-searchMatch").count();
+  check("find in Edit marks what is typed", (await matches()) === 1, String(await matches()));
+  for (let i = 0; i < 4; i++) await page.keyboard.down("Backspace");
+  await pause(80);
+  check("find follows a held Backspace", (await matches()) > 1, String(await matches()));
+  await page.keyboard.down("Backspace");
+  await pause(80);
+  check("clearing the field with Backspace held clears every match", (await matches()) === 0, String(await matches()));
+  await page.keyboard.up("Backspace");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+e");
+  await pause(200);
+
   await openNote("Broken blocks");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-preview-block .diagram.is-error", { timeout: 15000 });

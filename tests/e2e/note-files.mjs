@@ -414,8 +414,21 @@ try {
   );
   check("new note left the title bar", (await page.locator('.titlebar [data-act="new-note"]').count()) === 0);
   const moreMenu = async (selector, item) => {
-    await hover(selector);
-    await strip().last().click();
+    /* A file change can rebuild the tree under the pointer and take the buttons with it. */
+    for (let tries = 5; tries > 0; tries--) {
+      await hover(selector);
+      const clicked = await strip()
+        .last()
+        .click({ timeout: 1500 })
+        .then(
+          () => true,
+          (error) => {
+            if (tries === 1) throw error;
+            return false;
+          },
+        );
+      if (clicked) break;
+    }
     await pause(120);
     await page.locator(`.context-item:has-text("${item}")`).click();
     await pause(150);
@@ -676,6 +689,22 @@ try {
   await pause(500);
   const afterRestart = await heightsWhileOpening("Chart.md");
   check("nor does it after the app restarts", afterRestart.length === 1, afterRestart.join());
+
+  await openNote("Writing");
+  await page.click('[data-side="search"]');
+  await pause(150);
+  await page.fill(".search-field input", "Below");
+  await pause(150);
+  await page.keyboard.press("Enter");
+  await pause(500);
+  const searchMarks = () => page.evaluate(() => CSS.highlights.get("search")?.size ?? 0);
+  check("opening a search result marks the matches", (await searchMarks()) > 0, String(await searchMarks()));
+  await page.locator(".search-field input").click();
+  await page.keyboard.press("Backspace");
+  await pause(80);
+  check("editing the search clears the old marks at once", (await searchMarks()) === 0, String(await searchMarks()));
+  await page.click('[data-side="search"]');
+  await pause(150);
 
   check("Obsidian's settings are never touched", (await disk(".obsidian/app.json")) === obsidianBefore);
   check("nothing threw", errors.length === 0, errors[0]);

@@ -4,6 +4,7 @@ import { Highlighter } from "../render/highlight";
 import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
+import { resolveColor } from "./colors";
 import { type Metrics, Reader } from "./reader";
 import { Sound } from "./sound";
 import { showWelcome } from "./welcome";
@@ -155,6 +156,7 @@ export class App {
   private applyTheme(): void {
     const family = findFamily(this.prefs.value.family);
     applyTheme(family, this.scheme());
+    this.matchWindowToPage();
     this.reader?.refreshTheme();
     if (family.id === this.codeFamily) return;
     const first = this.codeFamily === "";
@@ -165,6 +167,13 @@ export class App {
       this.reader?.rerender();
       this.reader?.editing.redrawCode();
     });
+  }
+
+  /** The window shows its own colour in newly exposed space while it grows, before the page has resized. */
+  private matchWindowToPage(): void {
+    if (!isDesktop) return;
+    const [red, green, blue] = resolveColor("var(--paper)").match(/\d+/g)!.map(Number);
+    native.setWindowColor([red, green, blue]).catch((error: unknown) => console.warn("Window colour not set", error));
   }
 
   private async syncCodeTheme(): Promise<void> {

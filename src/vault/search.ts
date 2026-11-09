@@ -72,15 +72,19 @@ export class SearchIndex {
   }
 }
 
+/** Terms this short match only as whole words, so the snippet must not mark a longer word that merely starts with them. */
+const WHOLE_WORD_TERM_LENGTH = 2;
+
 function snippet(markdown: string, terms: string[]): Hit["snippet"] {
   const { body } = parseFrontmatter(markdown);
   const lower = body.toLowerCase();
   let best = -1;
   let term = "";
   for (const t of [...terms].sort((a, b) => b.length - a.length)) {
-    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(t)}`, "iu");
+    const wholeWord = t.length <= WHOLE_WORD_TERM_LENGTH ? "(?![\\p{L}\\p{N}])" : "";
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(t)}${wholeWord}`, "iu");
     const m = re.exec(body);
-    const at = m ? m.index + m[1].length : lower.indexOf(t.toLowerCase());
+    const at = m ? m.index + m[1].length : wholeWord ? -1 : lower.indexOf(t.toLowerCase());
     if (at >= 0 && !isHeadingLine(body, at)) {
       best = at;
       term = t;

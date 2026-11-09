@@ -26,6 +26,7 @@ export class SearchPane {
     this.results = root.querySelector(".search-results")!;
     this.input.addEventListener("input", () => {
       this.query = this.input.value;
+      this.host.clearHighlights();
       this.run();
     });
     this.input.addEventListener("keydown", (e) => this.onKey(e));

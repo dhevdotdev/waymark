@@ -260,6 +260,11 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
     }),
   });
   options.onStats(stats(view.state));
+  /* CodeMirror's find bar only searches again when a key is released, so a held Backspace left old matches lit. */
+  view.dom.addEventListener("input", (event) => {
+    const field = event.target as HTMLElement;
+    if (field.closest(".cm-search")) field.dispatchEvent(new KeyboardEvent("keyup"));
+  });
   return {
     focus: () => view.focus(),
     find: () => openSearchPanel(view),

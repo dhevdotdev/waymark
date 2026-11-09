@@ -38,6 +38,11 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
     );
   for (const family of app.themeFamilies) check(`macOS accepts the ${family} Dock icon`, await accepted(family));
   check("a family with no icon is refused", !(await accepted("no-such-family")));
+  const colourSet = await native.setWindowColor([30, 30, 46]).then(
+    () => true,
+    () => false,
+  );
+  check("the window colour can follow the theme", colourSet);
 }
 
 const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";

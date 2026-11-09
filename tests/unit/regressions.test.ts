@@ -109,6 +109,14 @@ describe("frontmatter", () => {
   });
 });
 
+describe("search snippets", () => {
+  it("marks only a whole word for a very short term", () => {
+    const search = new SearchIndex();
+    search.set("a.md", "A", "the basics come first and vitamin b is last");
+    expect(search.search("b")[0].snippet?.match).toBe("b");
+  });
+});
+
 describe("phrase search", () => {
   it("finds a rare phrase beyond the first page of word matches", () => {
     const search = new SearchIndex();

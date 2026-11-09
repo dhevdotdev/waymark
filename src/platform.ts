@@ -81,6 +81,10 @@ export const native = {
   openVault: (path: string) => call<VaultInfo>("open_vault", { path }),
   reveal: (path?: string) => call<void>("reveal", { path }),
   setDockIcon: (family: string) => call<void>("set_dock_icon", { family }),
+  async setWindowColor(color: [number, number, number]): Promise<void> {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setBackgroundColor(color);
+  },
   openTerminal: () => call<void>("open_terminal"),
   readPrefs: () => call<Record<string, unknown>>("read_prefs"),
   writePrefs: (prefs: unknown) => call<void>("write_prefs", { prefs }),
