@@ -232,8 +232,13 @@ export class Inspector {
       this.propertySlot.append(editor.root);
       return editor;
     });
-    const [editor, text] = await Promise.all([this.propertyEditor, this.host.editing().noteText(path)]);
-    if (path === this.current) editor.show(path, text);
+    /* The note can be renamed or deleted while this is on its way. The next render shows the new state. */
+    const text = await this.host
+      .editing()
+      .noteText(path)
+      .catch(() => null);
+    const editor = await this.propertyEditor;
+    if (text !== null && path === this.current) editor.show(path, text);
   }
 
   /** Folder, length and every frontmatter property, shown as written and without meaning attached to any key. */

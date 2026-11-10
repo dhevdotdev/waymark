@@ -16,7 +16,7 @@ import { isNarrow } from "./media";
 import { NoteEditing } from "./note-editing";
 import { NoteFiles } from "./note-files";
 import { NoteView } from "./note-view";
-import { toast } from "./overlays";
+import { ESCAPE_IS_TAKEN, toast } from "./overlays";
 import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
@@ -33,8 +33,6 @@ import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
 
 export type { Metrics, OpenOptions, ReaderDeps };
-
-const ESCAPE_IS_TAKEN = ".lightbox, .sheet-overlay, .popover, .prompt-overlay, .prop-new, [data-editing-property]";
 
 /** One open vault's window: its panels, its tabs and how the user moves between notes. */
 export class Reader {
