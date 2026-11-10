@@ -68,6 +68,7 @@ const settle = async () => {
 };
 
 async function open(name) {
+  await page.waitForFunction(() => !["unsaved", "saving"].includes(document.querySelector(".edit-state")?.dataset.state));
   await writeFile(file(name), FILES[name]);
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
