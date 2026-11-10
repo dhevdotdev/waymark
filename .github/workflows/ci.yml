@@ -11,7 +11,7 @@ concurrency:
 jobs:
   frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -33,8 +33,26 @@ jobs:
       - run: pnpm dup
       - run: pnpm size
       - run: pnpm audit --prod --audit-level high
-      - run: pnpm exec playwright install --with-deps webkit
-      - run: pnpm test:e2e
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The image carries WebKit and its system libraries, which took up to 20 minutes to install. Its version must match package.json.
+    container: mcr.microsoft.com/playwright:v1.65.0-noble
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - run: command -v git || (apt-get update -qq && apt-get install -y -qq git)
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/e2e.mjs ${{ matrix.shard }}
 
   secrets:
     runs-on: ubuntu-latest

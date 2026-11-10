@@ -9,7 +9,7 @@
     "size": "vite build --logLevel error && node scripts/check-bundle.mjs",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/reader.mjs && node tests/e2e/reader.mjs reduced && node tests/e2e/edge.mjs && node tests/e2e/editing.mjs && node tests/e2e/tables.mjs && node tests/e2e/dialogs.mjs && node tests/e2e/organize.mjs && node tests/e2e/note-files.mjs && node tests/e2e/recovery.mjs && node tests/e2e/backup.mjs && node tests/e2e/library.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
     "test:sweep": "node tests/e2e/sweep.mjs",
     "test:visual": "node tests/e2e/visual.mjs",
     "install:app": "node scripts/install-app.mjs",
