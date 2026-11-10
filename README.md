@@ -18,6 +18,7 @@ On first launch, choose **Open a vault…** (an existing folder) or **Clone from
 | Keys | Action |
 |---|---|
 | ⌘K, ⌘O, ⌘P | Go to a note, or type `>` for commands |
+| ⌘K with text selected in Edit | Turn the selection into a link |
 | ⌘T | New tab |
 | ⌘⇧E / ⌘⇧F | Files / Search in the sidebar |
 | ⌘⇧F | Search inside notes; ↵ opens at the match |

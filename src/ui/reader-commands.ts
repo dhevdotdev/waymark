@@ -87,7 +87,15 @@ export function readerCommands(r: Reader): Command[] {
   }));
 
   return [
-    { id: "palette", keys: ["mod+k", "mod+o", "mod+p"], inField: true, run: () => r.palette.open() },
+    { id: "palette", keys: ["mod+o", "mod+p"], inField: true, run: () => r.palette.open() },
+    {
+      id: "palette-or-link",
+      keys: ["mod+k"],
+      inField: true,
+      run: () => {
+        if (!r.editing.linkSelection()) r.palette.open();
+      },
+    },
     { id: "new-tab", keys: ["mod+t"], inField: true, run: () => r.newTab() },
     {
       id: "reopen-tab",

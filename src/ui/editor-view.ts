@@ -57,6 +57,8 @@ export interface EditorHandle {
   /** Moves the cursor onto a line, revealing it if it was folded away. */
   revealLine(line: number): void;
   placeCursorAt(x: number, y: number): void;
+  /** Turns the selected text into a link, as the formatting bubble does. False when nothing is selected here. */
+  linkSelection(): boolean;
   /** Stops typing while text is being moved somewhere safe. */
   setFrozen(frozen: boolean): void;
   /** Draws again after code colours changed. */
@@ -393,6 +395,9 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
     },
     placeCursorAt(x, y) {
       view.dispatch({ selection: { anchor: blocks.outsideBlocks(view.state, view.posAtCoords({ x, y }, false)) } });
+    },
+    linkSelection() {
+      return !view.state.selection.main.empty && view.hasFocus && !view.state.readOnly && addLink(view);
     },
     setFrozen(frozen) {
       if (frozen) focusedBeforeFreeze = view.hasFocus;

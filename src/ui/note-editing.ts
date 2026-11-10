@@ -121,6 +121,10 @@ export class NoteEditing {
     this.markMode(false);
   }
 
+  linkSelection(): boolean {
+    return this.session?.editor.linkSelection() ?? false;
+  }
+
   get isOpen(): boolean {
     return this.session !== null;
   }

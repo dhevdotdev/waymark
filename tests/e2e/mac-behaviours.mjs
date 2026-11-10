@@ -196,6 +196,59 @@ await rm(inVault("Doomed.md"));
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
 await pause(200);
 
+/* Command-K */
+await writeFile(inVault("Keyed.md"), "# Keyed\n\nSome words here.\n\n| A | B |\n| --- | --- |\n| one | two |\n");
+await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Keyed.md"]));
+await pause(200);
+await open("Keyed.md");
+await page.keyboard.press("Meta+e");
+await page.waitForSelector(".cm-content");
+await pause(400);
+const paletteOpen = () => page.locator(".palette").count();
+const line = page.locator(".cm-line", { hasText: "Some words here" });
+await line.click({ position: { x: 4, y: 8 } });
+await pause(80);
+await page.keyboard.press("Home");
+await page.keyboard.press("Shift+End");
+await pause(80);
+await page.keyboard.press("Meta+k");
+await pause(200);
+check(
+  "Command-K with text selected makes a link",
+  (await line.first().textContent()).includes("Some words here.") &&
+    (await page.locator(".cm-content").textContent()).includes("](url)") &&
+    (await paletteOpen()) === 0,
+  await line.first().textContent(),
+);
+await page.keyboard.press("Meta+p");
+await pause(200);
+check("Command-P stays the palette with text selected", (await paletteOpen()) === 1);
+await page.keyboard.press("Escape");
+await pause(200);
+await page.locator(".cm-line").last().click();
+await pause(80);
+await page.keyboard.press("Meta+k");
+await pause(200);
+check("with nothing selected Command-K is the palette", (await paletteOpen()) === 1);
+await page.keyboard.press("Escape");
+await pause(200);
+const cell = page.locator('.cm-table-widget td[data-row="1"][data-column="0"]');
+await cell.click();
+await pause(120);
+await page.keyboard.press("Shift+End");
+await pause(80);
+await page.keyboard.press("Meta+k");
+await pause(200);
+check(
+  "a table cell keeps the palette and its text",
+  (await paletteOpen()) === 1 && (await cell.textContent()) === "one",
+  await cell.textContent(),
+);
+await page.keyboard.press("Escape");
+await pause(200);
+await page.keyboard.press("Meta+e");
+await pause(500);
+
 check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 await browser.close();
 await app.close();
