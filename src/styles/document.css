@@ -456,7 +456,7 @@
   color: var(--ink-2);
   text-align: left;
   vertical-align: bottom;
-  padding: 0 var(--s4) var(--s2);
+  padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--rule-strong);
   white-space: nowrap;
 }
@@ -489,8 +489,8 @@
     background: var(--fill);
   }
 }
-.doc th:empty {
-  padding: 0;
+.doc th:empty::before {
+  content: "\200b";
 }
 
 /* Callouts */
@@ -945,7 +945,9 @@ button.callout-title:focus-visible {
 .doc.doc > h3 + * {
   margin-top: var(--s2);
 }
-.doc.doc > * + .table-wrap,
+.doc.doc > * + .table-wrap {
+  margin-top: var(--table-room-above);
+}
 .doc.doc > .table-wrap + :not(h2) {
   margin-top: var(--table-room);
 }

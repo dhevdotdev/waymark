@@ -448,6 +448,32 @@ try {
   const namedOpacity = await page.evaluate(() => getComputedStyle(document.querySelector(".cm-table-add.is-row span")).opacity);
   check("hovering Add row names it", Number(namedOpacity) > 0.95, namedOpacity);
 
+  /* The header row's shape */
+  await open("Awkward");
+  const headerShape = await page.evaluate(() => {
+    const heads = [...document.querySelectorAll(".cm-table-widget th")].map((h) => h.getBoundingClientRect().height);
+    const filled = document.querySelector('.cm-table-widget [data-row="0"][data-column="0"]');
+    const style = getComputedStyle(filled);
+    return { heads, top: style.paddingTop, bottom: style.paddingBottom };
+  });
+  check(
+    "a header cell has the same space above and below its text",
+    headerShape.top === headerShape.bottom && headerShape.top !== "0px",
+    JSON.stringify(headerShape),
+  );
+  check(
+    "a blank header is as tall as a filled one",
+    new Set(headerShape.heads.map(Math.round)).size === 1,
+    headerShape.heads.join(),
+  );
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc-title");
+  await pause(250);
+  const headerHeights = await page.$$eval(".doc table th", (heads) =>
+    heads.map((h) => Math.round(h.getBoundingClientRect().height)),
+  );
+  check("a blank header is as tall as a filled one in Read too", new Set(headerHeights).size === 1, headerHeights.join());
+
   /* Selecting text in a cell */
   await open("Plot");
   await cell(2, 1).click({ button: "right" });

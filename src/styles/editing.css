@@ -181,7 +181,7 @@
   word-break: normal;
 }
 .cm-table-widget.no-gap-above {
-  margin-block-start: var(--table-room);
+  margin-block-start: var(--table-room-above);
 }
 .cm-table-widget.no-gap-below {
   margin-block-end: var(--table-room);
@@ -224,12 +224,6 @@
 }
 .cm-table-widget.has-handles :is(th, td) + :is(th, td) {
   box-shadow: inset 1px 0 0 var(--rule);
-}
-.cm-table-widget th:empty {
-  padding: 0 var(--s4) var(--s2);
-}
-.cm-table-widget th:first-child:empty {
-  padding-inline-start: var(--hang);
 }
 .cm-table-widget th:empty::before {
   content: "Heading";
@@ -1145,7 +1139,9 @@ button.task-box:focus-visible {
 .doc-editing .cm-h3 + .cm-blank {
   line-height: 8px;
 }
-.doc-editing .cm-blank:has(+ .cm-table-widget),
+.doc-editing .cm-blank:has(+ .cm-table-widget) {
+  line-height: var(--table-room-above);
+}
 .doc-editing .cm-table-widget + .cm-blank:not(:has(+ .cm-h2)) {
   line-height: var(--table-room);
 }
