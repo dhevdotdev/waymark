@@ -377,7 +377,7 @@ fn finish_quit(app: AppHandle) {
 }
 
 /// Gives the frontend a moment to save before the app goes away. The timer covers a frontend that never answers.
-fn quit_after_saving(app: &AppHandle) {
+pub(crate) fn quit_after_saving(app: &AppHandle) {
     if QUITTING.swap(true, Ordering::SeqCst) {
         return;
     }
