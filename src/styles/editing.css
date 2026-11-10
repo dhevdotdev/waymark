@@ -23,9 +23,36 @@
 }
 .doc-editing .cm-line {
   padding: 0;
+  caret-color: transparent;
 }
-.doc-editing .cm-cursor {
-  border-left: 2px solid var(--accent);
+.doc-editing .cm-scroller.is-composing .cm-line {
+  caret-color: var(--accent);
+}
+.doc-editing .cm-scroller.is-composing .cm-caret-layer {
+  display: none;
+}
+.doc-editing .cm-caret {
+  background: var(--accent);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .doc-editing .cm-caret-layer {
+    animation: caret-blink 1s steps(1) infinite;
+  }
+  .doc-editing .cm-caret-layer.is-restarted {
+    animation-name: caret-blink-restarted;
+  }
+}
+/* Two identical animations, because switching between them is what restarts the blink with the caret showing. */
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes caret-blink-restarted {
+  50% {
+    opacity: 0;
+  }
 }
 .doc-editing .cm-h1,
 .doc-editing .cm-h2 {
@@ -213,6 +240,19 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   background: color-mix(in oklab, var(--accent) 7%, var(--paper));
+}
+/* The table clips to its own corners, so a corner cell's outline has to take the same curve to stay whole. */
+.cm-table-widget thead tr:first-child > :first-child:focus-visible {
+  border-start-start-radius: var(--r-block);
+}
+.cm-table-widget thead tr:first-child > :last-child:focus-visible {
+  border-start-end-radius: var(--r-block);
+}
+.cm-table-widget :is(tbody tr:last-child, table:not(:has(tbody tr)) thead tr) > :first-child:focus-visible {
+  border-end-start-radius: var(--r-block);
+}
+.cm-table-widget :is(tbody tr:last-child, table:not(:has(tbody tr)) thead tr) > :last-child:focus-visible {
+  border-end-end-radius: var(--r-block);
 }
 .cm-table-widget.is-grid :is(th, td):focus-visible {
   background: color-mix(in oklab, var(--accent) 18%, var(--paper));
