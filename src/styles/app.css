@@ -583,6 +583,10 @@ kbd {
  * are pinned section headers; every row is one line on a fixed height.
  */
 .tree-folder + .tree-folder,
+/* Folder contents are clipped for their open and close animation, so a row's ring is drawn inside it. */
+:is(.tree-head, .nav-item):focus-visible {
+  outline-offset: -2px;
+}
 .tree-folder + .nav-item {
   margin-block-start: 2px;
 }
