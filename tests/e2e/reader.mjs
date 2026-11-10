@@ -294,6 +294,17 @@ check("the Links pane lists connected notes", backlinks > 0, `${backlinks}`);
 await page.click('[data-rail="links"]');
 const railGraph = await page.evaluate(() => document.querySelector(".local-graph canvas")?.getBoundingClientRect().height ?? 0);
 check("local graph renders in the rail", railGraph > 100, `${railGraph}px`);
+await page.evaluate(() => {
+  window.__graphText = 0;
+  const original = CanvasRenderingContext2D.prototype.fillText;
+  CanvasRenderingContext2D.prototype.fillText = function (...args) {
+    window.__graphText++;
+    return original.apply(this, args);
+  };
+});
+await page.locator(".local-graph canvas").hover();
+await pause(200);
+check("the local graph draws no names over its dots", (await page.evaluate(() => window.__graphText)) === 0);
 
 // Vault graph
 await page.keyboard.press("Meta+g");
