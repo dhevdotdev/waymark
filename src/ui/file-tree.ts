@@ -1,6 +1,7 @@
 import { isBaseFile, type VaultIndex } from "../vault/index";
 import { ancestors, buildTree, type TreeFolder } from "../vault/tree";
 import { icons } from "./icons";
+import { instantly } from "./instant";
 
 const CHEVRON = `<svg class="tree-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
@@ -131,7 +132,9 @@ export class FileTree {
 
   /** Opens a folder and its parents and moves focus to it. */
   focusFolder(path: string): void {
-    for (const folder of ancestors(`${path}/`)) this.setOpen(folder, true);
+    instantly(this.box, () => {
+      for (const folder of ancestors(`${path}/`)) this.setOpen(folder, true);
+    });
     const head = this.folders.get(path)?.querySelector<HTMLElement>(".tree-head");
     head?.focus({ preventScroll: true });
     head?.scrollIntoView({ block: "nearest" });
@@ -212,11 +215,9 @@ export class FileTree {
   }
 
   private expandTo(path: string, row: HTMLElement): void {
-    const tree = this.box.querySelector(".tree")!;
-    tree.classList.add("is-instant");
-    for (const folder of ancestors(path)) this.setOpen(folder, true);
-    void this.box.offsetHeight;
-    tree.classList.remove("is-instant");
+    instantly(this.box, () => {
+      for (const folder of ancestors(path)) this.setOpen(folder, true);
+    });
     const view = this.box.getBoundingClientRect();
     const r = row.getBoundingClientRect();
     if (r.top < view.top + 36 || r.bottom > view.bottom - 28) {

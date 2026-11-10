@@ -1,10 +1,5 @@
 const ROW = ".tree-head, .nav-item";
 
-interface TreeActions {
-  toggle: (folder: string) => void;
-  isOpen: (folder: string) => boolean;
-}
-
 function isShown(row: Element): boolean {
   if (row.classList.contains("is-naming")) return false;
   for (let body = row.closest(".tree-body"); body; body = body.parentElement?.closest(".tree-body") ?? null) {
@@ -14,7 +9,7 @@ function isShown(row: Element): boolean {
 }
 
 /** Arrow keys for the file list, which is a single Tab stop with one row holding it. */
-export function bindTreeKeys(box: HTMLElement, tree: TreeActions): void {
+export function bindTreeKeys(box: HTMLElement): void {
   const shownRows = () => [...box.querySelectorAll<HTMLElement>(ROW)].filter(isShown);
   let stop: HTMLElement | null = null;
 
@@ -59,20 +54,19 @@ export function bindTreeKeys(box: HTMLElement, tree: TreeActions): void {
     if (!row.matches(ROW) || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const rows = shownRows();
     const at = rows.indexOf(row);
-    const folder = row.dataset.folder;
-    const open = folder !== undefined && tree.isOpen(folder);
+    const open = row.getAttribute("aria-expanded") === "true";
     const actions: Record<string, () => void> = {
       ArrowDown: () => moveTo(rows[at + 1]),
       ArrowUp: () => moveTo(rows[at - 1]),
       Home: () => moveTo(rows[0]),
       End: () => moveTo(rows.at(-1)),
       ArrowRight: () => {
-        if (folder === undefined) return;
+        if (!row.matches(".tree-head")) return;
         if (open) moveTo(parentHead(rows[at + 1] ?? row) === row ? rows[at + 1] : undefined);
-        else tree.toggle(folder);
+        else row.click();
       },
       ArrowLeft: () => {
-        if (open && folder !== undefined) tree.toggle(folder);
+        if (open) row.click();
         else moveTo(parentHead(row));
       },
     };

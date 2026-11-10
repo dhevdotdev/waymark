@@ -1,3 +1,5 @@
+import { instantly } from "./instant";
+
 /** Text ranges under `root` that contain `needle`, ignoring case. Skips diagram sources and UI chrome. */
 export function findRanges(root: Element, needle: string, limit = 2000): Range[] {
   const q = needle.toLowerCase();
@@ -35,10 +37,11 @@ export function paint(name: string, ranges: Range[]): void {
 function reveal(range: Range): void {
   const el = range.startContainer.parentElement;
   const callout = el?.closest<HTMLElement>('.callout[data-fold="closed"]');
-  if (callout) {
+  if (!callout) return;
+  instantly(callout, () => {
     callout.dataset.fold = "open";
-    callout.querySelector(".callout-title")?.setAttribute("aria-expanded", "true");
-  }
+  });
+  callout.querySelector(".callout-title")?.setAttribute("aria-expanded", "true");
 }
 
 export function scrollToRange(range: Range, scroller: HTMLElement): void {

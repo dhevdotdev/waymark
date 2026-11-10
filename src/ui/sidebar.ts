@@ -31,7 +31,7 @@ export class Sidebar {
     private readonly host: SidebarHost,
   ) {
     this.tree = new FileTree(els.sidebar, new Set(openFolders), () => host.persist());
-    bindTreeKeys(els.sidebar, this.tree);
+    bindTreeKeys(els.sidebar);
     this.searchPane = new SearchPane(els.searchPane, {
       ...host,
       close: () => this.showFiles(),

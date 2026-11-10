@@ -711,7 +711,7 @@ kbd {
   inline-size: 1px;
   background: var(--rule);
 }
-.tree-folder:not(.is-open) > .tree-body > .tree-inner {
+:where(.tree-folder:not(.is-open) > .tree-body) > .tree-inner {
   visibility: hidden;
   transition: visibility 0s var(--t-menu);
 }
@@ -720,7 +720,8 @@ kbd {
     transition: none;
   }
 }
-.tree.is-instant :is(.tree-body, .tree-inner, .tree-chevron) {
+:root[data-input="keyboard"] .tree :is(.tree-body, .tree-inner, .tree-chevron),
+.is-instant .tree :is(.tree-body, .tree-inner, .tree-chevron) {
   transition: none;
 }
 
