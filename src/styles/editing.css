@@ -214,6 +214,19 @@
   outline-offset: -2px;
   background: color-mix(in oklab, var(--accent) 7%, var(--paper));
 }
+/* The table clips to its own corners, so a corner cell's outline has to take the same curve to stay whole. */
+.cm-table-widget thead tr:first-child > :first-child:focus-visible {
+  border-start-start-radius: var(--r-block);
+}
+.cm-table-widget thead tr:first-child > :last-child:focus-visible {
+  border-start-end-radius: var(--r-block);
+}
+.cm-table-widget :is(tbody tr:last-child, table:not(:has(tbody tr)) thead tr) > :first-child:focus-visible {
+  border-end-start-radius: var(--r-block);
+}
+.cm-table-widget :is(tbody tr:last-child, table:not(:has(tbody tr)) thead tr) > :last-child:focus-visible {
+  border-end-end-radius: var(--r-block);
+}
 .cm-table-widget.is-grid :is(th, td):focus-visible {
   background: color-mix(in oklab, var(--accent) 18%, var(--paper));
   caret-color: transparent;

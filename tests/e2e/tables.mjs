@@ -1289,6 +1289,41 @@ try {
   check("a failed write from a table is visible", failedState.state === "failed", JSON.stringify(failedState));
   await page.unroute("**/*");
 
+  /* The table clips to its rounded corners, so a focused corner cell has to round the same corner by the same amount. */
+  const cornerRadii = (row, column) =>
+    cell(row, column).evaluate((focused) => {
+      focused.focus();
+      const style = getComputedStyle(focused);
+      return {
+        tl: Number.parseFloat(style.borderTopLeftRadius),
+        tr: Number.parseFloat(style.borderTopRightRadius),
+        bl: Number.parseFloat(style.borderBottomLeftRadius),
+        br: Number.parseFloat(style.borderBottomRightRadius),
+        table: Number.parseFloat(getComputedStyle(focused.closest(".table-wrap")).borderTopLeftRadius),
+      };
+    });
+  const roundsOnly = (radii, corners) =>
+    ["tl", "tr", "bl", "br"].every((corner) => (radii[corner] === radii.table) === corners.includes(corner));
+  await open("Plot");
+  for (const [row, column, corners, name] of [
+    [0, 0, ["tl"], "top left"],
+    [0, 2, ["tr"], "top right"],
+    [3, 0, ["bl"], "bottom left"],
+    [3, 2, ["br"], "bottom right"],
+    [1, 1, [], "middle"],
+  ]) {
+    const radii = await cornerRadii(row, column);
+    check(`a focused ${name} cell's outline follows the table's corners`, roundsOnly(radii, corners), JSON.stringify(radii));
+  }
+  await open("OneColumn");
+  const columnHead = await cornerRadii(0, 0);
+  const columnLast = await cornerRadii(2, 0);
+  check("a one-column header rounds both top corners", roundsOnly(columnHead, ["tl", "tr"]), JSON.stringify(columnHead));
+  check("a one-column last row rounds both bottom corners", roundsOnly(columnLast, ["bl", "br"]), JSON.stringify(columnLast));
+  await open("Single");
+  const alone = await cornerRadii(0, 0);
+  check("a header-only single cell rounds all four corners", roundsOnly(alone, ["tl", "tr", "bl", "br"]), JSON.stringify(alone));
+
   check("no page errors", errors.length === 0, errors.join(" | "));
 } catch (e) {
   check("the run finished", false, String(e).split("\n")[0]);
