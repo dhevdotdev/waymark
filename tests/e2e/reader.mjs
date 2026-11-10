@@ -669,6 +669,22 @@ await pause(300);
 check("Delete removes one stop", (await page.locator(".trail-row").count()) === beforeRemove - 1);
 check("focus moves to the row in its place", (await focusedRow()) !== "");
 check("the toast names the stop and offers Undo", (await page.locator(".toast").textContent()).includes(removedName));
+check(
+  "Undo in the toast is plain text in the accent, with no box of its own",
+  await page.locator(".toast-action").evaluate((b) => {
+    const style = getComputedStyle(b);
+    const toast = b.closest(".toast").getBoundingClientRect();
+    const box = b.getBoundingClientRect();
+    return (
+      style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+      style.borderTopWidth === "0px" &&
+      style.appearance === "none" &&
+      box.top >= toast.top &&
+      box.bottom <= toast.bottom &&
+      box.right <= toast.right
+    );
+  }),
+);
 await page.locator(".toast-action").click();
 await pause(300);
 check("Undo puts the stop back", (await page.locator(".trail-row").count()) === beforeRemove);

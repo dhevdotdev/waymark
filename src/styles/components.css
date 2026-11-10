@@ -600,12 +600,20 @@
   }
 }
 .toast-action {
-  margin-inline-start: 12px;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: default;
+  margin-block: -4px;
+  margin-inline: 8px -6px;
+  padding: 4px 6px;
   color: var(--accent-ink);
   font: inherit;
   font-weight: 650;
-  border-radius: 3px;
-  transition: scale var(--t-hover) var(--ease-out);
+  border-radius: var(--r-control);
+  transition:
+    background-color var(--t-hover) ease,
+    scale var(--t-hover) var(--ease-out);
 }
 .toast-action:active {
   scale: 0.97;
@@ -616,7 +624,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .toast-action:hover {
-    text-decoration: underline;
+    background: var(--fill);
   }
 }
 .toast.is-leaving {
