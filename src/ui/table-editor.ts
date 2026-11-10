@@ -168,15 +168,43 @@ export function tableEditor(options: TableEditorOptions): Extension {
   };
   const backspace = (view: EditorView) =>
     atLineStart(view) || (heads(view)?.head === heads(view)?.line.from && keepsGap(view, -1));
+  /** Deleting the blank line under a table would join the text below to it as a row, so Delete moves onto that text. */
+  const gapBelow = (view: EditorView) => {
+    const at = heads(view);
+    if (!at || at.line.text.trim() || at.line.number >= view.state.doc.lines) return false;
+    const next = view.state.doc.line(at.line.number + 1);
+    if (!next.text.trim() || !drawn(view).some((t) => t.to + 1 === at.line.from)) return false;
+    view.dispatch({ selection: { anchor: next.from }, scrollIntoView: true });
+    return true;
+  };
   const forwardDelete = (view: EditorView) =>
-    atLineEnd(view) || (heads(view)?.head === heads(view)?.line.to && keepsGap(view, 1));
+    atLineEnd(view) || gapBelow(view) || (heads(view)?.head === heads(view)?.line.to && keepsGap(view, 1));
 
-  /** Text typed against the edge of a table starts its own paragraph, or Markdown would read it as a row. */
+  /** The line breaks typed text needs at `head` so a blank line stays between it and any table. */
+  const separation = (state: EditorState, head: number): { before: string; after: string } | null => {
+    const tables = state.field(field).tables;
+    const { doc, lineBreak } = state;
+    const gap = lineBreak + lineBreak;
+    if (tables.some((t) => t.from === head)) return { before: "", after: gap };
+    if (tables.some((t) => t.to === head)) return { before: gap, after: "" };
+    const line = doc.lineAt(head);
+    if (line.text.trim()) return null;
+    const under = tables.some((t) => t.to + 1 === line.from);
+    const over = tables.some((t) => t.from === line.to + 1);
+    if (!under && !over) return null;
+    const text = (number: number) => number >= 1 && number <= doc.lines && doc.line(number).text.trim() !== "";
+    return {
+      before: under || text(line.number - 1) ? lineBreak : "",
+      after: over || text(line.number + 1) ? lineBreak : "",
+    };
+  };
+
+  /** Text typed against a table, or on the one blank line beside it, starts its own paragraph, or Markdown would read it as a row. */
   const typingBeside = EditorState.transactionFilter.of((tr) => {
     if (!tr.docChanged || tr.annotation(tableWrite) || !(tr.isUserEvent("input") || tr.isUserEvent("paste"))) return tr;
     const { main } = tr.startState.selection;
-    const table = tr.startState.field(field).tables.find((t) => t.from === main.head || t.to === main.head);
-    if (!main.empty || !table) return tr;
+    const around = main.empty ? separation(tr.startState, main.head) : null;
+    if (!around) return tr;
     let inserted: string | null = null;
     let elsewhere = false;
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, text) => {
@@ -184,13 +212,10 @@ export function tableEditor(options: TableEditorOptions): Extension {
       inserted = text.toString();
     });
     if (elsewhere || inserted === null) return tr;
-    const { lineBreak } = tr.startState;
-    const gap = lineBreak + lineBreak;
-    const before = main.head === table.from;
     const text: string = inserted;
     return {
-      changes: { from: main.head, insert: before ? `${text}${gap}` : `${gap}${text}` },
-      selection: { anchor: main.head + text.length + (before ? 0 : 2) },
+      changes: { from: main.head, insert: `${around.before}${text}${around.after}` },
+      selection: { anchor: main.head + around.before.length + text.length },
       annotations: Transaction.userEvent.of("input.type"),
       scrollIntoView: true,
     };

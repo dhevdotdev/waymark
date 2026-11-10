@@ -528,7 +528,7 @@ export class Reader {
     opts.onPainted?.();
 
     this.renderTabChrome();
-    if (changedNote || !opts.quiet) this.renderTree();
+    this.renderTree();
     this.inspector.render(path, rendered);
     this.editing.stats.read(path);
     this.persist();

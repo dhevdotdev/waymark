@@ -64,7 +64,12 @@ export class FileTree {
   }
 
   /** Moves focus to the row that had it, or else the nearest folder still in the list, or else the open note. */
-  private refocus({ dataset: { path, folder } }: HTMLElement): void {
+  private refocus(lost: HTMLElement): void {
+    if (lost.isConnected) {
+      lost.focus({ preventScroll: true });
+      return;
+    }
+    const { path, folder } = lost.dataset;
     const head = (name: string) => this.folders.get(name)?.querySelector<HTMLElement>(":scope > .tree-head") ?? null;
     const same = path ? (this.notes.get(path) ?? null) : head(folder ?? "");
     const parents = ancestors(path ?? `${folder}/`)
@@ -85,18 +90,20 @@ export class FileTree {
     return expected;
   }
 
+  /** Keeps the current note, so a rebuild that leaves it in place neither scrolls to it nor reopens its folders. */
   private rebuild(index: VaultIndex): void {
+    /* Read before the bookmarks move into the new tree, which shrinks the old one and clamps its scroll. */
+    const keep = this.box.scrollTop;
     this.folders.clear();
     this.notes.clear();
     const tree = document.createElement("div");
     tree.className = "tree";
     if (this.leading) tree.append(this.leading);
     tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
-    const keep = this.box.scrollTop;
     this.box.replaceChildren(tree);
     this.box.scrollTop = keep;
     this.builtFor = index;
-    this.current = "";
+    this.notes.get(this.current)?.classList.add("is-current");
   }
 
   /** Sets the order before the first draw. */
