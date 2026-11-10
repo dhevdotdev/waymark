@@ -5,7 +5,7 @@ import { isBaseFile } from "../vault/index";
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
 import { type Tab, Workspace } from "../vault/workspace";
-import { BaseView } from "./base-view";
+import type { BaseView } from "./base-view";
 import { Bookmarks } from "./bookmarks";
 import { CommandTable } from "./commands";
 import { FindBar, paint } from "./find";
@@ -47,7 +47,7 @@ export class Reader {
   readonly editing: NoteEditing;
   readonly spots: ReadingSpots;
   readonly bookmarks: Bookmarks;
-  private readonly baseView: BaseView;
+  private baseView: BaseView | null = null;
   readonly files: NoteFiles;
   readonly workspace = new Workspace();
   /** The note on screen, or the note a graph tab was opened from. */
@@ -142,11 +142,6 @@ export class Reader {
       current: () => (this.onBlank ? "" : this.current),
     });
     this.sidebar.tree.leading = this.bookmarks.element;
-    this.baseView = new BaseView({
-      vault,
-      scroller: els.scroller,
-      open: (path, newTab) => void this.open(path, { newTab, focus: true, via: "link" }),
-    });
     this.files = new NoteFiles({
       bookmarks: this.bookmarks,
       sidebar: els.sidebar,
@@ -551,6 +546,12 @@ export class Reader {
     const scroll = opts.keepScroll ? this.els.scroller.scrollTop : this.tab.trail.current.scroll;
     this.current = path;
     this.noteView.showPaneHead(path, "");
+    /* Views bring a YAML parser, which only someone opening one should load. */
+    this.baseView ??= new (await import("./base-view")).BaseView({
+      vault: this.vault,
+      scroller: this.els.scroller,
+      open: (target, newTab) => void this.open(target, { newTab, focus: true, via: "link" }),
+    });
     await this.baseView.show(path, scroll, () => seq !== this.renderSeq);
     if (seq !== this.renderSeq) return;
     this.renderTabChrome(opts.entering);
