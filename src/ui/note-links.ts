@@ -1,6 +1,7 @@
 import { native } from "../platform";
 import type { VaultIndex } from "../vault/index";
 import { type MenuItem, showContextMenu } from "./context-menu";
+import { outsideHref, outsideLink } from "./link-tooltip";
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
 
@@ -48,9 +49,31 @@ function headingText(el: HTMLElement): string | null {
   return label.replace(/^#{1,6}\s+/, "").trim() || null;
 }
 
+function linkItems(href: string, toast: (message: string) => void): MenuItem[] {
+  const copy = async () => {
+    try {
+      await native.copyText(href.replace(/^mailto:/i, ""));
+      toast("Link address copied");
+    } catch {
+      toast("The link address could not be copied.");
+    }
+  };
+  return [
+    { label: "Open link", run: () => void native.openExternal(href) },
+    { label: "Copy link address", run: () => void copy() },
+  ];
+}
+
 /** Right-clicking a heading, in Read, Edit or the outline, offers a link to that place. */
 export function bindHeadingLinks(host: LinkMenuHost): void {
   host.shell.addEventListener("contextmenu", (e) => {
+    const link = outsideLink(e.target as HTMLElement);
+    const href = link && outsideHref(link);
+    if (href) {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, linkItems(href, host.toast));
+      return;
+    }
     const heading = (e.target as HTMLElement).closest<HTMLElement>(HEADINGS);
     const path = host.path();
     if (!heading || !path) return;

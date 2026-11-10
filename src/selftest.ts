@@ -200,6 +200,29 @@ async function checkFolders({ reader, vault, check, until }: SelfTestContext): P
   await vault.applyChanges([]);
 }
 
+/** Nothing may replace the app's page, while the frames it needs keep loading. */
+async function runNavigate({ reader, check, wait, until }: SelfTestContext): Promise<void> {
+  await reader.open("With paper.md");
+  check("a PDF frame is drawn", await until(() => document.querySelector("iframe") !== null, 5000));
+  const frame = document.querySelector("iframe")!;
+  const loaded = new Promise<boolean>((done) => {
+    frame.addEventListener("load", () => done(true), { once: true });
+    setTimeout(() => done(false), 6000);
+  });
+  frame.src = String(frame.src);
+  check("a PDF frame still loads from the vault", await loaded);
+  const home = location.href;
+  for (const away of ["vault://localhost/Welcome.md", "file:///etc/hosts"]) {
+    location.href = away;
+    await wait(1500);
+    check(
+      `the app cannot be replaced by ${away.split(":")[0]}`,
+      location.href === home && document.querySelector(".shell") !== null,
+      location.href,
+    );
+  }
+}
+
 async function runRead(ctx: SelfTestContext): Promise<void> {
   const { app, reader, vault, check, wait, until, log, report } = ctx;
   await checkDockIcons(ctx);
@@ -481,6 +504,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
 
   if (mode.startsWith("show:")) await runShow(ctx, mode);
   if (mode === "read") await runRead(ctx);
+  if (mode === "navigate") await runNavigate(ctx);
 
   const played: string[] = [];
   app.sound.onPlay = (cue: string) => played.push(cue);

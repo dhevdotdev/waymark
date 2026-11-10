@@ -147,6 +147,10 @@ Each round was judged from WebKit screenshots of real notes, not from mockups.
 
 Hovering a web or mail link shows its real address under the link, in Read and Edit: the site in full and strong, the rest quieter, three lines at most with the middle of the path cut. The address is read from the link when it is shown, `http://` stays visible, and international hosts stay in their `xn--` form because a decoded name can imitate another site.
 
+## The app stays the app
+
+Nothing replaces Waymark's page. A web address that tries to load inside it opens in the default browser, and anything else is refused. A file or link dropped outside the editor does nothing. Right-clicking a web or mail link, in Read or Edit, offers Open link and Copy link address.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

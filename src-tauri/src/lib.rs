@@ -2,6 +2,7 @@ mod clipboard;
 mod dock_icon;
 mod folders;
 mod git;
+mod navigation;
 mod selftest;
 mod trash;
 mod vault;
@@ -549,6 +550,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(navigation::guard())
         .manage(Vault::default())
         .manage(Watcher::default())
         .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {

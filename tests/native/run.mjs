@@ -61,6 +61,17 @@ const SETUP = {
     await commitAll(vault, "fixture");
     return vault;
   },
+  async navigate(base) {
+    const vault = path.join(base, "vault");
+    await mkdir(vault, { recursive: true });
+    await writeFixtureVault(vault);
+    await writeFile(
+      path.join(vault, "Paper.pdf"),
+      "%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
+    );
+    await writeFile(path.join(vault, "With paper.md"), "# With paper\n\n![[Paper.pdf]]\n");
+    return vault;
+  },
   async empty(base) {
     const vault = path.join(base, "vault");
     await mkdir(vault, { recursive: true });

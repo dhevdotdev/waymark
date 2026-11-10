@@ -86,6 +86,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
         void native.openExternal((el as HTMLAnchorElement).href);
       },
     ],
+    [".doc a[href^='vault:']", (_el, e) => e.preventDefault()],
     [
       ".remote-image",
       (el) => {

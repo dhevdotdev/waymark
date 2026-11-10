@@ -20,6 +20,11 @@ export function outsideLink(el: Element): HTMLElement | null {
   return href && destinationOf(href) ? link : null;
 }
 
+/** The address the link would open. */
+export function outsideHref(link: HTMLElement): string | null {
+  return realHref(link);
+}
+
 export function linkDestination(link: HTMLElement): Destination | null {
   const href = realHref(link);
   return href ? destinationOf(href) : null;
