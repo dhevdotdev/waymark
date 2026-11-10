@@ -207,7 +207,12 @@
   border-radius: 50%;
   background: var(--knob);
   box-shadow: var(--shadow-knob);
-  transition: translate var(--t-menu) var(--ease-out);
+  transition: translate var(--t-menu) var(--ease-in-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .toggle i::after {
+    transition: none;
+  }
 }
 .toggle input:checked + i {
   background: var(--accent);

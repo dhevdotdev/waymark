@@ -103,6 +103,10 @@ class TaskWidget extends WidgetType {
     box.setAttribute("aria-checked", String(this.done));
     return box;
   }
+  updateDOM(box: HTMLElement): boolean {
+    box.setAttribute("aria-checked", String(this.done));
+    return true;
+  }
   ignoreEvent(): boolean {
     return false;
   }

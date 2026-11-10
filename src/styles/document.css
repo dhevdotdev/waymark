@@ -171,7 +171,7 @@
   background: var(--accent);
   box-shadow: none;
 }
-.task-box[aria-checked="true"]::after {
+.task-box::after {
   content: "";
   position: absolute;
   inset-block-start: 0.12em;
@@ -181,6 +181,19 @@
   border: solid var(--paper);
   border-width: 0 1.6px 1.6px 0;
   rotate: 45deg;
+  opacity: 0;
+  transition: opacity var(--t-press) var(--ease-out);
+}
+.task-box[aria-checked="true"]::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-box::after {
+    transition: none;
+  }
+}
+.doc li.task {
+  transition: color var(--t-hover) ease;
 }
 .doc li.task.is-done {
   color: var(--ink-3);
