@@ -31,7 +31,7 @@ export class Sidebar {
     private readonly host: SidebarHost,
   ) {
     this.tree = new FileTree(els.sidebar, new Set(openFolders), () => host.persist());
-    bindTreeKeys(els.sidebar, this.tree);
+    bindTreeKeys(els.sidebar);
     this.searchPane = new SearchPane(els.searchPane, {
       ...host,
       close: () => this.showFiles(),
@@ -97,14 +97,6 @@ export class Sidebar {
     this.prefs.update((p) => {
       p.sidebar = !closed;
     });
-  }
-
-  /** Toggles with no transition, so a keyboard user sees the result at once. */
-  toggleInstantly(): void {
-    const { shell } = this.els;
-    shell.classList.add("no-anim");
-    this.toggle();
-    requestAnimationFrame(() => requestAnimationFrame(() => shell.classList.remove("no-anim")));
   }
 
   private ensureVisible(): void {

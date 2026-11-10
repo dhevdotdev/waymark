@@ -41,7 +41,7 @@ export function readerCommands(r: Reader): Command[] {
     close: (index) => r.closeTab(index),
     toast,
     saveScroll: () => r.saveScroll(),
-    show: () => void r.show({ keyboard: true }),
+    show: () => void r.show(),
     exists: (view) => viewExists(r.vault.index, view),
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
@@ -242,7 +242,7 @@ export function readerCommands(r: Reader): Command[] {
       label: "Toggle sidebar",
       keys: ["mod+\\"],
       hint: "⌘\\",
-      run: (origin) => (origin === "key" ? r.sidebar.toggleInstantly() : r.sidebar.toggle()),
+      run: () => r.sidebar.toggle(),
     },
     {
       id: "rail",

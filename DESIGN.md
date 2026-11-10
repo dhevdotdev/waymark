@@ -188,13 +188,15 @@ Native scrollbars are hidden everywhere and nothing rubber-bands past its edge. 
 The rules come from Emil Kowalski's animation standards, good-css.com, Impeccable and taste-skill. Where those sources disagree, a short distillation records which rule Waymark follows.
 
 - Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
-- Following a link with the pointer fades the new page in over 180ms, with no movement.
+- Following a note link with the pointer fades the new page in over 180ms, with no movement. Files, search, the palette, tabs, back and forward show the page at once.
+- The palette and the menu bar count as the keyboard, even when a choice in them is clicked. A heading reached by the pointer takes a brief tint that holds until the eye can land on it, and a heading reached any other way does not.
 - Popovers and menus grow from the point nearest what opened them, measured after they are pushed back into the window. Sheets and the lightbox stay centred. Entries and exits are transitions, so a reversal starts from where the surface is. A key press shows or removes any of them at once.
 - A sheet opened from a sheet changes the open sheet's content, so two never overlap.
 - A toast from a key press appears and leaves with no motion. A replaced toast leaves through its exit and takes no clicks while the new one is ready at once. The 400ms entry stays, because the curve has done 92% of its travel by 160ms.
 - Every small control presses to the same .97 over 160ms, for the pointer only, because Space and Return also set `:active`. Dense rows and the table only tint.
 - Moving the pointer counts as coming back to it, so hover fades return after typing.
-- Collapsed callouts and sidebar groups open by animating grid rows, so the content keeps its height and nothing jumps.
+- Collapsed callouts and sidebar groups open by animating grid rows when clicked, so the content keeps its height and nothing jumps. Anything revealed for a search, a find or an open note lands at once, so a scroll target is never moving when it is measured.
+- Floating panels slide, and the narrow-window scrim fades with the sidebar. Docked panels never animate their width, because that would move the page. Rail sections move only when a fold is clicked, not when the window resizes or a note changes what they hold.
 - While writing, each key sounds like a recorded mechanical switch, with a press and its own release, placed left to right by where the key sits. Quick typing lands softer than a deliberate press, and a held key repeats silently. Linear, Tactile or Clicky are chosen in settings, and picking one plays a few keys so it can be judged at once.
 - Sound is a small synthesised palette: copy, a new background tab, sync finished, incoming changes, commit, push, and a problem. Each cue has a 900ms cooldown, so repeated actions never pile up. Nothing plays for clicks, scrolling, typing or background fetches. One toggle mutes everything.
 

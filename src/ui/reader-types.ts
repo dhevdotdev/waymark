@@ -37,9 +37,9 @@ export interface ShowOptions {
   anchor?: string;
   entering?: number;
   find?: string;
+  followed?: boolean;
   keepScroll?: boolean;
   quiet?: boolean;
   restoring?: boolean;
-  keyboard?: boolean;
   onPainted?: () => void;
 }

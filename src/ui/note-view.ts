@@ -3,11 +3,32 @@ import { headingKey } from "../vault/index";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
+import { isPointerAction } from "./input-origin";
+import { reducedMotion } from "./media";
 import type { ShellElements } from "./shell";
 import { watchTableFit } from "./table-fit";
 import { watchTableSelection } from "./table-selection";
 
 const WORDS_PER_MINUTE = 230;
+const TARGET_HOLD = 0.45;
+
+/** Tints a heading just reached, holding long enough for the eye to land before it clears. */
+function markTarget(target: HTMLElement): void {
+  target.classList.add("is-target");
+  if (reducedMotion()) return;
+  for (const running of target.getAnimations()) running.cancel();
+  const style = getComputedStyle(target);
+  const tint = { backgroundColor: "var(--accent-soft)", boxShadow: "0 0 0 6px var(--accent-soft)" };
+  const clear = { backgroundColor: "transparent", boxShadow: "0 0 0 6px transparent" };
+  target.animate(
+    [
+      { ...tint, offset: 0 },
+      { ...tint, offset: TARGET_HOLD, easing: style.getPropertyValue("--ease-out").trim() },
+      { ...clear, offset: 1 },
+    ],
+    Number.parseFloat(style.getPropertyValue("--t-toast")),
+  );
+}
 
 /** The reading column: the rendered note, its header and its backlinks. */
 export class NoteView {
@@ -22,10 +43,12 @@ export class NoteView {
   }
 
   /** Replaces the column with a rendered note and returns its article element. */
-  mount(path: string, body: DocumentFragment, animate: boolean): HTMLElement {
+  mount(path: string, body: DocumentFragment, followed: boolean): HTMLElement {
     const doc = document.createElement("article");
     doc.className = "doc";
-    if (animate) doc.classList.add("doc-enter");
+    /* A second link followed during the fade must not dip the page again. */
+    const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
+    if (followed && isPointerAction() && !midFade) doc.classList.add("doc-enter");
     doc.append(this.heading(path), body);
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);
@@ -60,9 +83,8 @@ export class NoteView {
     }
     target.scrollIntoView({ block: "start" });
     if (quiet) return;
-    target.classList.remove("is-target");
-    void target.offsetWidth;
-    target.classList.add("is-target");
+    this.els.scroller.querySelector(".is-target")?.classList.remove("is-target");
+    if (isPointerAction()) markTarget(target);
   }
 
   /** Scrolls to the first occurrence of `text` in the note body and marks every occurrence. */

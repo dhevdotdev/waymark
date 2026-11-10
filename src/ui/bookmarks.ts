@@ -30,9 +30,18 @@ const headingOf = (line: string) => /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
 /** A saved list of notes and headings, kept per vault in the app's preferences and shown above the folders. */
 export class Bookmarks {
   readonly element = document.createElement("div");
+  private readonly head = document.createElement("button");
+  private readonly inner = document.createElement("div");
+  private readonly body = document.createElement("div");
 
   constructor(private readonly host: BookmarksHost) {
     this.element.className = "tree-folder bookmarks";
+    this.head.className = "tree-head";
+    this.head.dataset.bookmarksHead = "";
+    this.head.innerHTML = `${CHEVRON}${treeIcon(icons.bookmark)}<span class="tree-name">Bookmarks</span><span class="tree-count"></span>`;
+    this.inner.className = "tree-inner";
+    this.body.className = "tree-body";
+    this.body.append(this.inner);
     this.element.addEventListener("click", (e) => this.onClick(e));
     this.element.addEventListener("contextmenu", (e) => this.onMenu(e));
   }
@@ -93,23 +102,22 @@ export class Bookmarks {
       this.element.replaceChildren();
       return;
     }
+    if (this.head.parentElement !== this.element) this.element.replaceChildren(this.head, this.body);
     const closed = this.host.prefs.value.vaults[this.host.root]?.bookmarksClosed === true;
     this.element.classList.toggle("is-open", !closed);
-    const head = document.createElement("button");
-    head.className = "tree-head";
-    head.dataset.bookmarksHead = "";
-    head.setAttribute("aria-expanded", String(!closed));
-    head.innerHTML = `${CHEVRON}${treeIcon(icons.bookmark)}<span class="tree-name">Bookmarks</span><span class="tree-count"></span>`;
-    head.querySelector(".tree-count")!.textContent = list.length.toLocaleString();
-    const inner = document.createElement("div");
-    inner.className = "tree-inner";
-    list.forEach((bookmark, i) => {
-      inner.append(this.row(bookmark, i));
-    });
-    const body = document.createElement("div");
-    body.className = "tree-body";
-    body.append(inner);
-    this.element.replaceChildren(head, body);
+    this.head.setAttribute("aria-expanded", String(!closed));
+    this.head.querySelector(".tree-count")!.textContent = list.length.toLocaleString();
+    this.drawRows(list);
+  }
+
+  /** The rows are rebuilt on every note change, so a row holding focus hands it to its replacement. */
+  private drawRows(list: Bookmark[]): void {
+    const focused = this.inner.contains(document.activeElement)
+      ? (document.activeElement as HTMLElement).dataset.bookmark
+      : undefined;
+    this.inner.replaceChildren(...list.map((bookmark, i) => this.row(bookmark, i)));
+    if (focused !== undefined)
+      this.inner.querySelector<HTMLElement>(`[data-bookmark="${focused}"]`)?.focus({ preventScroll: true });
   }
 
   private row(bookmark: Bookmark, index: number): HTMLElement {

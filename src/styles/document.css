@@ -675,6 +675,10 @@ button.callout-title:focus-visible {
 .callout[data-fold="closed"] .callout-body {
   grid-template-rows: 0fr;
 }
+:root[data-input="keyboard"] :is(.callout-body, .callout-chevron),
+.callout.is-instant :is(.callout-body, .callout-chevron) {
+  transition: none;
+}
 .callout-content {
   overflow: hidden;
   padding: 6px 16px 12px;
@@ -860,21 +864,9 @@ button.callout-title:focus-visible {
   margin: var(--s3) 0 var(--s4);
 }
 
-/* Heading anchors land with a brief accent flash so the eye finds the target. */
+/* A heading reached by the pointer lands with a brief accent tint, drawn by `markTarget`, so the eye finds it. */
 .doc .is-target {
-  animation: target-flash 600ms var(--ease-out);
   border-radius: var(--r-chip);
-}
-@keyframes target-flash {
-  0%,
-  25% {
-    background: var(--accent-soft);
-    box-shadow: 0 0 0 6px var(--accent-soft);
-  }
-  100% {
-    background: transparent;
-    box-shadow: 0 0 0 6px transparent;
-  }
 }
 
 /* Selection */
@@ -1035,7 +1027,6 @@ button.callout-title:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .doc .is-target {
-    animation: none;
     background: var(--row-hover);
   }
   .callout-body,
