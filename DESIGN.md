@@ -49,18 +49,24 @@ Every state has a visible way in and a visible way out.
 - Tabs reorder by dragging and from the tab's menu or the palette. Pinned tabs sit together at the left, survive a relaunch and cannot be closed by accident: closing one says to unpin it first.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
-- The trail is one row above the note, and the note's area starts below it, so nothing slides under it. Branches open over the page from its chevron and close with Escape.
+- Nothing sits between the path row and the note. The trail is a small readout in the path row and a tab in the right panel, so a note starts at the same height whether or not its tab has a trail.
 - A destructive confirmation arms nothing when it opens. The dialog holds focus, Return moves to Cancel, and Delete needs its button reached on purpose. Other confirmations keep Return.
 - The outline is a dash per heading on the right edge, whether or not the inspector is open. Hovering opens the titles. There is one outline, so the inspector has no tab for it. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.
 - Selecting text while editing offers a small formatting bubble. It never appears without a selection.
-- Close controls lead their label on tabs and trail stops, in a 20px target with a 13px icon, the same size as the new-tab plus. Every trail stop has a quiet pill, so its always-visible remove control belongs to something.
+- Close controls lead their label on tabs, in a 20px target with a 13px icon, the same size as the new-tab plus. A trail stop's remove control sits at the end of its row, at the same size, and shows on hover or focus. Destinations should not read as closable tabs.
 - Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.
 
 ## Trails
 
-Each tab keeps a map of where following links has taken it, drawn over the top of the note once it has more than one note, in space the title already leaves free, so following a link moves nothing. Following a link grows a branch from the current note, and a second link from the same note opens a new row. Clicking any note on the map moves that tab there and leaves the map intact. A link to a note already on the map moves there too, and draws nothing, because a line back would break the tree the map is drawn as. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
+Each tab remembers where following links has taken it. A second link from the same note starts a side branch. A link to a note already on the trail moves there and adds nothing. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
+
+Above the note there is only the readout in the path row: "Trail 4 of 6", with a fork count when there are side branches. Its slot is always reserved, so a tab's second stop moves nothing. The readout or ⌘Y opens the Trail tab of the right panel on the current stop, and doing it again puts the panel back as it was.
+
+The Trail tab is a list, because a tree of long titles does not fit a row. One 28px row per stop, top to bottom. Side branches sit directly under the stop they left from, stepped in 14px, up to three steps, and the main line carries on level after them. The way to the current note is drawn in the accent. The current stop uses the same tint as the current file in the tree. A stop with branches has a chevron in place of its dot, and folding shows how many stops went out of sight. The list scrolls like any other panel, and only the panel's own controls or Escape close it, so clicking stop after stop keeps it open. In a window too narrow for a docked panel, it slides over the note as the panel always does, and a click on the note dismisses it.
+
+Removing a stop takes out only that stop. Its children move up to its place, nothing else is lost, and the toast offers Undo. The current note cannot be removed, because that would move the tab. The panel only sits beside notes, so a graph, a base or a blank tab shows no readout and Back is the way out of them.
 
 ## Graph
 

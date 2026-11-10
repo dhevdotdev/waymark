@@ -42,6 +42,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
     [".tab", (el, e) => (e.button === 1 ? closeTabOf(r, el) : r.switchTab(Number(el.dataset.tab)))],
     ["[data-side]", () => r.sidebar.toggleSearch()],
     [".tree-head", (el) => r.sidebar.tree.toggle(el.dataset.folder!)],
+    ['[data-act="trail"]', () => r.trail.togglePanel()],
     ["[data-crumb]", (el) => r.sidebar.revealFolder(el.dataset.crumb!)],
     [
       "[data-rail]",

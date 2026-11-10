@@ -1,18 +1,31 @@
 const TOAST_MS = 2600;
+const TOAST_WITH_ACTION_MS = 6000;
 const TOAST_EXIT_MS = 220;
 const LIGHTBOX_EXIT_MS = 150;
 
-export function toast(message: string): void {
+export function toast(message: string, action?: { label: string; run: () => void }): void {
   document.querySelector(".toast:not(.is-leaving)")?.remove();
   const el = document.createElement("div");
   el.className = "toast";
   el.setAttribute("role", "status");
   el.textContent = message;
-  document.body.append(el);
-  setTimeout(() => {
+  const leave = () => {
     el.classList.add("is-leaving");
     setTimeout(() => el.remove(), TOAST_EXIT_MS);
-  }, TOAST_MS);
+  };
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toast-action";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      action.run();
+      leave();
+    });
+    el.append(button);
+  }
+  document.body.append(el);
+  setTimeout(leave, action ? TOAST_WITH_ACTION_MS : TOAST_MS);
 }
 
 export function lightbox(content: Element): void {

@@ -27,11 +27,13 @@ export interface SavedTrail {
 export interface Placement {
   id: number;
   parent: number | null;
-  depth: number;
-  row: number;
-  /** Children on the map, counted whether or not they are folded away. */
+  /** How far the stop is stepped in: the main line stays level and each side branch moves one step in. */
+  level: number;
+  /** Children on the trail, counted whether or not they are folded away. */
   branches: number;
   collapsed: boolean;
+  /** Stops out of sight because this one is folded. */
+  folded: number;
 }
 
 const sameView = (a: View, b: View) =>
@@ -282,54 +284,61 @@ export class Trail {
     if (node) node.collapsed = !node.collapsed;
   }
 
-  /** Removes a note and everything reachable only through it. Removing the start resets the map to where the tab is now. */
+  /** How many stops sit at or below a node. */
+  private stopsFrom(id: number): number {
+    return this.childrenOf(id).reduce((sum, child) => sum + this.stopsFrom(child.id), 1);
+  }
+
+  /**
+   * Takes one stop off the trail. Its children move up to take its place, so
+   * nothing else is lost. The first child takes over when the start goes. The
+   * current note stays, because removing it would move the tab.
+   */
   remove(id: number): void {
-    if (id === this.root) {
-      this.clear();
-      return;
-    }
     const node = this.nodes.get(id);
-    if (!node) return;
-    const doomed = new Set<number>();
-    const collect = (n: number) => {
-      doomed.add(n);
-      this.childrenOf(n).forEach((c) => {
-        collect(c.id);
-      });
-    };
-    collect(id);
-    const alive = (n: number) => !doomed.has(n);
-    const earlier = this.visits.slice(0, this.position + 1).filter(alive);
-    const later = this.visits.slice(this.position + 1).filter(alive);
-    if (doomed.has(this.cur)) {
-      this.cur = node.parent!;
-      if (earlier.at(-1) !== this.cur) earlier.push(this.cur);
+    if (!node || id === this.cur) return;
+    const children = this.childrenOf(id);
+    const heir = node.parent === null ? children[0] : undefined;
+    if (heir) {
+      heir.parent = null;
+      this.root = heir.id;
     }
-    this.visits = [...earlier, ...later].filter((v, i, all) => v !== all[i - 1]);
-    this.position = earlier.filter((v, i, all) => v !== all[i - 1]).length - 1;
-    for (const n of doomed) this.nodes.delete(n);
+    for (const child of children) if (child !== heir) child.parent = heir ? heir.id : node.parent;
+    const moved = new Set(children);
+    const order = [...this.nodes.values()].flatMap((n) => (n === node ? children : moved.has(n) ? [] : [n]));
+    this.nodes = new Map(order.map((n) => [n.id, n]));
+    const steps = (visits: number[]) => visits.filter((v) => v !== id).filter((v, i, all) => v !== all[i - 1]);
+    const earlier = steps(this.visits.slice(0, this.position + 1));
+    this.visits = steps(this.visits);
+    this.position = earlier.length - 1;
   }
 
-  /** Forgets the map and keeps only where the tab is now. */
-  clear(): void {
-    const { view, scroll } = this.current;
-    this.startFresh(view, scroll);
+  /** Puts the trail back as it was when `saved` was taken. */
+  revert(saved: SavedTrail): void {
+    this.load(saved);
   }
 
-  /** Grid positions: the first child continues its parent's row, later children open new rows below. */
+  /**
+   * The trail as a list, top to bottom. A stop's side branches sit directly
+   * under it, stepped in, and the main line carries on level after them.
+   * Folding keeps the way to the current note, or the main line when the
+   * current note is elsewhere.
+   */
   layout(): Placement[] {
     const out: Placement[] = [];
-    let lastRow = 0;
     const onRoute = this.pathToCurrent();
-    const place = (node: TrailNode, depth: number, row: number) => {
+    const place = (node: TrailNode, level: number) => {
       const children = this.childrenOf(node.id);
-      out.push({ id: node.id, parent: node.parent, depth, row, branches: children.length, collapsed: node.collapsed });
-      const shown = node.collapsed ? children.filter((c, i) => i === 0 || onRoute.has(c.id)) : children;
-      shown.forEach((child, i) => {
-        place(child, depth + 1, i === 0 ? row : ++lastRow);
-      });
+      const kept = children.find((c) => onRoute.has(c.id)) ?? children[0];
+      const shown = node.collapsed ? children.filter((c) => c === kept) : children;
+      const folded = children.filter((c) => !shown.includes(c)).reduce((sum, c) => sum + this.stopsFrom(c.id), 0);
+      out.push({ id: node.id, parent: node.parent, level, branches: children.length, collapsed: node.collapsed, folded });
+      const [main, ...sides] = children.filter((c) => shown.includes(c));
+      const mainLine = children[0] === main ? main : undefined;
+      for (const side of mainLine ? sides : [main, ...sides]) if (side) place(side, level + 1);
+      if (mainLine) place(mainLine, level);
     };
-    place(this.nodes.get(this.root)!, 0, 0);
+    place(this.nodes.get(this.root)!, 0);
     return out;
   }
 

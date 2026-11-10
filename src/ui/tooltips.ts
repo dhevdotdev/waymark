@@ -35,7 +35,9 @@ export function bindTooltips(root: HTMLElement): void {
   root.addEventListener("pointerover", (e) => {
     const target = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]");
     if (!target || target === pressed || target.closest(".tab.is-active")) return;
-    const label = target.querySelector<HTMLElement>(":scope > :is(.nav-text, .rail-link-name, .tree-name, .start-title)");
+    const label = target.querySelector<HTMLElement>(
+      ":scope > :is(.nav-text, .rail-link-name, .tree-name, .start-title, .trail-name)",
+    );
     if (label && label.scrollWidth <= label.clientWidth) return;
     if (target.classList.contains("tab")) {
       const title = target.querySelector<HTMLElement>(".tab-title");

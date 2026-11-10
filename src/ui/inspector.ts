@@ -4,13 +4,16 @@ import { ancestors } from "../vault/tree";
 import { FloatingOutline } from "./floating-outline";
 import { icons } from "./icons";
 import { LocalGraph } from "./local-graph";
+import { railFloats } from "./media";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import type { ShellElements } from "./shell";
 
-export type RailPane = "links" | "info";
+export type RailPane = "links" | "info" | "trail";
 
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
+  paneChanged: () => void;
+  railToggled: (open: boolean) => void;
 }
 
 /** The right panel: links, note details and the local graph. It also owns the heading outline on the reading pane. */
@@ -20,6 +23,7 @@ export class Inspector {
   private localGraph: LocalGraph | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
+  pane: RailPane;
 
   constructor(
     private readonly els: ShellElements,
@@ -27,6 +31,7 @@ export class Inspector {
     private readonly host: InspectorHost,
     pane: RailPane,
   ) {
+    this.pane = pane;
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
     this.setPane(pane);
@@ -49,6 +54,8 @@ export class Inspector {
 
   setPane(pane: RailPane): void {
     const { shell, railBody } = this.els;
+    this.pane = pane;
+    shell.classList.toggle("on-trail", pane === "trail");
     for (const button of shell.querySelectorAll<HTMLElement>("[data-rail]")) {
       const on = button.dataset.rail === pane;
       button.classList.toggle("is-on", on);
@@ -57,6 +64,23 @@ export class Inspector {
     for (const el of shell.querySelectorAll<HTMLElement>("[data-pane]")) el.hidden = el.dataset.pane !== pane;
     railBody.scrollTop = 0;
     this.refreshHistory();
+    this.host.paneChanged();
+  }
+
+  get isShowing(): boolean {
+    const { shell } = this.els;
+    return railFloats() ? shell.classList.contains("rail-peek") : !shell.classList.contains("rail-closed");
+  }
+
+  /** A narrow window slides the panel over the note, so that state is not one to remember. */
+  toggle(): void {
+    const { shell } = this.els;
+    if (railFloats()) {
+      shell.classList.toggle("rail-peek");
+      return;
+    }
+    const closed = shell.classList.toggle("rail-closed");
+    this.host.railToggled(!closed);
   }
 
   /** Called when the Git status changes, so the Info pane stays honest about uncommitted edits. */

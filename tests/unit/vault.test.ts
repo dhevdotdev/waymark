@@ -129,9 +129,9 @@ describe("trail", () => {
     t.follow(note("c"));
     t.select(t.layout()[0].id);
     t.follow(note("d"));
-    const rows = t.layout().map((p) => p.row);
-    expect(rows).toEqual([0, 0, 0, 1]);
-    expect(t.layout().at(-1)!.depth).toBe(1);
+    const names = t.layout().map((p) => t.view(p.id));
+    expect(names).toEqual([note("a"), note("d"), note("b"), note("c")]);
+    expect(t.layout().map((p) => p.level)).toEqual([0, 1, 0, 0]);
   });
 
   it("moves to a note already on the trail instead of repeating it", () => {
@@ -179,16 +179,48 @@ describe("trail", () => {
     expect(here(t)).toBe("a");
   });
 
-  it("removes a branch with everything beyond it, even a note reached another way", () => {
+  it("removes one stop and hands what came after it to the stop before", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("c"));
     t.select(t.layout()[0].id);
     t.follow(note("d"));
+    const b = t.layout().find((p) => t.view(p.id)?.kind === "note" && (t.view(p.id) as { path: string }).path === "b")!;
+    t.remove(b.id);
+    expect(t.layout().map((p) => t.view(p.id))).toEqual([note("a"), note("d"), note("c")]);
+    const start = t.layout()[0].id;
+    expect(t.layout().map((p) => p.parent)).toEqual([null, start, start]);
+    expect(here(t)).toBe("d");
+  });
+
+  it("keeps a branch's place in the order when the stop before it goes", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
     t.follow(note("c"));
+    t.select(t.layout()[0].id);
+    t.follow(note("d"));
+    t.select(t.layout()[0].id);
+    const b = t.layout().find((p) => (t.view(p.id) as { path: string }).path === "b")!;
+    t.remove(b.id);
+    expect(t.layout().map((p) => [t.view(p.id), p.level])).toEqual([
+      [note("a"), 0],
+      [note("d"), 1],
+      [note("c"), 0],
+    ]);
+  });
+
+  it("puts the trail back exactly as it was", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
+    t.follow(note("c"));
+    const saved = t.save();
     t.remove(t.layout()[1].id);
     expect(t.size).toBe(2);
-    expect(here(t)).toBe("a");
+    t.revert(saved);
+    expect(t.size).toBe(3);
+    expect(t.layout().map((p) => t.view(p.id))).toEqual([note("a"), note("b"), note("c")]);
+    t.back();
+    expect(here(t)).toBe("b");
   });
 
   it("restores stops, ignores old saved links, and rebuilds stops for trails saved without them", () => {
@@ -238,22 +270,36 @@ describe("trail", () => {
     expect(here(t)).toBe("x");
   });
 
-  it("removes a note with everything beyond it and steps back if it was current", () => {
+  it("leaves the current note alone, because removing it would move the tab", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
+    t.remove(t.current.id);
+    expect(t.size).toBe(2);
+    expect(here(t)).toBe("b");
+  });
+
+  it("retraces Back without a removed stop", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.follow(note("c"));
     t.remove(t.layout()[1].id);
-    expect(t.size).toBe(1);
+    expect(t.canBack).toBe(true);
+    t.back();
     expect(here(t)).toBe("a");
-    expect(t.canForward).toBe(false);
+    expect(t.canBack).toBe(false);
   });
 
-  it("resets to the current note when the start of the trail is removed", () => {
+  it("hands the start to its first child when the start is removed", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
+    t.select(t.layout()[0].id);
+    t.follow(note("c"));
     t.remove(t.layout()[0].id);
-    expect(t.size).toBe(1);
-    expect(here(t)).toBe("b");
+    expect(t.layout().map((p) => [t.view(p.id), p.level, p.parent === null])).toEqual([
+      [note("b"), 0, true],
+      [note("c"), 0, false],
+    ]);
+    expect(here(t)).toBe("c");
   });
 
   it("folds side branches but never the way to the current note", () => {
@@ -264,15 +310,18 @@ describe("trail", () => {
     t.follow(note("c"));
     t.select(root);
     t.toggleCollapsed(root);
-    expect(t.layout().map((p) => p.id)).toHaveLength(2);
+    expect(t.layout().map((p) => t.view(p.id))).toEqual([note("a"), note("b")]);
+    expect(t.layout()[0].folded).toBe(1);
     t.toggleCollapsed(root);
     expect(t.layout()).toHaveLength(3);
+    expect(t.layout()[0].folded).toBe(0);
     const c = new Trail(note("a"));
     c.follow(note("b"));
     c.select(c.layout()[0].id);
     c.follow(note("c"));
     c.toggleCollapsed(c.layout()[0].id);
-    expect(c.layout()).toHaveLength(3);
+    expect(c.layout().map((p) => t.view(p.id) && c.view(p.id))).toEqual([note("a"), note("c")]);
+    expect(c.layout()[1].level).toBe(1);
   });
 
   it("restores a saved trail and drops notes that no longer exist with their branches", () => {

@@ -818,191 +818,197 @@ kbd {
 .shell:is(.is-blank, :has(.empty-state.is-page)) .pane-head {
   visibility: hidden;
 }
-.shell:has(.empty-state.is-page) .trail {
+/* The trail's place in the path row. The slot is always there, so a tab's second stop moves nothing. */
+.trail-slot {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  inline-size: 132px;
+}
+.trail-readout {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: default;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  block-size: 24px;
+  padding-inline: 8px;
+  border-radius: var(--r-control);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    scale var(--t-hover) var(--ease-out);
+}
+.trail-readout[hidden] {
   display: none;
 }
-
-/* The tab's trail: where following links has taken it. */
-.trail {
-  position: absolute;
-  inset-inline: 0;
-  inset-block-start: 38px;
-  z-index: 3;
-  display: flex;
-  gap: var(--s2);
-  padding: 5px var(--s4) 5px;
-  background: var(--paper);
-  border-block-end: 1px solid var(--rule);
+.trail-readout:active {
+  scale: 0.97;
 }
-.shell.is-graph .trail {
-  position: static;
-  grid-row: 1;
+.trail-readout:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
-.scroller {
-  margin-block-start: var(--trail-room, 0px);
+.trail-forks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: 3px;
 }
-.reader:has(> .trail:not([hidden])) .scroller {
-  scroll-padding-top: 12px;
-}
-.trail.is-open {
-  box-shadow: var(--shadow-float);
-}
-.trail.is-open .trail-scroll {
-  max-block-size: min(50vh, 420px);
-}
-.trail-more {
-  flex: none;
-  align-self: center;
-}
-.trail-more svg {
+.trail-forks svg {
+  inline-size: 12px;
+  block-size: 12px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.trail-more[hidden] {
+@media (hover: hover) and (pointer: fine) {
+  .trail-readout:hover {
+    background: var(--fill);
+    color: var(--ink);
+  }
+}
+.shell.on-trail:not(.rail-closed) .trail-readout,
+.shell.on-trail.rail-peek .trail-readout {
+  background: var(--fill);
+  color: var(--ink);
+}
+@media (max-width: 1240px) {
+  .shell.on-trail:not(.rail-peek) .trail-readout {
+    background: transparent;
+    color: var(--ink-3);
+  }
+}
+@media (max-width: 680px) {
+  .trail-slot {
+    inline-size: 84px;
+  }
+  .trail-word {
+    display: none;
+  }
+}
+
+/* The trail's panel: one row per stop, with side branches stepped in under the stop they left from. */
+.shell.on-trail .rail-graph {
   display: none;
 }
-.trail.is-open .trail-more svg {
-  rotate: 180deg;
+.trail {
+  position: relative;
 }
 .trail[hidden] {
   display: none;
 }
-.trail-scroll {
-  --fade-start: 0px;
-  --fade-end: 0px;
-  flex: 1;
-  min-inline-size: 0;
-  max-block-size: 32px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  mask-image: linear-gradient(to right, transparent, black var(--fade-start), black calc(100% - var(--fade-end)), transparent);
-}
-.trail-scroll.has-before {
-  --fade-start: 28px;
-}
-.trail-scroll.has-after {
-  --fade-end: 28px;
-}
-.trail-scroll::-webkit-scrollbar {
-  display: none;
-}
-.trail-inner {
-  position: relative;
+.trail-here {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  block-size: 28px;
+  border-radius: var(--r-control);
+  background: color-mix(in oklab, var(--accent) 14%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent);
 }
 .trail-lines {
   position: absolute;
-  inset: 0;
-  overflow: visible;
+  inset-block-start: 0;
+  inset-inline-start: 0;
   pointer-events: none;
-}
-.trail-lines path {
   fill: none;
   stroke: var(--rule-strong);
-  stroke-width: 1;
+  stroke-width: 1.25;
   stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .trail-lines path.is-on-path {
   stroke: var(--accent);
 }
-.trail-node {
-  --trail-ink: var(--ink-3);
-  position: absolute;
+.trail-row {
+  position: relative;
   display: flex;
   align-items: center;
   block-size: 28px;
-  margin-block-start: 2px;
-  padding-inline-start: 4px;
+  padding-inline: calc(var(--x) + 12px) 4px;
   border-radius: var(--r-control);
-  background: var(--fill);
-  color: var(--trail-ink);
+  color: var(--chrome-ink-3);
+  font-size: 0.8125rem;
+  font-weight: 450;
   transition:
     background-color var(--t-hover) ease,
     color var(--t-hover) ease;
 }
-.trail-node.is-on-path {
-  --trail-ink: var(--accent-ink);
-  background: color-mix(in oklab, var(--accent) 5%, var(--paper));
+.trail-row.is-on-path {
+  color: var(--chrome-ink);
 }
-.trail-node.is-current {
-  background: color-mix(in oklab, var(--accent-ink) 14%, var(--paper));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent-ink) 45%, transparent);
+.trail-row.is-current {
+  color: var(--accent-ink);
+  font-weight: 550;
+}
+.trail-row:not(.is-current):active {
+  background: var(--selected);
+}
+.trail-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .trail-name {
-  appearance: none;
-  border: 0;
-  background: none;
-  cursor: default;
-  color: inherit;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  block-size: 28px;
-  max-inline-size: 260px;
-  padding-inline: 3px 8px;
-  border-radius: var(--r-control);
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-.trail-name span {
+  flex: 1;
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.trail-name svg {
-  inline-size: 12px;
-  block-size: 12px;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.trail-dot {
+  position: absolute;
+  inset-inline-start: calc(var(--x) - 3px);
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--chrome-ink-3);
 }
-.trail-node:active {
-  background: var(--selected);
+.trail-row.is-on-path .trail-dot {
+  background: var(--accent);
 }
-.trail-node.is-current:active {
-  background: color-mix(in oklab, var(--accent) 20%, var(--paper));
-}
-@media (hover: hover) and (pointer: fine) {
-  .trail-node:not(.is-current):hover {
-    background: var(--row-hover);
-    --trail-ink: var(--ink);
-  }
-  .trail-node.is-on-path:not(.is-current):hover {
-    --trail-ink: var(--accent-ink);
-    background: color-mix(in oklab, var(--accent) 12%, var(--paper));
-  }
-}
+.trail-fold,
 .trail-x {
-  position: relative;
-  flex: none;
   appearance: none;
   border: 0;
+  background: none;
   cursor: default;
   padding: 0;
-  inline-size: 20px;
-  block-size: 20px;
   display: grid;
   place-items: center;
-  border-radius: var(--r-chip);
-  background: none;
-  color: inherit;
-  opacity: 0.7;
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: var(--r-control);
+  color: var(--chrome-ink-3);
   transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
     opacity var(--t-hover) ease,
-    background-color var(--t-hover) ease;
+    scale var(--t-hover) var(--ease-out);
 }
-.trail-x::after {
-  content: "";
+.trail-fold[hidden],
+.trail-x[hidden] {
+  display: none;
+}
+.trail-fold:active,
+.trail-x:active {
+  scale: 0.9;
+}
+.trail-fold {
   position: absolute;
-  inset: -4px;
+  inset-inline-start: calc(var(--x) - 10px);
 }
+.trail-row.is-on-path .trail-fold {
+  color: var(--accent-ink);
+}
+.trail-fold svg,
 .trail-x svg {
   inline-size: 13px;
   block-size: 13px;
@@ -1010,73 +1016,55 @@ kbd {
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.trail-x:active {
-  background: var(--selected);
+.trail-fold.is-folded svg {
+  rotate: -90deg;
+}
+.trail-count {
+  flex: none;
+  inline-size: 24px;
+  text-align: end;
+  padding-inline-end: 4px;
+  color: var(--chrome-ink-3);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  transition: opacity var(--t-hover) ease;
+}
+.trail-x {
+  position: absolute;
+  inset-inline-end: 4px;
+  opacity: 0;
+}
+.trail-row:focus-visible .trail-x {
   opacity: 1;
 }
-@media (hover: hover) and (pointer: fine) {
-  .trail-x:hover {
-    opacity: 1;
-    background: var(--selected);
-  }
-}
-.trail-fold {
-  position: absolute;
-  z-index: 1;
-  appearance: none;
-  border: 0;
-  cursor: default;
-  padding: 0;
-  inline-size: 14px;
-  block-size: 14px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--paper);
-  box-shadow: inset 0 0 0 1px var(--rule-strong);
-  color: var(--ink-3);
-  font-size: 0.6875rem;
-  line-height: 1;
-  transition:
-    color var(--t-hover) ease,
-    box-shadow var(--t-hover) ease;
-}
-.trail-fold::after {
-  content: "";
-  position: absolute;
-  inset: -6px;
-}
-.trail-fold:active {
-  color: var(--ink);
+.trail-row:focus-visible:has(.trail-x:not([hidden])) .trail-count {
+  opacity: 0;
 }
 @media (hover: hover) and (pointer: fine) {
-  .trail-fold:hover {
+  .trail-row:not(.is-current):hover {
+    background: var(--row-hover);
     color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--ink-3);
+  }
+  .trail-row:hover .trail-x {
+    opacity: 1;
+  }
+  .trail-row:hover:has(.trail-x:not([hidden])) .trail-count {
+    opacity: 0;
+  }
+  .trail-fold:hover,
+  .trail-x:hover {
+    background: var(--fill);
+    color: var(--ink);
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .trail-node.is-new {
-    animation: trail-in 180ms var(--ease-out);
+  .trail-here:not(.is-instant) {
+    transition: transform var(--t-menu) var(--ease-out);
   }
-  .trail-lines path.is-new {
-    stroke-dasharray: 1;
-    animation: trail-draw 180ms var(--ease-out);
-  }
-}
-@keyframes trail-in {
-  from {
-    opacity: 0;
-    translate: -6px 0;
-  }
-}
-@keyframes trail-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
+  .trail-fold svg {
+    transition: rotate var(--t-menu) var(--ease-out);
   }
 }
 .pane-head {
@@ -1133,7 +1121,7 @@ kbd {
 .scroller {
   overflow-y: auto;
   overflow-x: hidden;
-  height: calc(100% - var(--trail-room, 0px));
+  height: 100%;
   container: reader / inline-size;
   user-select: text;
   -webkit-user-select: text;

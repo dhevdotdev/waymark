@@ -12,6 +12,8 @@ export interface ShellElements {
   paneHead: HTMLElement;
   crumbs: HTMLElement;
   paneMeta: HTMLElement;
+  trailSlot: HTMLElement;
+  trailPane: HTMLElement;
   editState: HTMLElement;
   modeSwitch: HTMLElement;
   statusStats: HTMLElement;
@@ -77,7 +79,7 @@ function template(options: ShellOptions): string {
         <div class="sidebar-resize" aria-hidden="true"></div>
       </nav>
       <main class="reader">
-        <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
+        <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><div class="trail-slot"></div><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
         <div class="scroller" tabindex="-1"><article class="doc"></article></div>
       </main>
       <aside class="rail" aria-label="Inspector">
@@ -85,10 +87,12 @@ function template(options: ShellOptions): string {
           <div class="seg seg-full rail-tabs" role="tablist">
             <button class="seg-btn" role="tab" data-rail="links">Links</button>
             <button class="seg-btn" role="tab" data-rail="info">Info</button>
+            <button class="seg-btn" role="tab" data-rail="trail">Trail</button>
           </div>
           <div class="rail-body">
             <div class="rail-pane rail-links" data-pane="links"></div>
             <div class="rail-pane rail-info" data-pane="info"></div>
+            <div class="rail-pane rail-trail" data-pane="trail"></div>
           </div>
           <div class="rail-graph"></div>
         </div>
@@ -123,6 +127,8 @@ export function mountShell(host: HTMLElement, options: ShellOptions): ShellEleme
     paneHead: q(".pane-head"),
     crumbs: q(".crumbs"),
     paneMeta: q(".pane-meta"),
+    trailSlot: q(".trail-slot"),
+    trailPane: q(".rail-trail"),
     editState: q(".edit-state"),
     modeSwitch: q(".mode-switch"),
     statusStats: q(".status-stats"),

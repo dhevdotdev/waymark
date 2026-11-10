@@ -164,7 +164,7 @@ export function readerCommands(r: Reader): Command[] {
     { id: "mode-edit", needsNote: true, run: () => void r.editing.open() },
     { id: "mode-read", needsNote: true, run: () => (r.editing.isOpen ? void r.editing.finish() : undefined) },
     { id: "save-note", keys: ["mod+s"], inField: true, run: () => void r.editing.flush() },
-    { id: "undo-task", keys: ["mod+z"], run: () => void r.editing.undoTask() },
+    { id: "undo-task", keys: ["mod+z"], run: () => r.trail.undoFromPanel() || void r.editing.undoTask() },
     {
       id: "files",
       label: "Show files",
@@ -226,7 +226,18 @@ export function readerCommands(r: Reader): Command[] {
       keys: ["mod+alt+\\"],
       hint: "⌥⌘\\",
       keywords: "linked notes properties",
-      run: () => r.toggleRail(),
+      run: () => r.inspector.toggle(),
+    },
+    {
+      id: "trail",
+      label: "Show this tab's trail",
+      keys: ["mod+y"],
+      hint: "⌘Y",
+      keywords: "followed links path branches",
+      inField: true,
+      needsNote: true,
+      when: () => r.trail.available,
+      run: () => r.trail.togglePanel(),
     },
     {
       id: "settings",

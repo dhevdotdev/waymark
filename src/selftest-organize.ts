@@ -123,5 +123,5 @@ export async function runEmpty({ check, until }: SelfTestContext): Promise<void>
   check("an empty folder shows its page", await until(() => document.querySelector(".empty-state.is-page") !== null));
   check("it offers a new note", document.querySelector('[data-act="new-note"].btn') !== null);
   check("it offers another folder", document.querySelector('[data-act="open-vault"].btn') !== null);
-  check("no stray divider shows", getComputedStyle(document.querySelector(".trail")!).display === "none");
+  check("the path row stays out of sight", getComputedStyle(document.querySelector(".pane-head")!).visibility === "hidden");
 }

@@ -35,7 +35,7 @@ export interface Prefs {
   remoteChecksApplied: boolean;
   sidebar: boolean;
   rail: boolean;
-  railPane: "links" | "info";
+  railPane: "links" | "info" | "trail";
   sidebarWidth: number;
   /** How notes are ordered within a folder. Kept with the app's preferences, never in the vault. */
   fileSort: "name" | "modified";
@@ -69,7 +69,7 @@ const LOCAL_KEY = "waymark.prefs";
 
 const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
   appearance: ["system", "light", "dark"],
-  railPane: ["links", "info"],
+  railPane: ["links", "info", "trail"],
 };
 
 /** Read from disk or browser storage, so each key is checked and falls back to its own default. */

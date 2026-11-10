@@ -12,7 +12,7 @@ import { FindBar, paint } from "./find";
 import { type GraphTabView, GraphView } from "./graph-view";
 import { Inspector } from "./inspector";
 import { LinkPreview } from "./link-preview";
-import { isNarrow, railFloats } from "./media";
+import { isNarrow } from "./media";
 import { NoteEditing } from "./note-editing";
 import { NoteFiles } from "./note-files";
 import { NoteView } from "./note-view";
@@ -55,7 +55,7 @@ export class Reader {
 
   readonly els: ShellElements;
   private readonly noteView: NoteView;
-  private readonly trail: TrailActions;
+  readonly trail: TrailActions;
   private graph: GraphView | null = null;
   private renderSeq = 0;
 
@@ -67,15 +67,16 @@ export class Reader {
     const { els } = this;
 
     this.noteView = new NoteView(els, vault, deps.name, toast);
-    this.trail = new TrailActions({
+    this.trail = new TrailActions(els, {
       tab: () => this.tab,
       label: (view) => this.viewLabel(view),
       open: (path) => void this.open(path, { newTab: true, focus: true }),
       saveScroll: () => this.saveScroll(),
       show: () => void this.show({ keyboard: true }),
       persist: () => this.persist(),
+      chrome: () => this.renderTabChrome(),
+      inspector: () => this.inspector,
     });
-    els.reader.prepend(this.trail.map.root);
 
     this.sidebar = new Sidebar(els, prefs, p.vaults[deps.root]?.openFolders ?? [], {
       search: (query, limit) => vault.search.search(query, limit),
@@ -101,6 +102,8 @@ export class Reader {
         showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
+        paneChanged: () => this.trail.panel.reveal(),
+        railToggled: (open) => prefs.update((next) => Object.assign(next, { rail: open })),
       },
       p.railPane,
     );
@@ -359,19 +362,6 @@ export class Reader {
     if (!this.onGraph) return;
     if (this.tab.trail.canBack) void this.go(-1);
     else this.closeTab(this.workspace.activeIndex);
-  }
-
-  toggleRail(): void {
-    const { shell } = this.els;
-    if (railFloats()) {
-      shell.classList.toggle("rail-peek");
-      return;
-    }
-    const closed = !shell.classList.contains("rail-closed");
-    shell.classList.toggle("rail-closed", closed);
-    this.deps.prefs.update((p) => {
-      p.rail = !closed;
-    });
   }
 
   openSyncPanel(origin: "click" | "other"): void {

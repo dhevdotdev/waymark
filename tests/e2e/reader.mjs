@@ -387,7 +387,19 @@ await page.evaluate(async () => {
   await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
 await pause(400);
-check("a tab with one note shows no trail", !(await page.locator(".trail").isVisible()));
+const readout = page.locator(".trail-readout");
+const trailPane = page.locator('[data-pane="trail"]');
+const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
+const slotPlace = () =>
+  page.locator(".trail-slot").evaluate((s) => {
+    const r = s.getBoundingClientRect();
+    return `${r.left},${r.width}`;
+  });
+const focusedRow = () => page.evaluate(() => document.activeElement?.closest(".trail-row")?.textContent ?? "");
+const currentRow = () => page.locator(".trail-row.is-current .trail-name").textContent();
+check("a tab with one note shows no trail readout", !(await readout.isVisible()));
+const titleWithOneStop = await titleTop();
+const slotWithOneStop = await slotPlace();
 const followed = [];
 const followLink = async () => {
   const index = await page.evaluate(() => {
@@ -404,128 +416,264 @@ const followLink = async () => {
   await pause(450);
 };
 await followLink();
-check("following a link grows the trail", (await page.locator(".trail-node").count()) === 2);
-await page.locator(".trail-name").first().click();
+check("following a link grows the trail", (await page.locator(".trail-row").count()) === 2);
+check("the readout says where the tab is", (await readout.textContent()).includes("2 of 2"), await readout.textContent());
+check("a second stop leaves the readout's slot where it was", (await slotPlace()) === slotWithOneStop);
+check("nothing sits between the path row and the note", (await page.locator(".reader > .trail").count()) === 0);
+const titleBeforeOpen = await titleTop();
+await readout.click();
+await pause(200);
+check("the readout opens the trail in the panel", await trailPane.isVisible());
+check("opening the trail leaves the note where it was", (await titleTop()) === titleBeforeOpen, `${titleBeforeOpen}`);
+check(
+  "the readout shows the trail is open",
+  (await readout.evaluate((e) => getComputedStyle(e).backgroundColor)) !== "rgba(0, 0, 0, 0)",
+);
+await page.locator(".trail-row").first().click();
 await pause(450);
 check(
-  "clicking the map moves this tab there",
-  (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2,
+  "clicking a stop moves this tab there",
+  (await title()).startsWith("Compass declination") && (await page.locator(".trail-row").count()) === 2,
+);
+check("the trail stays open when another note is clicked", await trailPane.isVisible());
+check(
+  "a note starts at the same height with a trail as without one",
+  (await titleTop()) === titleWithOneStop,
+  `${await titleTop()} and ${titleWithOneStop}`,
 );
 await followLink();
-const rows = await page.evaluate(
-  () => new Set([...document.querySelectorAll(".trail-node")].map((n) => n.style.insetBlockStart)).size,
-);
-check(
-  "a second link from the same note branches",
-  (await page.locator(".trail-node").count()) === 3 && rows === 2,
-  `${rows} rows`,
-);
+check("the trail stays open when a link in the note is followed", await trailPane.isVisible());
+const levels = await page.locator(".trail-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-level")));
+check("a second link from the same note branches", levels.join() === "1,2,1", levels.join());
+check("the readout counts the side branch", (await readout.locator(".trail-forks").textContent()) === "1");
 await page.keyboard.down("Meta");
 await page.locator(".tree-folder.is-open .nav-item").first().click();
 await page.keyboard.up("Meta");
 await pause(500);
 await page.click(".tab:nth-child(2)");
 await pause(450);
-check("another tab has its own trail", !(await page.locator(".trail").isVisible()));
+check("another tab has its own trail", !(await readout.isVisible()));
+check(
+  "a tab with one stop says what the panel is for",
+  (await trailPane.textContent()).includes("Follow a link") && !(await page.locator(".trail").isVisible()),
+);
 await page.click(".tab:nth-child(1)");
 await pause(450);
-check("the first tab keeps its map", (await page.locator(".trail-node").count()) === 3);
-const trailClearance = () =>
-  page.evaluate(
-    () =>
-      document.querySelector(".doc-title").getBoundingClientRect().top -
-      document.querySelector(".trail").getBoundingClientRect().bottom,
-  );
-check("a note's title clears the map above it", (await trailClearance()) >= 16, String(await trailClearance()));
-check(
-  "the map takes one row above the note",
-  (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) <= 44,
-);
-check(
-  "the note's area starts below the map",
-  await page.evaluate(
-    () =>
-      document.querySelector(".scroller").getBoundingClientRect().top >=
-      document.querySelector(".trail").getBoundingClientRect().bottom - 1,
-  ),
-);
-const titleBeforeOpen = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
-await page.locator(".trail-more").click();
-await pause(120);
-check(
-  "the whole map opens over the note without moving it",
-  (await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === titleBeforeOpen &&
-    (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) > 44,
-);
-await page.keyboard.press("Escape");
-await pause(120);
-check("Escape closes the whole map", (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) <= 44);
-const closeControlIsLeading = (root, [button, label]) => {
-  const box = (selector) => root.querySelector(selector).getBoundingClientRect();
-  const control = box(button);
-  const mark = box(`${button} path`);
-  const centred = Math.abs(control.left + control.width / 2 - (mark.left + mark.width / 2)) <= 0.5;
-  return control.right <= box(label).left && control.width >= 20 && mark.width >= 5.5 && mark.width <= 6 && centred;
-};
-check(
-  "a tab's close control leads its title, centred and full size",
-  await page.locator(".tab").first().evaluate(closeControlIsLeading, [".tab-close", ".tab-title"]),
-);
-check(
-  "a trail stop's remove control leads its name, centred and full size",
-  await page.locator(".trail-node").first().evaluate(closeControlIsLeading, [".trail-x", ".trail-name span"]),
-);
+check("the first tab keeps its trail", (await page.locator(".trail-row").count()) === 3);
 await page.click(".tab:nth-child(2) .tab-close", { force: true });
 await pause(300);
-check(
-  "every note on the map shows its remove button",
-  await page
-    .locator(".trail-x")
-    .first()
-    .evaluate((e) => getComputedStyle(e).opacity !== "0" && e.getBoundingClientRect().width >= 18),
-);
+
+const firstStop = page.locator(".trail-row").first();
+const sideRow = page.locator('.trail-row[aria-level="2"]');
 await page.mouse.move(2, 450);
-await pause(250);
-check(
-  "every stop away from the current note has its own pill around the remove button",
-  await page
-    .locator(".trail-node:not(.is-current)")
-    .evaluateAll((nodes) => nodes.length > 0 && nodes.every((n) => getComputedStyle(n).backgroundColor !== "rgba(0, 0, 0, 0)")),
-);
-const foldButton = page.locator(".trail-fold").first();
-const titleBeforeFold = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
-await foldButton.click();
-await pause(150);
-check(
-  "folding the map leaves the note where it is",
-  (await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === titleBeforeFold,
-);
-check(
-  "the branch control folds away branches the tab is not on",
-  (await foldButton.textContent()) !== "" &&
-    (await page.locator(".trail-fold").first().getAttribute("aria-expanded")) === "false",
-);
-await page.locator(".trail-fold").first().click();
-await pause(150);
-await page.locator(".trail-node.is-current .trail-x").click();
-await pause(450);
-check(
-  "removing the current note steps back to its parent",
-  (await title()).startsWith("Compass declination") && (await page.locator(".trail-node").count()) === 2,
-);
-await page.locator(".trail-x").first().click();
 await pause(200);
 check(
-  "removing the start keeps only the current note",
-  !(await page.locator(".trail").isVisible()) && (await title()).startsWith("Compass declination"),
+  "a stop's remove control waits until the row is pointed at",
+  (await sideRow.locator(".trail-x").evaluate((e) => getComputedStyle(e).opacity)) === "0" ||
+    (await sideRow.evaluate((r) => r.classList.contains("is-current"))),
 );
+const lastStop = page.locator(".trail-row").last();
+await lastStop.hover();
+await pause(200);
+check(
+  "pointing at a stop shows its remove control at full size",
+  await lastStop
+    .locator(".trail-x")
+    .evaluate((e) => getComputedStyle(e).opacity === "1" && e.getBoundingClientRect().width >= 20),
+);
+check("the current note has no remove control", !(await page.locator(".trail-row.is-current .trail-x").isVisible()));
+const foldButton = page.locator(".trail-fold").first();
+const titleBeforeFold = await titleTop();
+await foldButton.click();
+await pause(250);
+check("folding leaves the note where it is", (await titleTop()) === titleBeforeFold);
+check(
+  "folding hides the branch the tab is not on and says how much",
+  (await page.locator(".trail-row").count()) === 2 &&
+    (await firstStop.getAttribute("aria-expanded")) === "false" &&
+    (await firstStop.locator(".trail-count").textContent()) === "+1",
+);
+await foldButton.click();
+await pause(250);
+check(
+  "unfolding brings it back",
+  (await page.locator(".trail-row").count()) === 3 && (await firstStop.getAttribute("aria-expanded")) === "true",
+);
+
+// The trail from the keyboard
+await page.locator(".doc").click({ position: { x: 4, y: 4 } });
+await readout.click();
+await pause(200);
+check("the readout closes the trail again", !(await trailPane.isVisible()));
+check("closing goes back to the pane that was showing", await page.locator('[data-pane="links"]').isVisible());
+await page.keyboard.press("Meta+y");
+await pause(200);
+const onCurrentRow = await focusedRow();
+check(
+  "the shortcut opens the trail on the current stop",
+  (await trailPane.isVisible()) && onCurrentRow.startsWith(await currentRow()),
+  onCurrentRow,
+);
+await page.keyboard.press("ArrowUp");
+const movedUp = await focusedRow();
+check("the arrow keys move along the stops", movedUp !== onCurrentRow, movedUp);
+await page.keyboard.press("Home");
+check("Home goes to the start", (await focusedRow()) === (await firstStop.textContent()));
+await page.keyboard.press("ArrowLeft");
+await pause(250);
+check("Left folds a branching stop", (await firstStop.getAttribute("aria-expanded")) === "false");
+await page.keyboard.press("ArrowRight");
+await pause(250);
+check("Right unfolds it", (await firstStop.getAttribute("aria-expanded")) === "true");
+await page.keyboard.press("End");
+await page.keyboard.press("Enter");
+await pause(450);
+check("Enter moves this tab to the stop", (await currentRow()) === (await lastStop.locator(".trail-name").textContent()));
+check("Enter leaves focus on the trail", (await focusedRow()) !== "" && (await trailPane.isVisible()));
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("ArrowUp");
+const beforeRemove = await page.locator(".trail-row").count();
+const removedName = await page.evaluate(() => document.activeElement.querySelector(".trail-name").textContent);
+await page.keyboard.press("Delete");
+await pause(300);
+check("Delete removes one stop", (await page.locator(".trail-row").count()) === beforeRemove - 1);
+check("focus moves to the row in its place", (await focusedRow()) !== "");
+check("the toast names the stop and offers Undo", (await page.locator(".toast").textContent()).includes(removedName));
+await page.locator(".toast-action").click();
+await pause(300);
+check("Undo puts the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
+await page.locator(".trail-row:not(.is-current)").first().focus();
+await page.keyboard.press("Delete");
+await pause(250);
+await page.keyboard.press("Meta+z");
+await pause(250);
+check("Command-Z on the trail brings the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
+await page.locator(".trail-row.is-current").focus();
+await page.keyboard.press("Delete");
+await pause(200);
+check(
+  "Delete on the current note says why it stays",
+  (await page.locator(".trail-row").count()) === beforeRemove &&
+    (await page.locator(".toast").textContent()).includes("another stop"),
+);
+await page.keyboard.press("Escape");
+await pause(100);
+check(
+  "Escape returns to the note and leaves the trail open",
+  (await page.evaluate(() => document.activeElement?.classList.contains("scroller"))) && (await trailPane.isVisible()),
+);
+await page.locator(".trail-row").nth(1).hover();
+await page.locator(".trail-row").nth(1).locator(".trail-x").click();
+await pause(300);
+check("a removed stop hands its place on, and the note stays", (await page.locator(".trail-row").count()) === beforeRemove - 1);
+await page.locator(".trail-row:not(.is-current)").first().hover();
+await page.locator(".trail-row:not(.is-current) .trail-x").first().click();
+await pause(300);
+check(
+  "removing the last other stop empties the trail and keeps the note",
+  !(await readout.isVisible()) && (await page.locator(".trail").isHidden()),
+);
+await page.click('[data-rail="links"]');
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
 await pause(450);
-check("opening an unrelated note from Files starts a new trail", !(await page.locator(".trail").isVisible()));
+check("opening an unrelated note from Files starts a new trail", !(await readout.isVisible()));
 await page.keyboard.press("Meta+[");
 await pause(450);
-check("Back brings the previous trail back", (await page.locator(".trail-node").count()) === 2);
+check("Back brings the previous trail back", (await page.locator(".trail-row").count()) === 2);
+
+// Twenty-odd stops with branches, in a short window, with the real wheel
+{
+  const big = await browser.newContext({
+    viewport: { width: 1280, height: 560 },
+    colorScheme: "light",
+    reducedMotion: reduced ? "reduce" : "no-preference",
+  });
+  const p = await big.newPage();
+  await p.goto(`${app.url}?note=${encodeURIComponent(NOTES.hero)}`);
+  await p.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
+  await p.evaluate(async () => {
+    const r = window.waymark.reader;
+    const stops = window.waymark.vault.index.notes.filter((n) => n.endsWith(".md")).slice(0, 24);
+    for (const [i, n] of stops.entries()) {
+      await r.open(n, { via: "link", focus: true });
+      if (i && i % 7 === 0) r.tab.trail.select(r.tab.trail.layout()[Math.floor(i / 2)].id);
+    }
+  });
+  await p.waitForTimeout(300);
+  await p.locator(".trail-readout").click();
+  await p.waitForTimeout(300);
+  const body = () =>
+    p.evaluate(() => {
+      const b = document.querySelector(".rail-body");
+      const box = b.getBoundingClientRect();
+      const rows = [...document.querySelectorAll(".trail-row")];
+      const seen = (r) => r.getBoundingClientRect().top >= box.top - 1 && r.getBoundingClientRect().bottom <= box.bottom + 1;
+      return {
+        top: b.scrollTop,
+        room: b.scrollHeight - b.clientHeight,
+        count: rows.length,
+        first: seen(rows[0]),
+        last: seen(rows.at(-1)),
+        current: seen(document.querySelector(".trail-row.is-current")),
+        heights: new Set(rows.map((r) => r.getBoundingClientRect().height)).size,
+        inside: rows.every((r) => {
+          const x = r.querySelector(".trail-x").getBoundingClientRect();
+          const rail = document.querySelector(".rail").getBoundingClientRect();
+          return r.getBoundingClientRect().right <= rail.right && x.right <= rail.right;
+        }),
+      };
+    });
+  const opened = await body();
+  check("a long trail has more than fits", opened.room > 0 && opened.count >= 24, JSON.stringify(opened));
+  check("opening shows the current stop", opened.current);
+  check("every row is one line high", opened.heights === 1);
+  check("no row runs out of the panel", opened.inside);
+  const title0 = await p.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
+  await p.mouse.move(1180, 250);
+  await p.mouse.wheel(0, -3000);
+  await p.waitForTimeout(200);
+  const atStart = await body();
+  check("the real wheel reaches the first stop", atStart.top === 0 && atStart.first, JSON.stringify(atStart));
+  await p.mouse.wheel(0, 3000);
+  await p.waitForTimeout(200);
+  const atEnd = await body();
+  check("the real wheel reaches the last stop", atEnd.top > 0 && atEnd.last, JSON.stringify(atEnd));
+  check(
+    "scrolling the trail leaves the note alone",
+    (await p.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === title0,
+  );
+  await p.setViewportSize({ width: 560, height: 560 });
+  await p.waitForTimeout(250);
+  const narrow = () =>
+    p.evaluate(() => {
+      const box = (s) => document.querySelector(s).getBoundingClientRect();
+      const slot = box(".trail-readout");
+      return {
+        inWindow: slot.left >= 0 && slot.right <= innerWidth,
+        clearOfSwitch: slot.right <= box(".mode-switch").left,
+        rail: box(".rail").left,
+        railRight: box(".rail").right,
+      };
+    });
+  const at560 = await narrow();
+  check("the readout fits a 560 px window", at560.inWindow && at560.clearOfSwitch, JSON.stringify(at560));
+  await p.locator(".trail-readout").click();
+  await p.waitForTimeout(450);
+  const floated = await narrow();
+  check(
+    "at 560 px the trail slides in, inside the window",
+    floated.rail >= 0 && floated.railRight <= 560,
+    JSON.stringify(floated),
+  );
+  await p.locator(".trail-row:not(.is-current)").first().click();
+  await p.waitForTimeout(400);
+  check("at 560 px clicking a stop leaves the trail open", (await narrow()).rail < 560 - 200);
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(450);
+  check("Escape slides it away", (await narrow()).rail >= 560);
+  await big.close();
+}
 
 // A trail can loop back on itself
 const loop = await page.evaluate(() => {
@@ -546,15 +694,17 @@ await clickTo(loop[1]);
 await clickTo(loop[0]);
 check(
   "a link back to an earlier note does not repeat it",
-  (await page.locator(".trail-node").count()) === 2 &&
-    (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").first().textContent()),
+  (await page.locator(".trail-row").count()) === 2 &&
+    (await page.locator(".trail-row.is-current .trail-name").textContent()) ===
+      (await page.locator(".trail-name").first().textContent()),
 );
-check("a link back adds no line to the map", (await page.locator(".trail-lines path").count()) === 2);
+check("a link back adds no line to the trail", (await page.locator(".trail-lines path").count()) === 1);
 await page.keyboard.press("Meta+[");
 await pause(450);
 check(
   "Back retraces the stop you came from",
-  (await page.locator(".trail-node.is-current").textContent()) === (await page.locator(".trail-name").nth(1).textContent()),
+  (await page.locator(".trail-row.is-current .trail-name").textContent()) ===
+    (await page.locator(".trail-name").nth(1).textContent()),
 );
 
 await page.click('[data-rail="info"]');
