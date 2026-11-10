@@ -19,6 +19,8 @@ export class RowActions {
   ) {
     this.strip.className = "row-actions";
     this.strip.hidden = true;
+    /* WebKit leaves a pressed button unfocused, so the press would blur the row and hide the strip before the click. */
+    this.strip.addEventListener("mousedown", (e) => e.preventDefault());
     tree.addEventListener("mouseover", (e) => this.onPointer(e.target as HTMLElement));
     tree.addEventListener("focusin", (e) => this.onFocus(e.target as HTMLElement));
     tree.addEventListener("focusout", (e) => {
