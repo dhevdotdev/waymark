@@ -1,5 +1,6 @@
 // Opens every note in the vault inside WebKit and reports render cost and rendering failures.
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const app = await serveFixture();
@@ -11,7 +12,7 @@ const pageErrors = [];
 page.on("request", (r) => {
   if (new URL(r.url()).hostname !== "localhost") external.push(r.url());
 });
-page.on("pageerror", (e) => pageErrors.push(String(e)));
+watchPageErrors(page, pageErrors);
 await page.goto(app.url);
 await page.waitForSelector(".doc .doc-title");
 const result = await page.evaluate(async () => {

@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -88,7 +89,7 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 const page = await context.newPage();
 const errors = [];
 const requests = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+watchPageErrors(page, errors);
 page.on("request", (r) => requests.push(r.url()));
 await page.addInitScript(installFakeGit);
 await page.route(/\/src\/platform\.ts/, async (route) => {

@@ -36,7 +36,8 @@ export interface Prefs {
   sidebar: boolean;
   rail: boolean;
   railPane: "links" | "info";
-  railLower: "graph" | "trail";
+  trailFolded: boolean;
+  graphFolded: boolean;
   sidebarWidth: number;
   /** How notes are ordered within a folder. Kept with the app's preferences, never in the vault. */
   fileSort: "name" | "modified";
@@ -59,7 +60,8 @@ const DEFAULTS: Prefs = {
   sidebar: true,
   rail: true,
   railPane: "links",
-  railLower: "graph",
+  trailFolded: false,
+  graphFolded: false,
   sidebarWidth: 268,
   fileSort: "name",
   diffWrap: true,
@@ -72,7 +74,6 @@ const LOCAL_KEY = "waymark.prefs";
 const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
   appearance: ["system", "light", "dark"],
   railPane: ["links", "info"],
-  railLower: ["graph", "trail"],
 };
 
 /** Read from disk or browser storage, so each key is checked and falls back to its own default. */

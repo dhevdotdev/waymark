@@ -3,6 +3,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -42,7 +43,7 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 const page = await context.newPage();
 await page.clock.install();
 const errors = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+watchPageErrors(page, errors);
 await page.addInitScript(installFakeGit);
 await page.route(/\/src\/platform\.ts/, async (route) => {
   const response = await fetchRoute(route);

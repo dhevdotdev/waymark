@@ -205,6 +205,11 @@ export class TrailPanel {
     else if (place.bottom > bounds.bottom - room) body.scrollTop += place.bottom - bounds.bottom + room;
   }
 
+  /** Answers a press when the trail was already showing. */
+  pulse(): void {
+    this.marker.animate({ opacity: [0.35, 1] }, { duration: 240, easing: "ease-out" });
+  }
+
   focusCurrent(): void {
     this.rows.get(this.current)?.focus({ preventScroll: true });
     this.reveal();

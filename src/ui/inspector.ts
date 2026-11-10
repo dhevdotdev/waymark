@@ -9,13 +9,12 @@ import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import type { ShellElements } from "./shell";
 
 export type RailPane = "links" | "info";
-export type RailLower = "graph" | "trail";
+export type RailSection = "trail" | "graph";
 
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
-  paneChanged: () => void;
   railToggled: (open: boolean) => void;
-  lowerChanged: (lower: RailLower) => void;
+  sectionFolded: (section: RailSection, folded: boolean) => void;
 }
 
 /** The right panel: links, note details and the local graph. It also owns the heading outline on the reading pane. */
@@ -25,20 +24,20 @@ export class Inspector {
   private localGraph: LocalGraph | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
-  lower: RailLower;
+  private readonly vacant: Record<RailSection, boolean> = { trail: true, graph: true };
 
   constructor(
     private readonly els: ShellElements,
     private readonly vault: VaultStore,
     private readonly host: InspectorHost,
     pane: RailPane,
-    lower: RailLower,
+    private readonly folded: Record<RailSection, boolean>,
   ) {
-    this.lower = lower;
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
     this.setPane(pane);
-    this.showLower(lower);
+    this.drawSection("trail");
+    this.drawSection("graph");
   }
 
   render(path: string, rendered: RenderedNote): void {
@@ -68,23 +67,34 @@ export class Inspector {
     this.refreshHistory();
   }
 
-  /** The panel's lower half, so the trail and the links can be read side by side. */
-  setLower(lower: RailLower): void {
-    this.showLower(lower);
-    this.host.lowerChanged(lower);
+  isOpen(section: RailSection): boolean {
+    return !this.folded[section] && !this.vacant[section];
   }
 
-  private showLower(lower: RailLower): void {
-    const { shell } = this.els;
-    this.lower = lower;
-    shell.classList.toggle("on-trail", lower === "trail");
-    for (const button of shell.querySelectorAll<HTMLElement>("[data-lower]")) {
-      const on = button.dataset.lower === lower;
-      button.classList.toggle("is-on", on);
-      button.setAttribute("aria-selected", String(on));
-    }
-    for (const el of shell.querySelectorAll<HTMLElement>("[data-lower-pane]")) el.hidden = el.dataset.lowerPane !== lower;
-    this.host.paneChanged();
+  toggleSection(section: RailSection): void {
+    this.setFolded(section, !this.folded[section]);
+  }
+
+  setFolded(section: RailSection, folded: boolean): void {
+    this.folded[section] = folded;
+    this.drawSection(section);
+    this.host.sectionFolded(section, folded);
+  }
+
+  /** A section with nothing to show stays folded, and its room goes to the others. */
+  setEmpty(section: RailSection, empty: boolean): void {
+    if (this.vacant[section] === empty) return;
+    this.vacant[section] = empty;
+    this.drawSection(section);
+  }
+
+  private drawSection(section: RailSection): void {
+    const el = this.els.shell.querySelector<HTMLElement>(`[data-section="${section}"]`)!;
+    const open = this.isOpen(section);
+    el.classList.toggle("is-folded", !open);
+    const toggle = el.querySelector<HTMLButtonElement>("[data-fold-section]")!;
+    toggle.disabled = this.vacant[section];
+    toggle.setAttribute("aria-expanded", String(open));
   }
 
   get isShowing(): boolean {
@@ -219,11 +229,10 @@ export class Inspector {
     const incoming = links.in.get(this.current) ?? new Set<string>();
     const ids = new Set([...out, ...incoming]);
     if (!this.localGraph) {
-      box.innerHTML = `<button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.fit}</button><p class="rail-empty rail-graph-empty">No links to or from this note.</p>`;
       this.localGraph = new LocalGraph((id, newTab) => this.host.openFromGraph(id, newTab));
       box.append(this.localGraph.root);
     }
-    box.classList.toggle("is-empty", ids.size === 0);
+    this.setEmpty("graph", ids.size === 0);
     const edges: [string, string][] = [];
     for (const a of ids) for (const b of links.out.get(a) ?? []) if (ids.has(b) && a !== b) edges.push([a, b]);
     const { groupOf } = this.vault.communities();

@@ -62,6 +62,14 @@ export interface EditorHandle {
   destroy(): void;
 }
 
+/** Space above a line's text that the editor counts as part of the line, as headings have and rendered blocks do not. */
+function lineInset(view: EditorView, at: number): number {
+  const { node } = view.domAtPos(at);
+  const element = node instanceof HTMLElement ? node : node.parentElement;
+  const line = element?.closest(".cm-line");
+  return line ? Number.parseFloat(getComputedStyle(line).paddingTop) || 0 : 0;
+}
+
 function wrap(view: EditorView, marker: string): boolean {
   const { state } = view;
   view.dispatch(
@@ -375,14 +383,18 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
     topLine(scroller) {
       const top = scroller.getBoundingClientRect().top;
       const block = view.lineBlockAtHeight(top - view.documentTop);
-      return { line: view.state.doc.lineAt(block.from).number - 1, offset: view.documentTop + block.top - top };
+      return {
+        line: view.state.doc.lineAt(block.from).number - 1,
+        offset: view.documentTop + block.top + lineInset(view, block.from) - top,
+      };
     },
     showLine(scroller, line, offset) {
       const { doc } = view.state;
       const at = doc.line(Math.min(doc.lines, line + 1)).from;
       /* Heights off screen are estimates until drawn, so the first jump lands close and the next frames correct it. */
       const align = (frames: number) => {
-        const off = view.documentTop + view.lineBlockAt(at).top - scroller.getBoundingClientRect().top - offset;
+        const top = view.lineBlockAt(at).top + lineInset(view, at);
+        const off = view.documentTop + top - scroller.getBoundingClientRect().top - offset;
         scroller.scrollTop += off;
         if (frames > 0 && !view.composing) requestAnimationFrame(() => align(frames - 1));
       };

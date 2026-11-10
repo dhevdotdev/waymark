@@ -2,6 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const results = [];
@@ -13,7 +14,7 @@ async function withApp(options, drive) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   const requests = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
+  watchPageErrors(page, errors);
   page.on("request", (r) => requests.push(r.url()));
   await drive(page, app, { errors, requests });
   await page.close();

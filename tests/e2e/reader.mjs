@@ -296,17 +296,16 @@ const railGraph = await page.evaluate(() => document.querySelector(".local-graph
 check("local graph renders in the rail", railGraph > 100, `${railGraph}px`);
 const openGraph = page.locator(".rail-graph-open");
 check(
-  "the local graph opens from an icon in its corner, clear of a text label",
+  "the local graph opens from an icon in its header",
   await openGraph.evaluate((b) => {
     const box = b.getBoundingClientRect();
-    const graph = document.querySelector(".local-graph canvas").getBoundingClientRect();
+    const head = b.closest(".rail-section-head").getBoundingClientRect();
     return (
       b.textContent === "" &&
       b.querySelector("svg") !== null &&
       box.width >= 24 &&
       box.height >= 24 &&
-      box.right <= graph.right + 8 &&
-      box.top >= graph.top - 1
+      box.right <= head.right + 1
     );
   }),
 );
@@ -409,7 +408,7 @@ await page.evaluate(async () => {
 });
 await pause(400);
 const readout = page.locator(".trail-readout");
-const trailPane = page.locator('[data-lower-pane="trail"]');
+const trailPane = page.locator(".rail-trail");
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 const slotPlace = () =>
   page.locator(".trail-slot").evaluate((s) => {
@@ -454,11 +453,16 @@ const titleBeforeOpen = await titleTop();
 await readout.click();
 await pause(200);
 check("the readout opens the trail in the panel", await trailPane.isVisible());
-check("the trail sits beside the links, both on screen", await page.locator('[data-pane="links"]').isVisible());
+check(
+  "the links, the trail and the graph are on screen together",
+  (await page.locator('[data-pane="links"]').isVisible()) && (await page.locator(".local-graph canvas").isVisible()),
+);
 check("opening the trail leaves the note where it was", (await titleTop()) === titleBeforeOpen, `${titleBeforeOpen}`);
 check(
-  "the readout shows the trail is open",
-  (await readout.evaluate((e) => getComputedStyle(e).backgroundColor)) !== "rgba(0, 0, 0, 0)",
+  "the readout answers when the trail is already showing",
+  await page
+    .locator(".trail-here")
+    .evaluate((m) => m.getAnimations().length > 0 || document.activeElement?.closest(".trail-row") !== null),
 );
 await page.locator(".trail-row").first().click();
 await pause(450);
@@ -485,8 +489,10 @@ await page.click(".tab:nth-child(2)");
 await pause(450);
 check("another tab has its own trail", !(await readout.isVisible()));
 check(
-  "a tab with one stop says what the panel is for",
-  (await trailPane.textContent()).includes("Follow a link") && !(await page.locator(".trail").isVisible()),
+  "a tab with one stop keeps the trail folded and gives its room away",
+  (await page.locator('[data-section="trail"]').evaluate((e) => e.classList.contains("is-folded"))) &&
+    (await page.locator('[data-fold-section="trail"]').isDisabled()) &&
+    !(await trailPane.isVisible()),
 );
 await page.click(".tab:nth-child(1)");
 await pause(450);
@@ -533,11 +539,21 @@ check(
 
 // The trail from the keyboard
 await page.locator(".doc").click({ position: { x: 4, y: 4 } });
+const titleBeforeSection = await titleTop();
+const linksHeight = () => page.locator(".rail-body").evaluate((b) => b.getBoundingClientRect().height);
+const linksTall = await linksHeight();
+await page.locator('[data-fold-section="trail"]').click();
+await pause(320);
+check("folding the trail section hides it", !(await trailPane.isVisible()));
+check("its room goes to the links", (await linksHeight()) > linksTall + 60, `${linksTall} to ${await linksHeight()}`);
+check("folding a section leaves the note alone", (await titleTop()) === titleBeforeSection);
 await readout.click();
-await pause(200);
-check("the readout closes the trail again", !(await trailPane.isVisible()));
-check("closing goes back to what was showing", await page.locator('[data-lower-pane="graph"]').isVisible());
-check("closing leaves the links alone", await page.locator('[data-pane="links"]').isVisible());
+await pause(320);
+check("the readout unfolds it", await trailPane.isVisible());
+await readout.click();
+await pause(320);
+check("pressing the readout again folds it back", !(await trailPane.isVisible()));
+check("the links stay throughout", await page.locator('[data-pane="links"]').isVisible());
 await page.keyboard.press("Meta+y");
 await pause(200);
 const onCurrentRow = await focusedRow();
@@ -605,7 +621,6 @@ check(
   "removing the last other stop empties the trail and keeps the note",
   !(await readout.isVisible()) && (await page.locator(".trail").isHidden()),
 );
-await page.click('[data-lower="graph"]');
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
 await pause(450);
@@ -693,7 +708,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
     unseen >= 0 &&
       (await p.locator(".trail-row").count()) === stopsBefore + 1 &&
       (await p.locator('[data-pane="links"]').isVisible()) &&
-      (await p.locator('[data-lower-pane="trail"]').isVisible()),
+      (await p.locator(".rail-trail").isVisible()),
   );
   await p.setViewportSize({ width: 560, height: 560 });
   await p.waitForTimeout(250);

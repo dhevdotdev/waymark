@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const results = [];
@@ -55,7 +56,7 @@ const app = await serveFixture();
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
 const file = (name) => path.join(app.vault, `${name}.md`);
 const disk = (name) => readFile(file(name), "utf8");

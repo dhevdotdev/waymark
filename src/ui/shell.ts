@@ -92,13 +92,13 @@ function template(options: ShellOptions): string {
             <div class="rail-pane rail-links" data-pane="links"></div>
             <div class="rail-pane rail-info" data-pane="info"></div>
           </div>
-          <section class="rail-lower" aria-label="This tab's trail and the local graph">
-            <div class="seg seg-full rail-lower-tabs" role="tablist">
-              <button class="seg-btn" role="tab" data-lower="graph">Graph</button>
-              <button class="seg-btn" role="tab" data-lower="trail">Trail</button>
-            </div>
-            <div class="rail-pane rail-graph" data-lower-pane="graph"></div>
-            <div class="rail-pane rail-trail" data-lower-pane="trail"></div>
+          <section class="rail-section" data-section="trail" aria-label="This tab's trail">
+            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="trail"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Trail</span></button></div>
+            <div class="rail-section-body rail-trail"></div>
+          </section>
+          <section class="rail-section" data-section="graph" aria-label="Local graph">
+            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="graph"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Graph</span></button><button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.fit}</button></div>
+            <div class="rail-section-body rail-graph"></div>
           </section>
         </div>
       </aside>

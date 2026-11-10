@@ -62,9 +62,9 @@ Every state has a visible way in and a visible way out.
 
 Each tab remembers where following links has taken it. A second link from the same note starts a side branch. A link to a note already on the trail moves there and adds nothing. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
 
-Above the note there is only the readout in the path row: "Trail 4 of 6", with a fork count when there are side branches. Its slot is always reserved, so a tab's second stop moves nothing. The readout or ⌘Y opens the Trail section of the right panel on the current stop, and doing it again puts the panel back as it was.
+Above the note there is only the readout in the path row: "Trail 4 of 6", with a fork count when there are side branches. Its slot is always reserved, so a tab's second stop moves nothing. The readout or ⌘Y brings the Trail section into view on the current stop, opening the panel or the section if it has to, and pressing it again undoes what that opened.
 
-The panel has two halves. Links or Info sit above, Graph or Trail below, in a lower half of one fixed height, so the links and the trail can be read together and choosing between Graph and Trail moves nothing above it.
+Links or Info, the trail and the graph are all on screen together, because they get used together. Links or Info take what height is left. The trail and the graph each have a section that folds to its header and remembers it, and a section with nothing to show stays folded so the others get its room.
 
 The trail is a list, because a tree of long titles does not fit a row. One 28px row per stop, top to bottom. Side branches sit directly under the stop they left from, stepped in 14px, up to three steps, and the main line carries on level after them. The way to the current note is drawn in the accent. The current stop uses the same tint as the current file in the tree. A stop with branches has a chevron in place of its dot, and folding shows how many stops went out of sight. The list scrolls on its own, and only the panel's own controls or Escape close it, so clicking stop after stop keeps it open. In a window too narrow for a docked panel, it slides over the note as the panel always does, and a click on the note dismisses it.
 

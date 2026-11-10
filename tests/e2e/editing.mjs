@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const results = [];
@@ -101,7 +102,7 @@ await writeFile(file("Broken blocks.md"), "```mermaid\nthis is not -> a diagram 
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
 const openNote = async (name) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
@@ -391,6 +392,35 @@ try {
   );
   await page.keyboard.press("Meta+e");
   await pause(250);
+
+  const headingText = await page.locator(".doc h2").first().textContent();
+  const headingTop = () =>
+    page.evaluate((text) => {
+      const scroller = document.querySelector(".scroller");
+      const heading = [...scroller.querySelectorAll(".doc h2, .cm-content > .cm-line")].find((e) => e.textContent.includes(text));
+      const inset = heading.classList.contains("cm-line") ? Number.parseFloat(getComputedStyle(heading).paddingTop) : 0;
+      return heading.getBoundingClientRect().top + inset - scroller.getBoundingClientRect().top;
+    }, headingText);
+  await page.evaluate(() => {
+    const scroller = document.querySelector(".scroller");
+    const heading = scroller.querySelector(".doc h2");
+    scroller.scrollTop += heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 10;
+  });
+  await pause(100);
+  const headingInRead = await headingTop();
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(300);
+  const headingInEdit = await headingTop();
+  check(
+    "a heading at the top stays put going to Edit",
+    Math.abs(headingInEdit - headingInRead) <= 2,
+    `${headingInRead} to ${headingInEdit}`,
+  );
+  await page.keyboard.press("Meta+e");
+  await pause(300);
+  const headingBack = await headingTop();
+  check("and coming back to Read", Math.abs(headingBack - headingInRead) <= 2, `${headingInRead} to ${headingBack}`);
 
   await openNote("Crlf");
   await page.keyboard.press("Meta+e");

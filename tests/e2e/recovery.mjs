@@ -6,6 +6,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
+import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -87,7 +88,7 @@ const LONG = `${Array.from({ length: 90 }, (_, i) => `Paragraph number ${i} has 
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
 const errors = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+watchPageErrors(page, errors);
 await page.addInitScript(installFakeGit);
 await routeGit(page);
 

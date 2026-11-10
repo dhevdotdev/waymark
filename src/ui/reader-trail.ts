@@ -1,7 +1,7 @@
 import type { View } from "../vault/trail";
 import type { Tab } from "../vault/workspace";
 import { icons } from "./icons";
-import type { Inspector, RailLower } from "./inspector";
+import type { Inspector } from "./inspector";
 import { toast } from "./overlays";
 import type { ShellElements } from "./shell";
 import { TrailPanel } from "./trail-panel";
@@ -21,10 +21,9 @@ export interface TrailHost {
 export class TrailActions {
   readonly panel: TrailPanel;
   private readonly readout = document.createElement("button");
-  private readonly empty = document.createElement("p");
   private readonly tabButton: HTMLElement;
   private undoLast: (() => void) | null = null;
-  private returnTo: { lower: RailLower; railWasHidden: boolean } | null = null;
+  private returnTo: { railWasHidden: boolean; wasFolded: boolean } | null = null;
 
   constructor(
     private readonly els: ShellElements,
@@ -42,15 +41,17 @@ export class TrailActions {
     this.readout.dataset.key = "⌘Y";
     this.readout.hidden = true;
     els.trailSlot.append(this.readout);
-    this.empty.className = "rail-empty";
-    this.empty.textContent = "Follow a link and the notes this tab passes through collect here.";
-    els.trailPane.append(this.panel.root, this.empty);
-    this.tabButton = els.shell.querySelector<HTMLElement>('[data-lower="trail"]')!;
+    els.trailPane.append(this.panel.root);
+    els.trailPane.parentElement?.addEventListener("transitionend", (e) => {
+      if (e.target === els.trailPane.parentElement) this.panel.reveal();
+    });
+    this.tabButton = els.shell.querySelector<HTMLElement>('[data-section="trail"] .rail-section-name')!;
   }
 
   /** The panel only sits beside notes, so the graph, a base and a blank tab have nothing to open. */
   get available(): boolean {
-    return this.host.tab().trail.current.view.kind === "note";
+    const { trail } = this.host.tab();
+    return trail.size > 1 && trail.current.view.kind === "note";
   }
 
   render(): void {
@@ -63,9 +64,9 @@ export class TrailActions {
     this.panel.render(id, entries, current, trail.pathToCurrent());
     const many = trail.size > 1;
     this.panel.root.hidden = !many;
-    this.empty.hidden = many;
-    this.tabButton.textContent = many ? `Trail ${trail.size}` : "Trail";
-    this.readout.hidden = !many || !this.available;
+    this.tabButton.textContent = many ? `Trail · ${trail.size}` : "Trail";
+    this.host.inspector().setEmpty("trail", !many);
+    this.readout.hidden = !this.available;
     if (this.readout.hidden) return;
     const position = entries.findIndex((entry) => entry.id === current) + 1;
     const forks = entries.reduce((sum, entry) => sum + Math.max(0, entry.branches - 1), 0);
@@ -92,21 +93,31 @@ export class TrailActions {
     this.readout.append(fork);
   }
 
-  /** Opens the list and moves to the current stop. Closing puts the panel back exactly as it was. */
+  /** Brings the trail into view on the current stop. Pressing again undoes whatever that had to open. */
   togglePanel(): void {
-    if (!this.available) return;
     const inspector = this.host.inspector();
-    if (inspector.isShowing && inspector.lower === "trail") {
-      const before = this.returnTo ?? { lower: "graph" as const, railWasHidden: false };
+    if (this.host.tab().trail.current.view.kind !== "note") return;
+    if (!this.available) {
+      toast("This tab has no trail yet. Follow a link to start one.");
+      return;
+    }
+    const open = inspector.isShowing && inspector.isOpen("trail");
+    if (this.returnTo && open) {
+      const { railWasHidden, wasFolded } = this.returnTo;
       this.returnTo = null;
-      inspector.setLower(before.lower);
-      if (before.railWasHidden) inspector.toggle();
+      if (wasFolded) inspector.setFolded("trail", true);
+      if (railWasHidden) inspector.toggle();
       this.els.scroller.focus({ preventScroll: true });
       return;
     }
-    this.returnTo = { lower: inspector.lower, railWasHidden: !inspector.isShowing };
-    inspector.setLower("trail");
-    if (!inspector.isShowing) inspector.toggle();
+    if (open) {
+      this.panel.focusCurrent();
+      this.panel.pulse();
+      return;
+    }
+    this.returnTo = { railWasHidden: !inspector.isShowing, wasFolded: !inspector.isOpen("trail") };
+    if (this.returnTo.wasFolded) inspector.setFolded("trail", false);
+    if (this.returnTo.railWasHidden) inspector.toggle();
     this.panel.focusCurrent();
   }
 

@@ -102,12 +102,11 @@ export class Reader {
         showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
-        paneChanged: () => this.trail.panel.reveal(),
-        lowerChanged: (lower) => prefs.update((next) => Object.assign(next, { railLower: lower })),
+        sectionFolded: (section, folded) => prefs.update((next) => Object.assign(next, { [`${section}Folded`]: folded })),
         railToggled: (open) => prefs.update((next) => Object.assign(next, { rail: open })),
       },
       p.railPane,
-      p.railLower,
+      { trail: p.trailFolded, graph: p.graphFolded },
     );
 
     this.editing = new NoteEditing({
