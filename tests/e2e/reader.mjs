@@ -430,6 +430,17 @@ check("another tab has its own trail", !(await page.locator(".trail").isVisible(
 await page.click(".tab:nth-child(1)");
 await pause(450);
 check("the first tab keeps its map", (await page.locator(".trail-node").count()) === 3);
+const trailClearance = () =>
+  page.evaluate(
+    () =>
+      document.querySelector(".doc-title").getBoundingClientRect().top -
+      document.querySelector(".trail").getBoundingClientRect().bottom,
+  );
+check("a note's title clears the map above it", (await trailClearance()) >= 16, String(await trailClearance()));
+check(
+  "the map can grow past three rows",
+  (await page.locator(".trail-scroll").evaluate((s) => Number.parseFloat(getComputedStyle(s).maxBlockSize))) >= 96,
+);
 const closeControlIsLeading = (root, [button, label]) => {
   const box = (selector) => root.querySelector(selector).getBoundingClientRect();
   const control = box(button);
@@ -463,8 +474,13 @@ check(
     .evaluateAll((nodes) => nodes.length > 0 && nodes.every((n) => getComputedStyle(n).backgroundColor !== "rgba(0, 0, 0, 0)")),
 );
 const foldButton = page.locator(".trail-fold").first();
+const titleBeforeFold = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 await foldButton.click();
 await pause(150);
+check(
+  "folding the map leaves the note where it is",
+  (await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === titleBeforeFold,
+);
 check(
   "the branch control folds away branches the tab is not on",
   (await foldButton.textContent()) !== "" &&

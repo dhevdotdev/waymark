@@ -837,7 +837,8 @@ kbd {
   grid-row: 1;
 }
 .reader:has(> .trail:not([hidden])) .scroller {
-  scroll-padding-top: 52px;
+  padding-block-start: var(--trail-room, 0px);
+  scroll-padding-top: calc(var(--trail-room, 40px) + 12px);
 }
 .trail[hidden] {
   display: none;
@@ -847,7 +848,8 @@ kbd {
   --fade-end: 0px;
   flex: 1;
   min-inline-size: 0;
-  max-block-size: 64px;
+  /* Three and a half rows, so a cut-off row shows there is more below. */
+  max-block-size: 112px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;

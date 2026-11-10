@@ -9,11 +9,13 @@ export interface TrailHost {
   saveScroll: () => void;
   show: () => void;
   persist: () => void;
+  scroller: HTMLElement;
 }
 
 /** The map of where a tab has been, and what clicking on it does. */
 export class TrailActions {
   readonly map: TrailMap;
+  private roomFor = "";
 
   constructor(private readonly host: TrailHost) {
     this.map = new TrailMap({
@@ -26,12 +28,25 @@ export class TrailActions {
   render(): void {
     const { trail, id } = this.host.tab();
     this.map.root.hidden = trail.size < 2;
-    if (trail.size < 2) return;
+    if (trail.size < 2) {
+      this.reserveRoom();
+      return;
+    }
     const entries = trail.layout().map((placement) => {
       const view = trail.view(placement.id)!;
       return { ...placement, label: this.host.label(view), isGraph: view.kind === "graph" };
     });
     this.map.render(id, entries, trail.current.id, trail.pathToCurrent());
+    this.reserveRoom();
+  }
+
+  /** A note starts below the map. Folding or removing a stop leaves the note where it is, and the next note fits the map again. */
+  private reserveRoom(): void {
+    const { id, trail } = this.host.tab();
+    const key = `${id}:${trail.current.id}`;
+    if (key === this.roomFor) return;
+    this.roomFor = key;
+    this.host.scroller.style.setProperty("--trail-room", `${this.map.root.hidden ? 0 : this.map.root.offsetHeight}px`);
   }
 
   private select(id: number, newTab: boolean): void {

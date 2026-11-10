@@ -73,6 +73,7 @@ export class Reader {
       open: (path) => void this.open(path, { newTab: true, focus: true }),
       saveScroll: () => this.saveScroll(),
       show: () => void this.show({ keyboard: true }),
+      scroller: els.scroller,
       persist: () => this.persist(),
     });
     els.reader.prepend(this.trail.map.root);
