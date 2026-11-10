@@ -104,7 +104,7 @@ Removing a stop takes out only that stop. Its children move up to its place, not
 
 ## Graph
 
-Groups come only from the links, using Louvain community detection, so no folder or filename has any effect. A note keeps its community colour in the rail graph and the full graph. Links inside a community arc gently, and links between communities bend through both centres so they gather into threads. There are no rings or halos. Emphasis is a smooth falloff of light. Hovering sends small pulses along each link in its direction. Community chips light up a cluster and fly to it.
+Groups come only from the links, using Louvain community detection, so no folder or filename has any effect. A note keeps its community colour in the rail graph and the full graph. Links inside a community arc gently, and links between communities bend through both centres so they gather into threads. There are no rings or halos. Emphasis is a smooth falloff of light. Hovering sends small pulses along each link in its direction. Community chips light up a cluster and fly to it. Arrow keys walk the notes community by community, starting from the open note, and Return opens one; the focused note is the only bright one, and a note hidden behind the toolbars snaps to the middle.
 
 ## Vertical rhythm
 
@@ -189,6 +189,7 @@ The rules come from Emil Kowalski's animation standards, good-css.com, Impeccabl
 
 - Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
 - Following a link with the pointer fades the new page in over 180ms, with no movement.
+- The graph shows its finished layout and labels on the first frame. Only a new graph opened with the pointer fades in, over 140ms. Community chips and zoom buttons move the camera over 240ms for the pointer, and a move that interrupts another decelerates from where it is drawn. A held note is drawn under the pointer in the same event. A background refresh leaves the camera, spotlight and focus alone.
 - Popovers scale from their trigger, while sheets and the lightbox stay centred. Toasts rise and stay interruptible because they are transitions, not keyframes.
 - Collapsed callouts and sidebar groups open by animating grid rows, so the content keeps its height and nothing jumps.
 - While writing, each key sounds like a recorded mechanical switch, with a press and its own release, placed left to right by where the key sits. Quick typing lands softer than a deliberate press, and a held key repeats silently. Linear, Tactile or Clicky are chosen in settings, and picking one plays a few keys so it can be judged at once.

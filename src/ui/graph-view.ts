@@ -1,9 +1,11 @@
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
 import { GraphCanvas } from "./graph";
+import { tokenEasing, tokenMs } from "./graph-camera";
 import { groupColor } from "./graph-paint";
 import type { GraphData } from "./graph-types";
 import { icons } from "./icons";
+import { isPointerAction } from "./input-origin";
 import { MorphArrows } from "./morph-arrows";
 import { plural } from "./plural";
 
@@ -54,6 +56,8 @@ export class GraphView {
   private readonly strip: HTMLElement;
   private depth = 2;
   private spotlit: number | null = null;
+  private shown = "";
+  private arrived = false;
   private readonly leaveArrows = new MorphArrows("apart");
 
   constructor(
@@ -64,7 +68,7 @@ export class GraphView {
     this.root.className = "graph-view";
     this.root.innerHTML = TEMPLATE;
     this.canvas = new GraphCanvas({ onOpen: (id, newTab) => host.open(id, newTab) });
-    this.root.querySelector(".graph-stage")!.append(this.canvas.canvas);
+    this.root.querySelector(".graph-stage")!.append(this.canvas.canvas, this.canvas.announcer);
     this.strip = this.root.querySelector<HTMLElement>(".graph-groups")!;
     parent.append(this.root);
     this.root.querySelector(".graph-leave")!.append(this.leaveArrows.svg);
@@ -72,8 +76,12 @@ export class GraphView {
     this.bind();
   }
 
-  focus(): void {
-    this.canvas.canvas.focus({ preventScroll: true });
+  /** Takes the keyboard. Only a graph just opened with the pointer fades in; a tab switch, Back or a shortcut shows it at once. */
+  arrive(opened: boolean): void {
+    if (!this.arrived || document.activeElement === document.body) this.canvas.canvas.focus({ preventScroll: true });
+    this.arrived = true;
+    if (!opened || !isPointerAction()) return;
+    this.root.animate({ opacity: [0, 1] }, { duration: tokenMs("--t-exit"), easing: tokenEasing("--ease-out") });
   }
 
   refreshTheme(): void {
@@ -88,7 +96,12 @@ export class GraphView {
 
   show(note: string, scope: GraphScope): void {
     const data = graphData(this.vault, scope === "local" ? this.vault.links.neighbourhood(note, this.depth) : null);
-    this.canvas.setData(data, note);
+    /* The same graph shown again is the vault changing underneath: the reader's place in it stays. */
+    const shown = `${note}\0${scope}\0${this.depth}`;
+    const refreshing = shown === this.shown;
+    this.shown = shown;
+    this.spotlit = refreshing && data.groups.some((g) => g.id === this.spotlit) ? this.spotlit : null;
+    this.canvas.setData(data, note, refreshing ? this.spotlit : undefined);
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-gmode]"))
       b.classList.toggle("is-on", b.dataset.gmode === scope);
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-depth]"))
@@ -96,15 +109,15 @@ export class GraphView {
     this.root.querySelector<HTMLElement>(".graph-depth")!.hidden = scope !== "local";
     this.root.querySelector(".graph-stats")!.textContent =
       `${plural(data.nodes.length, "note")} · ${plural(data.links.length, "link")}`;
-    this.spotlit = null;
     this.renderChips(data);
   }
 
   private renderChips(data: GraphData): void {
+    const focused = (document.activeElement as HTMLElement | null)?.dataset?.ggroup;
     this.strip.replaceChildren();
     for (const group of [...data.groups].sort((a, b) => b.size - a.size)) {
       const chip = document.createElement("button");
-      chip.className = "graph-chip";
+      chip.className = group.id === this.spotlit ? "graph-chip is-on" : "graph-chip";
       chip.dataset.ggroup = String(group.id);
       chip.style.setProperty("--h", groupColor(group.id));
       const name = document.createElement("span");
@@ -113,6 +126,7 @@ export class GraphView {
       count.textContent = String(group.size);
       chip.append(name, count);
       this.strip.append(chip);
+      if (focused === chip.dataset.ggroup) chip.focus({ preventScroll: true });
     }
     this.markStripEnds();
   }
