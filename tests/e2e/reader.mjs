@@ -294,6 +294,27 @@ check("the Links pane lists connected notes", backlinks > 0, `${backlinks}`);
 await page.click('[data-rail="links"]');
 const railGraph = await page.evaluate(() => document.querySelector(".local-graph canvas")?.getBoundingClientRect().height ?? 0);
 check("local graph renders in the rail", railGraph > 100, `${railGraph}px`);
+const openGraph = page.locator(".rail-graph-open");
+check(
+  "the local graph opens from an icon in its corner, clear of a text label",
+  await openGraph.evaluate((b) => {
+    const box = b.getBoundingClientRect();
+    const graph = document.querySelector(".local-graph canvas").getBoundingClientRect();
+    return (
+      b.textContent === "" &&
+      b.querySelector("svg") !== null &&
+      box.width >= 24 &&
+      box.height >= 24 &&
+      box.right <= graph.right + 8 &&
+      box.top >= graph.top - 1
+    );
+  }),
+);
+await openGraph.click();
+await pause(900);
+check("the icon opens the full graph", await page.locator(".graph-view canvas").isVisible());
+await page.keyboard.press("Escape");
+await pause(500);
 await page.evaluate(() => {
   window.__graphText = 0;
   const original = CanvasRenderingContext2D.prototype.fillText;

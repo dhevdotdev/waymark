@@ -1364,17 +1364,27 @@ kbd {
   display: none;
 }
 .rail-graph {
+  position: relative;
   flex: 1;
   min-block-size: 0;
   display: flex;
   flex-direction: column;
 }
-.rail-graph-head {
-  justify-content: flex-end;
-  padding-block-end: 2px;
+.rail-graph-open {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  inline-size: 24px;
+  block-size: 24px;
+  color: var(--chrome-ink-3);
+}
+.rail-graph-open svg {
+  inline-size: 14px;
+  block-size: 14px;
 }
 .rail-graph-empty,
-.rail-graph.is-empty :is(.rail-graph-head, .local-graph) {
+.rail-graph.is-empty :is(.rail-graph-open, .local-graph) {
   display: none;
 }
 .rail-graph.is-empty .rail-graph-empty {

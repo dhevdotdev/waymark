@@ -219,7 +219,7 @@ export class Inspector {
     const incoming = links.in.get(this.current) ?? new Set<string>();
     const ids = new Set([...out, ...incoming]);
     if (!this.localGraph) {
-      box.innerHTML = `<div class="rail-title rail-graph-head"><button class="link-btn" data-act="graph-local">Expand</button></div><p class="rail-empty rail-graph-empty">No links to or from this note.</p>`;
+      box.innerHTML = `<button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.fit}</button><p class="rail-empty rail-graph-empty">No links to or from this note.</p>`;
       this.localGraph = new LocalGraph((id, newTab) => this.host.openFromGraph(id, newTab));
       box.append(this.localGraph.root);
     }
