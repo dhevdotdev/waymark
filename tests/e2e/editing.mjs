@@ -86,6 +86,9 @@ await writeFile(file("Crlf.md"), CRLF);
 await writeFile(file("Table.md"), TABLE);
 await writeFile(file("Mixed.md"), "one\r\ntwo\nthree\r\n");
 await writeFile(file("Blocks.md"), BLOCKS);
+const HEADS =
+  "# Heads\n\nIntro paragraph.\n\n## Alpha section\n\nAlpha body.\n\n### Beta sub\n\nBeta body.\n\n```\n# not a heading\n```\n\nThe end.\n";
+await writeFile(file("Heads.md"), HEADS);
 await writeFile(
   file("Anchored.md"),
   `# Anchored\n\n${Array.from({ length: 60 }, (_, i) => `Paragraph number ${i} has enough words in it to fill out a line of the column for the test.\n\n${i % 7 === 0 ? `## Section ${i}\n\n` : ""}`).join("")}`,
@@ -835,6 +838,112 @@ try {
   await pause(300);
   const inRead = await topText();
   check("switching back keeps the same text in view", editTop.text === inRead.text, `${editTop.text} ${inRead.text}`);
+
+  // Moving through headings with the keyboard
+  await openNote("Heads");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(400);
+  const caret = () =>
+    page.evaluate(() => {
+      const sel = getSelection();
+      const node = sel.focusNode;
+      const element = node.nodeType === 1 ? node : node.parentElement;
+      const line = element.closest(".cm-content > *");
+      const range = document.createRange();
+      let x = line.getBoundingClientRect().left;
+      if (node.nodeType === 3 && node.length) {
+        const at = Math.min(sel.focusOffset, node.length - 1);
+        range.setStart(node, at);
+        range.setEnd(node, at + 1);
+        x = sel.focusOffset < node.length ? range.getBoundingClientRect().left : range.getBoundingClientRect().right;
+      }
+      return {
+        text: line.textContent,
+        x: Math.round(x),
+        inMarks: element.closest(".cm-hang") !== null && sel.focusOffset < node.length,
+        column: Math.round(document.querySelector(".cm-content > .cm-line:not([class*='cm-h'])").getBoundingClientRect().left),
+      };
+    });
+  await page.locator(".cm-line", { hasText: "Intro paragraph." }).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  const onHeading = await caret();
+  check(
+    "Down lands on a heading's text, not in its marks",
+    onHeading.text === "## Alpha section" && !onHeading.inMarks && Math.abs(onHeading.x - onHeading.column) <= 3,
+    JSON.stringify(onHeading),
+  );
+  const walked = [];
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press("ArrowDown");
+    walked.push((await caret()).text);
+  }
+  check(
+    "Down stops on every line, the short gap under a small heading included",
+    walked.join("|") === "|Alpha body.||### Beta sub||Beta body.",
+    walked.join("|"),
+  );
+  const back = [];
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("ArrowUp");
+    back.push((await caret()).text);
+  }
+  check("Up stops on every line too", back.join("|") === "|### Beta sub||Alpha body.", back.join("|"));
+  await page.locator(".cm-line", { hasText: "Alpha body." }).click();
+  await page.keyboard.press("End");
+  const across = [];
+  for (let i = 0; i < 7; i++) {
+    await page.keyboard.press("ArrowRight");
+    const at = await caret();
+    if (at.text === "### Beta sub") across.push(at.x);
+  }
+  check(
+    "Right moves rightwards through a heading's marks",
+    across.length >= 4 && across.every((x, i) => i === 0 || x > across[i - 1]),
+    across.join(","),
+  );
+  await page.keyboard.press("End");
+  await page.keyboard.press("Home");
+  const home = await caret();
+  check(
+    "Home goes to the start of the heading's text",
+    !home.inMarks && Math.abs(home.x - home.column) <= 3,
+    JSON.stringify(home),
+  );
+  await page.keyboard.press("Home");
+  check("and stays there", (await caret()).x === home.x);
+  await pause(600);
+  await page.keyboard.press("Backspace");
+  await pause(650);
+  await saved();
+  check(
+    "Backspace there turns the heading into plain text in one step",
+    (await disk("Heads.md")) === HEADS.replace("### Beta sub", "Beta sub"),
+  );
+  await pause(600);
+  await page.keyboard.press("Meta+z");
+  await pause(650);
+  await saved();
+  check("one Undo brings the heading back", (await disk("Heads.md")) === HEADS);
+  check("with the caret on its text", (await caret()).text === "### Beta sub" && !(await caret()).inMarks);
+  await page.locator(".cm-line", { hasText: "# not a heading" }).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Backspace");
+  await pause(650);
+  await saved();
+  check(
+    "a hash inside code is left to ordinary Backspace",
+    (await disk("Heads.md")) === HEADS.replace("# not a heading", "#not a heading"),
+  );
+  await page.keyboard.press("Meta+z");
+  await pause(650);
+  await saved();
+  await page.keyboard.press("Meta+e");
+  await pause(300);
 
   await openNote("Broken blocks");
   await page.keyboard.press("Meta+e");

@@ -15,6 +15,7 @@ import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, V
 import { previewBlocks } from "./editor-blocks";
 import { findPanel } from "./editor-find";
 import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
+import { lineKeys } from "./editor-keys";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
@@ -355,6 +356,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
           { key: "Mod-b", run: (v) => wrap(v, "**") },
           { key: "Mod-i", run: (v) => wrap(v, "*") },
           ...searchKeymap.filter((binding) => binding.key === "Escape" || binding.key === "Mod-g"),
+          ...lineKeys,
           ...historyKeymap,
           ...defaultKeymap,
           indentWithTab,
@@ -399,12 +401,13 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
     },
     redraw,
     topLine(scroller) {
+      const { doc } = view.state;
       const top = scroller.getBoundingClientRect().top;
-      const block = view.lineBlockAtHeight(top - view.documentTop);
-      return {
-        line: view.state.doc.lineAt(block.from).number - 1,
-        offset: view.documentTop + block.top + lineInset(view, block.from) - top,
-      };
+      let line = doc.lineAt(view.lineBlockAtHeight(top - view.documentTop).from);
+      /* A gap between blocks is not a place in the note, so the first text at or below the edge stands for it. */
+      while (!line.text.trim() && line.number < doc.lines) line = doc.line(line.number + 1);
+      const block = view.lineBlockAt(line.from);
+      return { line: line.number - 1, offset: view.documentTop + block.top + lineInset(view, line.from) - top };
     },
     showLine(scroller, line, offset) {
       const { doc } = view.state;

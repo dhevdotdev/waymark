@@ -4,6 +4,7 @@ import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
 import type { ShellElements } from "./shell";
+import { watchTableFit } from "./table-fit";
 
 const WORDS_PER_MINUTE = 230;
 
@@ -14,7 +15,9 @@ export class NoteView {
     private readonly vault: VaultStore,
     private readonly vaultName: string,
     private readonly toast: (message: string) => void,
-  ) {}
+  ) {
+    watchTableFit(els.scroller);
+  }
 
   /** Replaces the column with a rendered note and returns its article element. */
   mount(path: string, body: DocumentFragment, animate: boolean): HTMLElement {

@@ -99,12 +99,12 @@
   font-size: 11px;
   line-height: 14px;
 }
+/* As wide as its marks and pulled back by the same amount, so it takes no room and reads left to right. */
 .doc-editing .cm-hang {
   display: inline-block;
-  inline-size: 0;
-  translate: -0.35em 0;
-  direction: rtl;
-  white-space: pre;
+  inline-size: calc(var(--hang-ch) * 1ch);
+  margin-inline: calc(var(--hang-ch) * -1ch - 0.35em) 0.35em;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 0.72em;
   font-weight: 450;

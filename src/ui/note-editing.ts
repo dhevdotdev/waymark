@@ -289,6 +289,11 @@ export class NoteEditing {
     return this.session?.path === path ? Promise.resolve(this.session.draft.text) : this.host.vault.read(path);
   }
 
+  /** Draws the reading view again after the file's lines moved under it, so its line numbers are true. */
+  async refreshReading(): Promise<void> {
+    if (!this.session) await this.host.reshow();
+  }
+
   async openAtLine(line: number): Promise<void> {
     await this.open();
     this.session?.editor.revealLine(line);

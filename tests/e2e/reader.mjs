@@ -758,7 +758,21 @@ await pause(250);
 await page.keyboard.press("Meta+z");
 await pause(250);
 check("Command-Z on the trail brings the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
+const scrollTop = () => page.locator(".scroller").evaluate((sc) => Math.round(sc.scrollTop));
+const scrollNoteTo = async (y) => {
+  await page.locator(".scroller").evaluate((sc, to) => {
+    sc.scrollTop = to;
+  }, y);
+  await pause(350);
+  return scrollTop();
+};
+await scrollNoteTo(160);
+await page.locator(".trail-row:not(.is-current)").last().click();
+await pause(450);
+await page.keyboard.press("Meta+[");
+await pause(450);
 const onNote = await title();
+const leftAt = await scrollNoteTo(90);
 await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Delete");
 await pause(500);
@@ -769,6 +783,31 @@ check(
 await page.locator(".toast-action").click();
 await pause(500);
 check("Undo returns to that note", (await page.locator(".trail-row").count()) === beforeRemove && (await title()) === onNote);
+check("at the place it was left", (await scrollTop()) === leftAt, `${await scrollTop()} for ${leftAt}`);
+const beforeGraph = await scrollNoteTo(120);
+await page.keyboard.press("Meta+Shift+g");
+await pause(900);
+await page.locator(".graph-leave").click();
+await pause(600);
+check(
+  "leaving the graph returns to the same place in the note",
+  (await scrollTop()) === beforeGraph,
+  `${await scrollTop()} for ${beforeGraph}`,
+);
+await page.keyboard.press("Meta+g");
+await pause(900);
+await page.click(".tab:nth-child(1)");
+await pause(600);
+check(
+  "so does clicking the note's tab while the graph shows",
+  (await scrollTop()) === beforeGraph,
+  `${await scrollTop()} for ${beforeGraph}`,
+);
+await page.click(".tab:nth-child(2)");
+await pause(600);
+await page.keyboard.press("Escape");
+await pause(600);
+check("and Escape from the graph", (await scrollTop()) === beforeGraph, `${await scrollTop()} for ${beforeGraph}`);
 await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Escape");
 await pause(100);

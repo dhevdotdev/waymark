@@ -23,7 +23,7 @@ export function watchTableFit(scroller: HTMLElement): void {
     }
   };
   new MutationObserver(() => {
-    frame ||= requestAnimationFrame(find);
+    if (!frame) frame = requestAnimationFrame(find);
   }).observe(scroller, { childList: true, subtree: true });
   find();
 }

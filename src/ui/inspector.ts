@@ -36,6 +36,7 @@ export class Inspector {
   private current = "";
   private readonly expandArrows = new MorphArrows("apart");
   private readonly propertySlot = document.createElement("div");
+  private readonly facts = document.createElement("dl");
   private propertyEditor: Promise<PropertyEditor> | null = null;
   readonly sections: PanelSections;
 
@@ -193,6 +194,7 @@ export class Inspector {
       const editor = new PropertyEditor({
         write: (at, edit) => editing().writer.change(at, edit),
         text: (at) => editing().noteText(at),
+        linesMoved: () => void editing().refreshReading(),
         openRaw: (_, line) => void editing().openAtLine(line),
         toast,
       });
@@ -208,35 +210,26 @@ export class Inspector {
     if (text !== null && path === this.current) editor.show(path, text);
   }
 
-  /** Folder, length and every frontmatter property, shown as written and without meaning attached to any key. */
+  /** Folder and length, then the properties and the history. The pane is built once, so redrawing a note never takes focus out of it. */
   private renderInfo(): void {
     const { info: box } = this.els;
-    box.replaceChildren();
-    const addRow = (target: HTMLElement, key: string, value: string | string[]) => {
+    if (!this.facts.isConnected) {
+      this.facts.className = "props";
+      const history = document.createElement("div");
+      history.className = "rail-history";
+      box.replaceChildren(this.facts, this.title("Properties"), this.propertySlot, history);
+    }
+    const fact = (key: string, value: string) => {
       const dt = document.createElement("dt");
       dt.textContent = key;
       const dd = document.createElement("dd");
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          const chip = document.createElement("span");
-          chip.className = "prop-chip";
-          chip.textContent = item;
-          dd.append(chip);
-        }
-      } else dd.textContent = value;
-      target.append(dt, dd);
+      dd.textContent = value;
+      return [dt, dd];
     };
-    const facts = document.createElement("dl");
-    facts.className = "props";
-    addRow(facts, "Folder", ancestors(this.current).at(-1) ?? "Vault root");
-    addRow(facts, "Words", this.vault.wordCount(this.current).toLocaleString());
-    box.append(facts);
-
-    box.append(this.title("Properties"), this.propertySlot);
-
-    const history = document.createElement("div");
-    history.className = "rail-history";
-    box.append(history);
+    this.facts.replaceChildren(
+      ...fact("Folder", ancestors(this.current).at(-1) ?? "Vault root"),
+      ...fact("Words", this.vault.wordCount(this.current).toLocaleString()),
+    );
     this.history.reset();
     this.refreshHistory();
   }

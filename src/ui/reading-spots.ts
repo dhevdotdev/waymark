@@ -64,6 +64,7 @@ export class ReadingSpots {
   constructor(private readonly host: ReadingSpotsHost) {}
 
   scrolled(): void {
+    if (this.restored && this.host.scroller.scrollTop !== this.restored.top) this.restored = null;
     clearTimeout(this.settleTimer);
     this.settleTimer = setTimeout(() => this.record(), SETTLE_MS);
   }
@@ -96,15 +97,20 @@ export class ReadingSpots {
     if (!isSpot(spot)) return;
     showReadingLine(scroller, spot);
     this.restored = { spot, top: scroller.scrollTop };
+    void document.fonts.ready.then(() => this.settle());
   }
 
-  /** Blocks above the spot may have changed height while drawing. Holds the place unless the reader has moved on. */
+  /**
+   * Blocks above the spot change height as diagrams draw and fonts arrive.
+   * Holds the place through each of those, until the reader moves on.
+   */
   settle(): void {
-    if (!this.restored || this.host.scroller.scrollTop !== this.restored.top) {
+    if (!this.restored) return;
+    if (this.host.scroller.scrollTop !== this.restored.top) {
       this.restored = null;
       return;
     }
     showReadingLine(this.host.scroller, this.restored.spot);
-    this.restored = null;
+    this.restored.top = this.host.scroller.scrollTop;
   }
 }

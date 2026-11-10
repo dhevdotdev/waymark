@@ -31,6 +31,7 @@ const MESSY = [
 const NOTES = {
   "Messy.md": MESSY,
   "Plain.md": "# Plain\n\nNo block here.\n",
+  "Tasks.md": "# Tasks\n\n- [ ] first\n- [ ] second\n",
   "Solo.md": "---\nonly: one\n---\nSolo body\n",
   "Nested.md": "---\nplace:\n  city: Paris\n  zip: 75001\nkept: yes please\na: 1\nb: 2\na: 3\n---\nNested body\n",
   "Broken.md": "---\ntitle: bad: yaml\nmore: [x\n---\nBroken body\n",
@@ -224,6 +225,26 @@ try {
   await page.keyboard.press("Enter");
   await pause(300);
   check("a note with no block gets one at the very top", (await disk("Plain.md")) === `---\nk: v\n---\n${NOTES["Plain.md"]}`);
+
+  await open("Tasks.md");
+  await page.locator(".prop-add").click();
+  await pause(60);
+  await page.keyboard.type("k");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("v");
+  await page.keyboard.press("Enter");
+  await pause(500);
+  check(
+    "focus stays in the panel after the note redraws",
+    await page.evaluate(() => document.activeElement?.closest(".prop-editor") !== null),
+  );
+  await page.locator("button.task-box").nth(1).click();
+  await pause(400);
+  check(
+    "a task still toggles its own line after a property moved the lines",
+    (await disk("Tasks.md")) === "---\nk: v\n---\n# Tasks\n\n- [ ] first\n- [x] second\n",
+    JSON.stringify(await disk("Tasks.md")),
+  );
 
   await open("Solo.md");
   await cell("only").hover();

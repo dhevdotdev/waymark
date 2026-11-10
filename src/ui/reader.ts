@@ -30,7 +30,6 @@ import { Sidebar } from "./sidebar";
 import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
-import { watchTableFit } from "./table-fit";
 import { bindTooltips } from "./tooltips";
 
 export type { Metrics, OpenOptions, ReaderDeps };
@@ -73,7 +72,6 @@ export class Reader {
     const { els } = this;
 
     this.noteView = new NoteView(els, vault, deps.name, toast);
-    watchTableFit(els.scroller);
     this.trail = new TrailActions(els, {
       tab: () => this.tab,
       label: (view) => this.viewLabel(view),
@@ -609,6 +607,7 @@ export class Reader {
   private closeGraphView(): void {
     this.graph?.destroy();
     this.graph = null;
+    this.els.shell.classList.remove("is-graph");
   }
 
   private renderTree(): void {
@@ -644,7 +643,8 @@ export class Reader {
 
   private saveScroll(): void {
     const node = this.tab?.trail.current;
-    if (node?.view.kind === "note" || node?.view.kind === "base") node.scroll = this.els.scroller.scrollTop;
+    const drawn = (node?.view.kind === "note" || node?.view.kind === "base") && node.view.path === this.current;
+    if (drawn && !this.els.shell.classList.contains("is-graph")) node.scroll = this.els.scroller.scrollTop;
     this.spots.record();
   }
 }

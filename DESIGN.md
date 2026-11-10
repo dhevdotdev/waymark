@@ -58,6 +58,20 @@ Every state has a visible way in and a visible way out.
 - Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.
 
+## Tables and callouts
+
+A table's header row has a faint band, and stays in view at the top of the note area while its rows scroll past, in Read and in Edit. A header with nothing in it is a table used for layout, so it gets neither. A table wider than its column scrolls sideways and its header scrolls away with it, because a sideways-scrolling box cannot also pin a row to the page.
+
+Inline code inside a callout takes a stronger tint of that callout's own colour. The plain grey only suits plain paper.
+
+## Moving through a note in Edit
+
+A heading's marks hang in the margin and read left to right, so the arrow keys move through them the way they look. Up, Down and Home land on the heading's text, never inside the marks. Up and Down stop on every line, the short gaps between blocks included. Backspace at the start of a heading's text makes it plain text in one step, and one Undo brings the heading back.
+
+## Coming back to a note
+
+A note is where it was left: after Back and Forward, after another tab, after the graph, after closing a stop on the trail, after Read and Edit, and after a relaunch. A position is never recorded while a different note or the graph is on screen. After a property change adds or removes lines, the reading view is drawn again in place, so its line numbers stay true.
+
 ## Properties
 
 The Info pane is the one home for a note's properties. Click a value and it becomes editable where it sits, so the row keeps its shape. Enter saves, Escape puts it back, and leaving the field saves. Lists edit item by item. No key means anything: `status` is treated like any other name.
@@ -74,7 +88,7 @@ Each tab remembers where following links has taken it. A second link from the sa
 
 Above the note there is only the readout in the path row: "Trail 4 of 6", with a fork count when there are side branches. Its slot is always reserved, so a tab's second stop moves nothing. The readout or ⌘Y brings the Trail section into view on the current stop, opening the panel or the section if it has to, and pressing it again undoes what that opened.
 
-Links or Info, the trail and the graph are all on screen together, because they get used together. Links or Info take what height is left. The trail and the graph each have a section that folds to its header and remembers it, and a section with nothing to show is not drawn at all, so a tab with no trail has no empty heading. The panel's left edge drags to widen it, and the width is remembered.
+Links or Info, the trail and the graph are all on screen together, because they get used together. Links or Info take what height is left. The trail and the graph each have a section that folds to its header and remembers it, and a section with nothing to show is not drawn at all, so a tab with no trail has no empty heading. The panel's left edge drags to widen it, and the width is remembered. The top edge of the trail and of the graph drags to make that section taller or shorter, down to a least height and up to what leaves the links readable. A trail too short to resize offers no handle.
 
 The trail is a list, because a tree of long titles does not fit a row. One 28px row per stop, top to bottom. Side branches sit directly under the stop they left from, stepped in 14px, up to three steps, and the main line carries on level after them. The way to the current note is drawn in the accent. The current stop uses the same tint as the current file in the tree. A stop with branches has a chevron in place of its dot, and folding shows how many stops went out of sight. The section is as tall as its stops, sitting on top of the graph, up to a limit where it scrolls on its own. Its height only changes when the trail does, which is when the panel's contents are changing anyway. Only the panel's own controls or Escape close it, so clicking stop after stop keeps it open. In a window too narrow for a docked panel, it slides over the note as the panel always does, and a click on the note dismisses it.
 

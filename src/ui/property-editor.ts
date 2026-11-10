@@ -7,6 +7,8 @@ import type { WriteResult } from "./note-writer";
 export interface PropertyHost {
   write: (path: string, edit: (text: string) => string | null) => Promise<WriteResult>;
   text: (path: string) => Promise<string>;
+  /** A change added or removed lines, so whatever was drawn from the old text has stale line numbers. */
+  linesMoved: () => void;
   openRaw: (path: string, line: number) => void;
   toast: (message: string, action?: { label: string; run: () => void }) => void;
 }
@@ -35,6 +37,7 @@ export class PropertyEditor {
   private readonly list = document.createElement("dl");
   private readonly adder = button("link-btn prop-add", "Add property", "Add property");
   private path = "";
+  private text = "";
   private sheet: PropertySheet = { properties: [], canAdd: false };
   private editing = false;
   private waiting: { path: string; text: string } | null = null;
@@ -48,13 +51,23 @@ export class PropertyEditor {
 
   /** A change arriving mid-edit waits, so what is being typed is not pulled away. */
   show(path: string, text: string): void {
+    if (path === this.path && text === this.text) return;
     if (this.editing && path === this.path) {
       this.waiting = { path, text };
       return;
     }
     this.path = path;
+    this.text = text;
     this.sheet = readSheet(text);
     this.draw(text);
+  }
+
+  private took(text: string): void {
+    const lines = (of: string) => of.split("\n").length;
+    const moved = lines(text) !== lines(this.text);
+    this.text = text;
+    this.sheet = readSheet(text);
+    if (moved) this.host.linesMoved();
   }
 
   private draw(text: string): void {
@@ -235,7 +248,7 @@ export class PropertyEditor {
   private async commit(edit: (text: string) => string | null, changed: HTMLElement, redraw = false): Promise<boolean> {
     const text = await this.write(edit);
     if (text === null) return false;
-    this.sheet = readSheet(text);
+    this.took(text);
     if (redraw) this.drawKeepingFocus(text, changed);
     else this.flash(changed);
     return true;
@@ -304,7 +317,7 @@ export class PropertyEditor {
 
   private redraw(text: string): void {
     const tops = this.tops();
-    this.sheet = readSheet(text);
+    this.took(text);
     this.draw(text);
     this.settle(tops);
   }

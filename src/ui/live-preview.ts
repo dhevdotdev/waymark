@@ -158,7 +158,9 @@ class Builder {
 
   /** Keeps a block's marks in the margin, so showing them never moves the text they belong to. */
   private hangMark(from: number, to: number): void {
-    this.out.push(mark(this.isActive(from) ? "cm-hang is-shown" : "cm-hang").range(from, to));
+    const glyphs = this.state.doc.sliceString(from, to).trimEnd().length;
+    const cls = this.isActive(from) ? "cm-hang is-shown" : "cm-hang";
+    this.out.push(Decoration.mark({ class: cls, attributes: { style: `--hang-ch: ${glyphs}` } }).range(from, to));
   }
 
   private withTrailingSpace(to: number): number {
