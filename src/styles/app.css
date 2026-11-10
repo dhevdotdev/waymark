@@ -1053,8 +1053,8 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .trail-here:not(.is-instant) {
-    transition: transform var(--t-menu) var(--ease-out);
+  :root:not([data-input="keyboard"]) .trail-here:not(.is-instant) {
+    transition: transform var(--t-menu) var(--ease-in-out);
   }
   .trail-fold svg {
     transition: rotate var(--t-menu) var(--ease-out);

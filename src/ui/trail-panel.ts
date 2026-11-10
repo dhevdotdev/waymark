@@ -1,5 +1,7 @@
 import type { Placement } from "../vault/trail";
 import { icons } from "./icons";
+import { isPointerAction } from "./input-origin";
+import { arrive, glide, type Place, placesOf, timing } from "./list-motion";
 import { reducedMotion } from "./media";
 
 export interface TrailEntry extends Placement {
@@ -19,7 +21,6 @@ const FIRST_COLUMN = 15;
 const DEEPEST_STEP = 3;
 const CHEVRON_CLEARANCE = 9;
 const ELBOW = 5;
-const MOVE_MS = 160;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const columnOf = (level: number) => FIRST_COLUMN + Math.min(level, DEEPEST_STEP) * STEP;
@@ -57,7 +58,7 @@ export class TrailPanel {
       this.rows.clear();
       this.tabId = tabId;
     }
-    const tops = new Map([...this.rows].map(([id, row]) => [id, row.offsetTop]));
+    const was = placesOf(this.rows, this.root);
     const focused = this.focusedIndex();
     const movedOn = !sameTab || current !== this.current;
     const shape = entries.map((e) => e.id).join();
@@ -77,7 +78,7 @@ export class TrailPanel {
     this.restoreFocus(focused, entries);
     if (!this.root.querySelector('.trail-row[tabindex="0"]')) this.makeTabStop(this.rows.get(current));
     if (movedOn) this.reveal();
-    if (reshaped && !reducedMotion()) this.settle(entries, tops);
+    if (reshaped && isPointerAction()) this.settle(entries, was);
   }
 
   /** Keeps every row's element, so its colours and chevron transition, and moves only the ones out of place. */
@@ -179,16 +180,12 @@ export class TrailPanel {
   }
 
   /** Rows glide from where they were. The lines cannot, so they fade back in at their new places. */
-  private settle(entries: TrailEntry[], tops: Map<number, number>): void {
-    const easing = getComputedStyle(this.root).getPropertyValue("--ease-out").trim() || "ease-out";
-    const timing = { duration: MOVE_MS, easing };
-    for (const entry of entries) {
-      const row = this.rows.get(entry.id)!;
-      const was = tops.get(entry.id);
-      if (was === undefined) row.animate({ opacity: [0, 1] }, timing);
-      else if (was !== row.offsetTop) row.animate({ translate: [`0 ${was - row.offsetTop}px`, "0 0"] }, timing);
-    }
-    this.lines.animate({ opacity: [0, 1] }, timing);
+  private settle(entries: TrailEntry[], was: Map<number, Place>): void {
+    const fade = timing("--t-press", "--ease-out");
+    for (const entry of entries) if (!was.has(entry.id)) arrive(this.rows.get(entry.id)!, fade);
+    if (!reducedMotion()) glide(this.rows, was, this.root, timing("--t-press", "--ease-in-out"));
+    for (const animation of this.lines.getAnimations()) animation.cancel();
+    this.lines.animate({ opacity: [0, 1] }, fade);
   }
 
   /** Scrolls the panel just enough to show the current stop. */
@@ -201,11 +198,6 @@ export class TrailPanel {
     const place = row.getBoundingClientRect();
     if (place.top < bounds.top + room) body.scrollTop -= bounds.top + room - place.top;
     else if (place.bottom > bounds.bottom - room) body.scrollTop += place.bottom - bounds.bottom + room;
-  }
-
-  /** Answers a press when the trail was already showing. */
-  pulse(): void {
-    this.marker.animate({ opacity: [0.35, 1] }, { duration: 240, easing: "ease-out" });
   }
 
   focusCurrent(): void {

@@ -81,7 +81,6 @@ export class TrailActions {
     }
     if (open) {
       this.panel.focusCurrent();
-      this.panel.pulse();
       return;
     }
     this.returnTo = { railWasHidden: !inspector.isShowing, wasFolded: !inspector.sections.isOpen("trail") };
