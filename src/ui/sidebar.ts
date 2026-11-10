@@ -15,6 +15,8 @@ const MAX_WIDTH = 440;
 
 export interface SidebarHost extends Omit<SearchPaneHost, "close" | "clearHighlights"> {
   focusReader: () => void;
+  /** Only one search marks the note at a time. */
+  searchOpened: () => void;
   persist: () => void;
 }
 
@@ -74,6 +76,7 @@ export class Sidebar {
   }
 
   showSearch(prefill?: string): void {
+    this.host.searchOpened();
     this.ensureVisible();
     this.setMode("search");
     this.searchPane.focus(prefill);

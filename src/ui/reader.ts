@@ -93,6 +93,7 @@ export class Reader {
         deps.metrics.searchMs = ms;
       },
       focusReader: () => els.scroller.focus({ preventScroll: true }),
+      searchOpened: () => this.find.close(),
       persist: () => this.persist(),
     });
 
@@ -198,7 +199,7 @@ export class Reader {
       (query) => paletteItems(this, query),
       () => paletteRecent(this),
     );
-    this.find = new FindBar(els.reader, () => els.scroller.querySelector(".doc"), els.scroller);
+    this.find = new FindBar(els.reader, els.scroller, () => `${this.tab.id} ${this.current}`);
     this.preview = new LinkPreview(els.shell, {
       vault,
       renderContext: () => this.renderContext(),
@@ -531,7 +532,6 @@ export class Reader {
     this.inspector.render(path, rendered);
     this.editing.stats.read(path);
     this.persist();
-    this.find.refresh();
 
     const t0 = performance.now();
     await renderDiagrams(doc);
@@ -567,7 +567,6 @@ export class Reader {
   }
 
   private showBlank(): void {
-    if (this.find.isOpen) this.find.close();
     this.els.scroller.replaceChildren(startPage(this.vault, this.deps.prefs, this.deps.root, this.deps.name));
     paint("search", []);
     this.renderTabChrome();

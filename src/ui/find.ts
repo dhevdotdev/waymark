@@ -27,10 +27,23 @@ export function findRanges(root: Element, needle: string, limit = 2000): Range[]
 
 const supported = typeof CSS !== "undefined" && "highlights" in CSS;
 
+/*
+ * Each name keeps one registered Highlight whose ranges change in place. After the note has scrolled, the macOS
+ * system WebKit does not repaint text whose Highlight was replaced in or removed from the registry, so marks from
+ * earlier keystrokes stay on screen. Clearing a registered Highlight repaints them.
+ */
+const registered = new Map<string, Highlight>();
+
 export function paint(name: string, ranges: Range[]): void {
   if (!supported) return;
-  if (ranges.length) CSS.highlights.set(name, new Highlight(...ranges));
-  else CSS.highlights.delete(name);
+  let highlight = registered.get(name);
+  if (!highlight) {
+    highlight = new Highlight();
+    registered.set(name, highlight);
+    CSS.highlights.set(name, highlight);
+  }
+  highlight.clear();
+  for (const range of ranges) highlight.add(range);
 }
 
 /** Opens a collapsed callout so a match inside it can be seen. */
@@ -62,12 +75,19 @@ export class FindBar {
   private count!: HTMLElement;
   private ranges: Range[] = [];
   private index = 0;
+  private searched = "";
+  private readonly watcher = new MutationObserver(() => this.followView());
 
+  /** `view` names what the scroller shows, such as a tab and note, so find knows when its note has gone. */
   constructor(
     private host: HTMLElement,
-    private doc: () => Element | null,
     private scroller: HTMLElement,
+    private view: () => string,
   ) {}
+
+  private get doc(): Element | null {
+    return this.scroller.querySelector(".doc:not(.doc-editing)");
+  }
 
   get isOpen(): boolean {
     return this.root !== null;
@@ -103,6 +123,9 @@ export class FindBar {
       else if (act === "close") this.close();
     });
     this.host.append(root);
+    paint("search", []);
+    this.searched = this.view();
+    this.watcher.observe(this.scroller, { childList: true });
     this.input.focus();
     const selection = window.getSelection()?.toString().trim();
     if (selection && selection.length < 80 && !selection.includes("\n")) {
@@ -112,6 +135,7 @@ export class FindBar {
   }
 
   close(): void {
+    this.watcher.disconnect();
     this.root?.remove();
     this.root = null;
     this.ranges = [];
@@ -119,13 +143,14 @@ export class FindBar {
     paint("find-current", []);
   }
 
-  /** Re-applies the query after the note re-renders. */
-  refresh(): void {
-    if (this.root) this.run();
+  /** The same note drawn again keeps the query. Another note, another tab or the editor in its place ends the search. */
+  private followView(): void {
+    if (this.view() === this.searched && this.doc) this.run();
+    else this.close();
   }
 
   private run(): void {
-    const doc = this.doc();
+    const doc = this.doc;
     this.ranges = doc ? findRanges(doc, this.input.value) : [];
     this.index = 0;
     const box = this.scroller.getBoundingClientRect();
