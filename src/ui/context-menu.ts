@@ -20,8 +20,8 @@ export interface MenuOptions {
   /** Puts the menu's right edge at `x` instead of its left edge. */
   alignEnd?: boolean;
   onClose?: () => void;
-  /** Chooses where the menu goes once its size is known. */
-  place?: (width: number, height: number) => readonly [left: number, top: number];
+  /** Chooses where the menu goes once its size is known, and the corner it grows from if that is not the `x`, `y` point. */
+  place?: (width: number, height: number) => readonly [left: number, top: number, origin?: string];
   /** Opened from the keyboard, so the first item takes focus. */
   keyboard?: boolean;
 }
@@ -126,9 +126,12 @@ export function showContextMenu(x: number, y: number, items: MenuItem[], options
   }
   document.body.append(menu);
   const { offsetWidth: width, offsetHeight: height } = menu;
-  const [left, top] = options.place?.(width, height) ?? [options.alignEnd ? x - width : x, y];
-  menu.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
-  menu.style.top = `${Math.max(8, Math.min(top, innerHeight - height - STATUS_BAR_ROOM))}px`;
-  menu.style.transformOrigin = options.alignEnd ? "right top" : "left top";
+  const [placedLeft, placedTop, origin] = options.place?.(width, height) ?? [options.alignEnd ? x - width : x, y];
+  const left = Math.max(8, Math.min(placedLeft, innerWidth - width - 8));
+  const top = Math.max(8, Math.min(placedTop, innerHeight - height - STATUS_BAR_ROOM));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.transformOrigin =
+    origin ?? `${Math.max(0, Math.min(width, x - left))}px ${Math.max(0, Math.min(height, y - top))}px`;
   if (options.keyboard) menu.querySelector<HTMLElement>(".context-item")?.focus();
 }

@@ -983,10 +983,6 @@ kbd {
 .trail-x[hidden] {
   display: none;
 }
-.trail-fold:active,
-.trail-x:active {
-  scale: 0.9;
-}
 .trail-fold {
   position: absolute;
   inset-inline-start: calc(var(--x) - 10px);

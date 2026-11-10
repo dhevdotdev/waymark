@@ -26,16 +26,18 @@ export interface ControlsHost {
 function besideRow(row: DOMRect, x: number) {
   return (_width: number, height: number) => {
     const below = row.bottom + MENU_GAP;
-    return [x, below + height <= innerHeight - MENU_GAP ? below : Math.max(MENU_GAP, row.top - height - MENU_GAP)] as const;
+    if (below + height <= innerHeight - MENU_GAP) return [x, below, "left top"] as const;
+    return [x, Math.max(MENU_GAP, row.top - height - MENU_GAP), "left bottom"] as const;
   };
 }
 
 /** Right of the column if it fits, then left of it, then under the table. */
 function besideColumn(column: { left: number; right: number; top: number; bottom: number }) {
   return (width: number) => {
-    if (column.right + MENU_GAP + width <= innerWidth - MENU_GAP) return [column.right + MENU_GAP, column.top] as const;
-    if (column.left - MENU_GAP - width >= MENU_GAP) return [column.left - MENU_GAP - width, column.top] as const;
-    return [column.left, column.bottom + MENU_GAP] as const;
+    if (column.right + MENU_GAP + width <= innerWidth - MENU_GAP)
+      return [column.right + MENU_GAP, column.top, "left top"] as const;
+    if (column.left - MENU_GAP - width >= MENU_GAP) return [column.left - MENU_GAP - width, column.top, "right top"] as const;
+    return [column.left, column.bottom + MENU_GAP, "left top"] as const;
   };
 }
 

@@ -201,7 +201,7 @@
   height: 18px;
   border-radius: var(--r-control);
   background: var(--rule-strong);
-  transition: background-color var(--t-menu) ease;
+  transition: background-color var(--t-hover) ease;
 }
 .toggle i::after {
   content: "";
@@ -380,15 +380,12 @@
   border-radius: var(--r-float);
   box-shadow: var(--shadow-float);
   padding: 6px;
-  animation: pop-in var(--t-menu) var(--ease-out);
-}
-@keyframes pop-in {
-  from {
+  transition:
+    opacity var(--t-menu) var(--ease-out),
+    scale var(--t-menu) var(--ease-out);
+  @starting-style {
     opacity: 0;
     scale: var(--pop);
-  }
-  35% {
-    opacity: 1;
   }
 }
 .pop-section {
@@ -557,14 +554,19 @@
   max-inline-size: 360px;
   overflow-wrap: anywhere;
   box-shadow: var(--shadow-float);
-  animation: tip-in 125ms var(--ease-out);
-  transform-origin: center bottom;
+  transition:
+    opacity 125ms var(--ease-out),
+    scale 125ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    scale: var(--pop);
+  }
 }
 .tooltip kbd {
   color: var(--ink-3);
 }
 .tooltip.is-instant {
-  animation: none;
+  transition: none;
 }
 .tooltip.is-destination {
   display: block;
@@ -576,12 +578,6 @@
 .tooltip-path {
   color: var(--ink-3);
   font-weight: 400;
-}
-@keyframes tip-in {
-  from {
-    opacity: 0;
-    scale: var(--pop);
-  }
 }
 
 .toast {
@@ -602,12 +598,15 @@
   overflow-wrap: anywhere;
   text-align: center;
   transition:
-    opacity var(--t-slide) var(--ease-out),
-    translate var(--t-slide) var(--ease-out);
+    opacity var(--t-toast) var(--ease-out),
+    translate var(--t-toast) var(--ease-out);
   @starting-style {
     opacity: 0;
     translate: -50% calc(var(--rise) * 2);
   }
+}
+.toast.is-instant {
+  transition: none;
 }
 .toast-action {
   appearance: none;
@@ -640,7 +639,8 @@
 .toast.is-leaving {
   opacity: 0;
   translate: -50% var(--rise);
-  transition-duration: 200ms;
+  pointer-events: none;
+  transition-duration: var(--t-exit);
 }
 
 .sheet-overlay,
@@ -650,28 +650,40 @@
   place-items: center;
   padding: 40px;
   background: var(--scrim);
-  animation: surface-in var(--t-modal) var(--ease-out);
 }
-.sheet-overlay.is-leaving,
-.sync-overlay.is-leaving,
-.lightbox.is-leaving {
-  animation: fade-out var(--t-exit) ease forwards;
+.sheet-overlay,
+.sync-overlay,
+.lightbox,
+.prompt-overlay {
+  transition: opacity var(--t-modal) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
+}
+.sheet,
+.sync-sheet,
+.lightbox-sheet,
+.prompt {
+  transition:
+    scale var(--t-modal) var(--ease-out),
+    translate var(--t-modal) var(--ease-out);
+  @starting-style {
+    scale: var(--pop);
+    translate: 0 var(--rise);
+  }
+}
+:is(.sheet-overlay, .sync-overlay, .lightbox, .prompt-overlay).is-leaving {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--t-exit);
+}
+:is(.sheet-overlay, .sync-overlay, .lightbox, .prompt-overlay).is-leaving :is(.sheet, .sync-sheet, .lightbox-sheet, .prompt) {
+  scale: var(--pop);
+  translate: 0 var(--rise);
+  transition-duration: var(--t-exit);
 }
 @keyframes fade-in {
   from {
-    opacity: 0;
-  }
-}
-@keyframes surface-in {
-  from {
-    opacity: 0;
-  }
-  35% {
-    opacity: 1;
-  }
-}
-@keyframes fade-out {
-  to {
     opacity: 0;
   }
 }
@@ -684,13 +696,6 @@
   border-radius: var(--r-sheet);
   box-shadow: var(--shadow-float);
   overflow: hidden;
-  animation: sheet-in var(--t-modal) var(--ease-out);
-}
-@keyframes sheet-in {
-  from {
-    scale: var(--pop);
-    translate: 0 var(--rise);
-  }
 }
 .sheet-head {
   display: flex;
@@ -745,7 +750,6 @@
   border-radius: var(--r-sheet);
   padding: 32px;
   box-shadow: var(--shadow-float);
-  animation: sheet-in var(--t-modal) var(--ease-out);
 }
 .lightbox-sheet:has(> svg) {
   width: min(1400px, 100%);
@@ -773,7 +777,13 @@
   background: var(--float-bg);
   border-radius: var(--r-float);
   box-shadow: var(--shadow-float);
-  animation: pop-in var(--t-menu) var(--ease-out);
+  transition:
+    opacity var(--t-menu) var(--ease-out),
+    scale var(--t-menu) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    scale: var(--pop);
+  }
   transform-origin: top left;
   user-select: text;
   -webkit-user-select: text;
@@ -1015,7 +1025,6 @@
   border-radius: var(--r-sheet);
   box-shadow: var(--shadow-float);
   overflow: hidden;
-  animation: sheet-in var(--t-modal) var(--ease-out);
 }
 .sync-sheet.is-short {
   height: auto;
@@ -1803,8 +1812,36 @@
 
 .popover.is-leaving {
   opacity: 0;
+  scale: var(--pop);
   pointer-events: none;
-  transition: opacity 100ms ease;
+  transition-duration: var(--t-exit);
+}
+
+/* What a key press changes or opens is simply there. */
+:root[data-input="keyboard"]
+  :is(
+    .popover,
+    .sheet-overlay,
+    .sync-overlay,
+    .lightbox,
+    .prompt-overlay,
+    .sheet,
+    .sync-sheet,
+    .lightbox-sheet,
+    .prompt,
+    .icon-btn,
+    .seg-btn,
+    .tab,
+    .toggle i,
+    .task-box,
+    .doc li.task
+  ),
+:root[data-input="keyboard"] :is(.toggle i, .task-box)::after,
+:root[data-input="keyboard"] .tab + .tab::before {
+  transition: none;
+}
+:root[data-input="keyboard"] .edit-bubble {
+  animation: none;
 }
 
 .btn-danger {
@@ -1823,7 +1860,7 @@
 }
 .sync-overlay ~ .sheet-overlay,
 .sync-overlay ~ .sheet-overlay .sheet {
-  animation: none;
+  transition: none;
 }
 .sync-overlay ~ .sheet-overlay.is-leaving {
   display: none;

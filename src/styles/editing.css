@@ -969,11 +969,6 @@ button.task-box:focus-visible {
   padding-top: 18vh;
   background: var(--scrim);
 }
-.prompt-overlay.is-leaving {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 100ms ease;
-}
 .prompt:focus {
   outline: 2px solid transparent;
 }

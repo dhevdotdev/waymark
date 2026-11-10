@@ -67,6 +67,8 @@ export function placeUnderLink(tip: HTMLElement, link: HTMLElement, pointerY: nu
   if (!line) return;
   const { offsetWidth: width, offsetHeight: height } = tip;
   const room = line.bottom + GAP + height + MARGIN <= window.innerHeight;
-  tip.style.left = `${Math.max(MARGIN, Math.min(window.innerWidth - width - MARGIN, line.left))}px`;
+  const left = Math.max(MARGIN, Math.min(window.innerWidth - width - MARGIN, line.left));
+  tip.style.left = `${left}px`;
   tip.style.top = `${Math.max(MARGIN, room ? line.bottom + GAP : line.top - GAP - height)}px`;
+  tip.style.transformOrigin = `${line.left - left}px ${room ? "top" : "bottom"}`;
 }

@@ -1,21 +1,32 @@
+import { isPointerAction } from "./input-origin";
+
 /** While one of these is open it answers Escape itself, so the window must not act on the key too. */
 export const ESCAPE_IS_TAKEN = ".lightbox, .sheet-overlay, .popover, .prompt-overlay, .prop-new, [data-editing-property]";
 
 const TOAST_MS = 2600;
 const TOAST_WITH_ACTION_MS = 6000;
-const TOAST_EXIT_MS = 220;
-const LIGHTBOX_EXIT_MS = 150;
+/** The same length as `--t-exit`. */
+const EXIT_MS = 140;
+
+function exit(element: HTMLElement): void {
+  element.classList.add("is-leaving");
+  setTimeout(() => element.remove(), EXIT_MS);
+}
+
+/** Takes a floating surface away, quicker than it arrived. After a key press it is gone at once. */
+export function fadeOut(element: HTMLElement): void {
+  if (isPointerAction()) exit(element);
+  else element.remove();
+}
 
 export function toast(message: string, action?: { label: string; run: () => void }): void {
-  document.querySelector(".toast:not(.is-leaving)")?.remove();
+  const previous = document.querySelector<HTMLElement>(".toast:not(.is-leaving)");
+  if (previous) fadeOut(previous);
+  const instant = !isPointerAction();
   const el = document.createElement("div");
-  el.className = "toast";
+  el.className = instant ? "toast is-instant" : "toast";
   el.setAttribute("role", "status");
   el.textContent = message;
-  const leave = () => {
-    el.classList.add("is-leaving");
-    setTimeout(() => el.remove(), TOAST_EXIT_MS);
-  };
   if (action) {
     const button = document.createElement("button");
     button.type = "button";
@@ -23,12 +34,12 @@ export function toast(message: string, action?: { label: string; run: () => void
     button.textContent = action.label;
     button.addEventListener("click", () => {
       action.run();
-      leave();
+      fadeOut(el);
     });
     el.append(button);
   }
   document.body.append(el);
-  setTimeout(leave, action ? TOAST_WITH_ACTION_MS : TOAST_MS);
+  setTimeout(() => (instant ? el.remove() : exit(el)), action ? TOAST_WITH_ACTION_MS : TOAST_MS);
 }
 
 export function lightbox(content: Element): void {
@@ -44,8 +55,7 @@ export function lightbox(content: Element): void {
   sheet.append(content);
   box.append(sheet);
   const close = () => {
-    box.classList.add("is-leaving");
-    setTimeout(() => box.remove(), LIGHTBOX_EXIT_MS);
+    fadeOut(box);
     window.removeEventListener("keydown", onKey, true);
   };
   const onKey = (e: KeyboardEvent) => {
@@ -74,12 +84,4 @@ export function dismissOnOutside(inside: Node[], close: (e: Event) => void): () 
   window.addEventListener("pointerdown", onEvent, true);
   window.addEventListener("keydown", onEvent, true);
   return stop;
-}
-
-const FADE_OUT_MS = 100;
-
-/** Removes a floating surface after a short fade. Leaving is quicker than arriving. */
-export function fadeOut(element: HTMLElement): void {
-  element.classList.add("is-leaving");
-  setTimeout(() => element.remove(), FADE_OUT_MS);
 }

@@ -85,13 +85,14 @@ let stopDismissing: (() => void) | null = null;
 
 /** Opens the appearance popover above `anchor`, or closes it if it is already open. */
 export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
-  const existing = document.querySelector(".popover.settings");
+  const existing = document.querySelector<HTMLElement>(".popover.settings:not(.is-leaving)");
   if (existing) {
     stopDismissing?.();
-    existing.remove();
+    fadeOut(existing);
     anchor.classList.remove("is-on");
     return;
   }
+  document.querySelector(".popover.settings")?.remove();
   anchor.classList.add("is-on");
   const pop = document.createElement("div");
   pop.className = "popover settings";

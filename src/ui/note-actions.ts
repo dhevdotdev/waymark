@@ -1,5 +1,5 @@
 import type { VaultIndex } from "../vault/index";
-import { dismissOnOutside } from "./overlays";
+import { dismissOnOutside, fadeOut } from "./overlays";
 
 const COPIED_MS = 1400;
 
@@ -41,7 +41,7 @@ export function chooseAmbiguous(
   label.className = "pop-label";
   label.textContent = `${candidates.length} notes share this name. Open which?`;
   pop.append(label);
-  const stopListening = dismissOnOutside([pop], () => pop.remove());
+  const stopListening = dismissOnOutside([pop], () => fadeOut(pop));
   for (const candidate of candidates) {
     const row = document.createElement("button");
     row.className = "choose-row";
@@ -53,7 +53,7 @@ export function chooseAmbiguous(
     row.append(name, dir);
     row.onclick = () => {
       stopListening();
-      pop.remove();
+      fadeOut(pop);
       choose(candidate);
     };
     pop.append(row);

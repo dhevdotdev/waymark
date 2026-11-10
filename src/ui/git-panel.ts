@@ -3,6 +3,7 @@ import type { PrefStore } from "../prefs";
 import { GitDetail } from "./git-detail";
 import { gitNotice } from "./git-notices";
 import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
+import { fadeOut } from "./overlays";
 import { plural } from "./plural";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
@@ -29,8 +30,6 @@ export interface GitHost {
 }
 
 export type SyncState = { kind: "idle" } | { kind: "busy"; label: string } | { kind: "error"; error: GitError };
-
-const SHEET_EXIT_MS = 180;
 
 /**
  * The sync panel: remote, branch, pending changes and history. Every write
@@ -277,8 +276,7 @@ export class GitPanel {
     this.overlay = null;
     this.root = null;
     this.host.onVisible?.(false);
-    overlay.classList.add("is-leaving");
-    setTimeout(() => overlay.remove(), SHEET_EXIT_MS);
+    fadeOut(overlay);
     if (this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
   }
 

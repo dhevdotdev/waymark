@@ -23,7 +23,7 @@ export function bindTooltips(root: HTMLElement): void {
   const show = (target: HTMLElement, pointerY: number | null) => {
     if (document.querySelector(".context-menu:not(.is-leaving)") || !target.isConnected) return;
     tip = document.createElement("div");
-    tip.className = `tooltip${performance.now() < warmUntil ? " is-instant" : ""}`;
+    tip.className = `tooltip${pointerY === null || performance.now() < warmUntil ? " is-instant" : ""}`;
     const destination = target.dataset.tip === undefined ? linkDestination(target) : null;
     if (destination) {
       document.body.append(tip);
@@ -40,9 +40,11 @@ export function bindTooltips(root: HTMLElement): void {
     document.body.append(tip);
     const r = target.getBoundingClientRect();
     const width = tip.offsetWidth;
-    tip.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, r.left + r.width / 2 - width / 2))}px`;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, r.left + r.width / 2 - width / 2));
+    tip.style.left = `${left}px`;
     const above = target.dataset.tipSide === "above" || r.bottom + 40 > window.innerHeight;
     tip.style.top = `${above ? r.top - tip.offsetHeight - 6 : r.bottom + 6}px`;
+    tip.style.transformOrigin = `${r.left + r.width / 2 - left}px ${above ? "bottom" : "top"}`;
   };
 
   const arrive = (target: HTMLElement, pointerY: number | null) => {

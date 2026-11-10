@@ -25,4 +25,12 @@ export function trackInputOrigin(): void {
     },
     { capture: true, passive: true },
   );
+  /* A hand back on the mouse restores hover fades. Layout changes under a still pointer report no movement. */
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      if (origin !== "pointer" && (e.movementX !== 0 || e.movementY !== 0)) setOrigin("pointer");
+    },
+    { capture: true, passive: true },
+  );
 }

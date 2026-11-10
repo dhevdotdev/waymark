@@ -1,5 +1,7 @@
 /** The sync panel's fixed text and small building blocks. */
 
+import { fadeOut } from "./overlays";
+
 export const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean; retry?: string }> = {
   offline: {
     title: "Offline",
@@ -95,36 +97,47 @@ export function remoteName(url: string | null): string {
 }
 
 /** A large read-only sheet for diffs and past revisions. Escape or a click outside closes it. */
-let closeActiveSheet: (() => void) | null = null;
+let activeSheet: { fill: (title: string, subtitle: string, content: HTMLElement) => void; dismiss: () => void } | null = null;
 
 export function closeSheet(): void {
-  closeActiveSheet?.();
+  activeSheet?.dismiss();
 }
 
+/** A sheet opened from another sheet changes what the open one shows, so two never overlap. */
 export function openSheet(title: string, subtitle: string, content: HTMLElement): void {
-  closeActiveSheet?.();
+  if (activeSheet) {
+    activeSheet.fill(title, subtitle, content);
+    return;
+  }
   const overlay = el("div", "overlay sheet-overlay");
   const sheet = el("div", "sheet");
   sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-label", title);
   const head = el("header", "sheet-head");
   const titles = el("div", "sheet-titles");
-  titles.append(el("h2", "sheet-title", title), el("div", "sheet-sub", subtitle));
+  const heading = el("h2", "sheet-title");
+  const sub = el("div", "sheet-sub");
+  titles.append(heading, sub);
   const close = el("button", "icon-btn");
   close.setAttribute("aria-label", "Close");
   close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
   head.append(titles, close);
   const body = el("div", "sheet-body");
-  body.append(content);
   sheet.append(head, body);
   overlay.append(sheet);
+  const fill = (nextTitle: string, nextSubtitle: string, nextContent: HTMLElement) => {
+    sheet.setAttribute("aria-label", nextTitle);
+    heading.textContent = nextTitle;
+    sub.textContent = nextSubtitle;
+    body.replaceChildren(nextContent);
+    body.scrollTop = 0;
+    close.focus({ preventScroll: true });
+  };
   const dismiss = () => {
-    closeActiveSheet = null;
-    overlay.classList.add("is-leaving");
-    setTimeout(() => overlay.remove(), 180);
+    activeSheet = null;
+    fadeOut(overlay);
     window.removeEventListener("keydown", onKey, true);
   };
-  closeActiveSheet = dismiss;
+  activeSheet = { fill, dismiss };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       e.stopPropagation();
@@ -137,7 +150,7 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   });
   window.addEventListener("keydown", onKey, true);
   document.body.append(overlay);
-  close.focus({ preventScroll: true });
+  fill(title, subtitle, content);
 }
 
 const SLOW_WORK_MS = 350;
