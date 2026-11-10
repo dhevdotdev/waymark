@@ -469,6 +469,27 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
  * WAYMARK_SELFTEST_OUT. "read" exercises a real vault without writing to it;
  * "git" drives sync against a disposable fixture repository.
  */
+/** Runs the checks for one mode. */
+async function runMode(ctx: SelfTestContext, mode: string): Promise<void> {
+  const { app } = ctx;
+  if (mode.startsWith("show:")) await runShow(ctx, mode);
+  if (mode === "read") await runRead(ctx);
+  if (mode === "navigate") await runNavigate(ctx);
+
+  const played: string[] = [];
+  app.sound.onPlay = (cue: string) => played.push(cue);
+
+  if (mode === "git") await runGit(ctx, played);
+  if (mode === "commit") await runCommit(ctx);
+  if (mode === "diverged" || mode === "blocked") await runRefusal(ctx, mode, played);
+  if (mode === "restore") await runRestore(ctx);
+  if (mode === "conflict") await runConflict(ctx);
+  if (mode === "backup") await runBackup(ctx);
+  if (mode === "library") await runLibrary(ctx);
+  if (mode === "organize") await runOrganize(ctx);
+  if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
+}
+
 export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {
   const reader = app.reader;
   if (!reader) throw new Error("The self-test needs an open vault");
@@ -502,22 +523,11 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   report.startup = { ...app.metrics };
   check("vault indexed", vault.index.notes.length > 0, vault.index.notes.length);
 
-  if (mode.startsWith("show:")) await runShow(ctx, mode);
-  if (mode === "read") await runRead(ctx);
-  if (mode === "navigate") await runNavigate(ctx);
-
-  const played: string[] = [];
-  app.sound.onPlay = (cue: string) => played.push(cue);
-
-  if (mode === "git") await runGit(ctx, played);
-  if (mode === "commit") await runCommit(ctx);
-  if (mode === "diverged" || mode === "blocked") await runRefusal(ctx, mode, played);
-  if (mode === "restore") await runRestore(ctx);
-  if (mode === "conflict") await runConflict(ctx);
-  if (mode === "backup") await runBackup(ctx);
-  if (mode === "library") await runLibrary(ctx);
-  if (mode === "organize") await runOrganize(ctx);
-  if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
+  try {
+    await runMode(ctx, mode);
+  } catch (err) {
+    check("the run finished without an error", false, String(err));
+  }
 
   report.results = results;
   report.passed = results.every((r) => r.ok);
