@@ -83,6 +83,7 @@ export class NoteFiles {
       const outcome = await vault.save(path, "", null);
       if (outcome.kind !== "saved") throw new Error("A note with that name appeared just now.");
       await vault.applyChanges([path]);
+      this.host.tree.expectEdit();
       await open(path);
       await editing.open({ focusTitle: true });
     } catch (error) {
@@ -153,6 +154,7 @@ export class NoteFiles {
     if (beingEdited) editing.discard();
     await vault.applyChanges([]);
     const forgotten = workspace.forgetNote(path);
+    this.host.tree.expectEdit();
     await redraw();
     this.offerUndo(token, [path], forgotten);
   }
@@ -171,6 +173,7 @@ export class NoteFiles {
     }
     await vault.applyChanges(notes);
     workspace.bringBack(forgotten);
+    this.host.tree.expectEdit();
     await redraw();
     toast("Put back");
   }
@@ -217,6 +220,7 @@ export class NoteFiles {
     if (beingEdited) editing.discard();
     await vault.applyChanges([]);
     const forgotten = notes.flatMap((note) => workspace.forgetNote(note));
+    this.host.tree.expectEdit();
     await redraw();
     this.offerUndo(token, notes, forgotten);
   }
@@ -312,11 +316,9 @@ export class NoteFiles {
       this.host.toast(`“${nameOf(path)}” is already in ${folder ? folderName(folder) : "the vault root"}. Nothing was moved.`);
       return false;
     }
+    if (folder) this.host.tree.openFolder(folder);
     const moved = await this.move(path, to);
-    if (moved) {
-      if (folder) this.host.tree.openFolder(folder);
-      this.host.tree.markLanded(to);
-    }
+    if (moved) this.host.tree.markLanded(to);
     return moved;
   }
 
@@ -368,6 +370,7 @@ export class NoteFiles {
     }
     const { count, failed } = await this.applyLinkUpdates(planned, moved);
     await editing.vaultChanged();
+    if (notes.some(([from, to]) => folderOf(from) !== folderOf(to))) this.host.tree.expectEdit();
     await redraw();
     if (failed) toast(`Moved, but ${plural(failed, "note")} could not be updated.`);
     else toast(count ? `Updated links in ${plural(count, "note")}` : "Moved");

@@ -1,6 +1,8 @@
 import { type PropertyValue, parseFrontmatter } from "../vault/frontmatter";
 import { addProperty, type Property, type PropertySheet, readSheet, removeProperty, setList, setText } from "../vault/properties";
 import { icons } from "./icons";
+import { isPointerAction } from "./input-origin";
+import { arrive, flashLanded, glide, holdClassWhile, type Place, placesOf, timing } from "./list-motion";
 import { reducedMotion } from "./media";
 import type { WriteResult } from "./note-writer";
 
@@ -12,9 +14,6 @@ export interface PropertyHost {
   openRaw: (path: string, line: number) => void;
   toast: (message: string, action?: { label: string; run: () => void }) => void;
 }
-
-const MOVE_MS = 160;
-const SAVED_MS = 520;
 
 const MESSAGES: Record<Exclude<WriteResult["kind"], "done" | "failed">, string> = {
   refused: "That property can't be changed here. Open the note as text to change it.",
@@ -250,21 +249,17 @@ export class PropertyEditor {
     if (text === null) return false;
     this.took(text);
     if (redraw) this.drawKeepingFocus(text, changed);
-    else this.flash(changed);
+    else flashLanded(changed);
     return true;
-  }
-
-  private flash(el: HTMLElement): void {
-    el.animate({ backgroundColor: ["color-mix(in oklab, var(--accent) 22%, transparent)", "transparent"] }, SAVED_MS);
   }
 
   private drawKeepingFocus(text: string, near: HTMLElement): void {
     const key = near.closest<HTMLElement>("[data-key]")?.dataset.key;
-    const tops = this.tops();
+    const was = placesOf(this.rows(), this.list);
     this.draw(text);
-    this.settle(tops);
+    this.settle(was);
     const cell = key ? this.cellOf(key) : null;
-    if (cell) this.flash(cell);
+    if (cell) flashLanded(cell);
     cell?.querySelector<HTMLElement>(".prop-chip-add, .prop-value")?.focus({ preventScroll: true });
   }
 
@@ -272,30 +267,23 @@ export class PropertyEditor {
     return [...this.list.querySelectorAll<HTMLElement>("[data-key]")].find((c) => c.dataset.key === key) ?? null;
   }
 
-  private moving(): HTMLElement[] {
-    const after = this.root.parentElement?.querySelector<HTMLElement>(".rail-history");
-    return [...this.list.querySelectorAll<HTMLElement>("dt, dd"), this.adder, ...(after ? [after] : [])];
+  private rows(): Map<string, HTMLElement> {
+    return new Map(
+      [...this.list.querySelectorAll<HTMLElement>("dt, dd")].map((el) => [
+        el.tagName === "DT" ? `dt:${el.textContent}` : `dd:${el.dataset.key}`,
+        el,
+      ]),
+    );
   }
 
-  private tops(): Map<HTMLElement | string, number> {
-    const tops = new Map<HTMLElement | string, number>();
-    for (const el of this.moving())
-      tops.set(el.tagName === "DT" ? `dt:${el.textContent}` : (el.dataset.key ?? el), el.getBoundingClientRect().top);
-    return tops;
-  }
-
-  /** Rows slide to their new places when one is added or removed. */
-  private settle(tops: Map<HTMLElement | string, number>): void {
+  /** After a pointer change the rows slide to their new places. The list clips them, so nothing below it has to move out of their way. */
+  private settle(was: Map<string, Place>): void {
+    if (!isPointerAction()) return;
+    const rows = this.rows();
+    const fade = timing("--t-menu", "--ease-out");
+    for (const [key, el] of rows) if (!was.has(key)) arrive(el, fade);
     if (reducedMotion()) return;
-    for (const el of this.moving()) {
-      const was = tops.get(el.tagName === "DT" ? `dt:${el.textContent}` : (el.dataset.key ?? el));
-      if (was === undefined) {
-        el.animate({ opacity: [0, 1] }, MOVE_MS);
-        continue;
-      }
-      const by = was - el.getBoundingClientRect().top;
-      if (by) el.animate({ translate: [`0 ${by}px`, "0 0"] }, { duration: MOVE_MS, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
-    }
+    holdClassWhile(this.list, "is-settling", glide(rows, was, this.list, timing("--t-menu", "--ease-in-out")));
   }
 
   private async remove(key: string): Promise<void> {
@@ -316,10 +304,10 @@ export class PropertyEditor {
   }
 
   private redraw(text: string): void {
-    const tops = this.tops();
+    const was = placesOf(this.rows(), this.list);
     this.took(text);
     this.draw(text);
-    this.settle(tops);
+    this.settle(was);
   }
 
   private beginAdd(): void {
@@ -373,7 +361,7 @@ export class PropertyEditor {
       this.editing = false;
       this.redraw(text);
       const cell = this.cellOf(key);
-      if (cell) this.flash(cell);
+      if (cell) flashLanded(cell);
       this.adder.focus({ preventScroll: true });
       this.afterEdit();
     };

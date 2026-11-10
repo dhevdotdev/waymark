@@ -2,6 +2,8 @@ import type { PrefStore } from "../prefs";
 import type { VaultIndex } from "../vault/index";
 import { showContextMenu } from "./context-menu";
 import { icons } from "./icons";
+import { isPointerAction } from "./input-origin";
+import { captureTree, settleTree } from "./tree-motion";
 
 export interface Bookmark {
   path: string;
@@ -166,11 +168,14 @@ export class Bookmarks {
 
   private write(list: Bookmark[]): void {
     const { prefs, root } = this.host;
+    const box = this.element.closest(".tree")?.parentElement;
+    const before = box && isPointerAction() ? captureTree(box) : null;
     prefs.update((p) => {
       p.vaults[root] ??= { tabs: [], active: 0, lastSync: null };
       p.vaults[root].bookmarks = list;
     });
     this.render();
+    if (box && before) settleTree(box, before);
   }
 }
 

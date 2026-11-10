@@ -273,10 +273,10 @@ export class Reader {
   async open(path: string, opts: OpenOptions = {}): Promise<void> {
     const view: View = isBaseFile(path) ? { kind: "base", path } : { kind: "note", path };
     if (opts.newTab && (opts.focus === false || !this.onBlank)) {
-      const tab = this.workspace.addBeside(view);
+      this.workspace.addBeside(view);
       this.deps.sound.play("open");
       if (opts.focus === false) {
-        this.renderTabs(opts.keyboard ? undefined : tab.id);
+        this.renderTabs();
         this.persist();
         return;
       }
@@ -284,7 +284,6 @@ export class Reader {
       this.workspace.activeIndex += 1;
       await this.show({
         anchor: opts.anchor,
-        entering: opts.keyboard ? undefined : tab.id,
         find: opts.find,
         followed: opts.via === "link",
       });
@@ -355,9 +354,9 @@ export class Reader {
       void this.show();
       return;
     }
-    const tab = this.workspace.addBeside(view);
+    this.workspace.addBeside(view);
     this.workspace.activeIndex += 1;
-    void this.show({ entering: tab.id });
+    void this.show();
   }
 
   toggleGraph(): void {
@@ -488,7 +487,7 @@ export class Reader {
     metrics.navStart = performance.now();
     const entry = this.tab.trail.current;
     if (entry.view.kind === "graph") {
-      this.showGraph(entry.view, opts.entering);
+      this.showGraph(entry.view);
       return;
     }
     this.closeGraphView();
@@ -527,7 +526,7 @@ export class Reader {
     metrics.paintMs = performance.now() - metrics.navStart;
     opts.onPainted?.();
 
-    this.renderTabChrome(opts.entering);
+    this.renderTabChrome();
     if (changedNote || !opts.quiet) this.renderTree();
     this.inspector.render(path, rendered);
     this.editing.stats.read(path);
@@ -554,7 +553,7 @@ export class Reader {
     });
     await this.baseView.show(path, scroll, () => seq !== this.renderSeq);
     if (seq !== this.renderSeq) return;
-    this.renderTabChrome(opts.entering);
+    this.renderTabChrome();
     this.renderTree();
     this.persist();
   }
@@ -576,7 +575,7 @@ export class Reader {
     this.persist();
   }
 
-  private showGraph(view: GraphTabView, entering?: number): void {
+  private showGraph(view: GraphTabView): void {
     if (this.find.isOpen) this.find.close();
     this.current = view.note;
     if (!this.graph) {
@@ -596,7 +595,7 @@ export class Reader {
       });
       this.sync.panel.close();
     }
-    this.renderTabChrome(entering);
+    this.renderTabChrome();
     this.renderTree();
     requestAnimationFrame(() => this.graph?.show(view.note, view.scope));
     this.graph.focus();
@@ -618,16 +617,16 @@ export class Reader {
     return view.kind === "graph" ? "Graph" : "New tab";
   };
 
-  renderTabs(entering?: number): void {
-    renderTabStrip(this.els.tabs, this.workspace, this.viewLabel, entering);
+  renderTabs(): void {
     this.els.shell.classList.toggle("single-tab", this.workspace.tabs.length === 1);
+    renderTabStrip(this.els.tabs, this.workspace, this.viewLabel);
   }
 
   /** The parts of the window that follow the active tab, whichever view it shows. */
-  private renderTabChrome(entering?: number): void {
+  private renderTabChrome(): void {
     const { shell, graphButton, back, forward } = this.els;
     const { trail } = this.tab;
-    this.renderTabs(entering);
+    this.renderTabs();
     this.trail.render();
     shell.classList.toggle("is-graph", this.onGraph);
     shell.classList.toggle("is-blank", this.onBlank);

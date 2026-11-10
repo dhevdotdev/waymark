@@ -183,8 +183,10 @@ kbd {
   padding: 0 8px;
   height: 100%;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
 }
-.tab {
+:is(.tab, .tab-ghost) {
   position: relative;
   display: flex;
   align-items: center;
@@ -225,7 +227,7 @@ kbd {
 .tab.is-active + .tab::before {
   opacity: 0;
 }
-.tab.is-active {
+:is(.tab, .tab-ghost).is-active {
   background: var(--selected);
   color: var(--ink);
 }
@@ -250,7 +252,7 @@ kbd {
   font-weight: 500;
   letter-spacing: -0.003em;
 }
-.tab.is-clipped .tab-title {
+:is(.tab, .tab-ghost).is-clipped .tab-title {
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
 }
 .tab-close {
@@ -283,8 +285,13 @@ kbd {
   mask-image: none;
   text-overflow: ellipsis;
 }
-.tab.is-entering {
-  opacity: 0;
+.tab-ghost {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  margin-block: auto;
+  max-width: none;
+  pointer-events: none;
 }
 @media (hover: hover) and (pointer: fine) {
   .tab:not(.is-active):hover {
@@ -1029,8 +1036,8 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .trail-here:not(.is-instant) {
-    transition: transform var(--t-menu) var(--ease-out);
+  :root:not([data-input="keyboard"]) .trail-here:not(.is-instant) {
+    transition: transform var(--t-menu) var(--ease-in-out);
   }
   .trail-fold svg {
     transition: rotate var(--t-menu) var(--ease-out);
@@ -1904,13 +1911,33 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:is(.nav-item, .tab).is-landed {
-  animation: landed 620ms var(--ease-out);
+:is(.nav-item, .tab, .prop-cell, .prop-value, .prop-chip).is-landed {
+  animation: landed var(--t-toast) var(--ease-out);
+}
+:root[data-input="keyboard"] .is-landed {
+  animation-timing-function: step-end;
+}
+.tree-ghost {
+  position: absolute;
+  margin: 0;
+  pointer-events: none;
+}
+.tree {
+  position: relative;
+}
+.tree.is-settling .tree-folder.is-open > .tree-body > .tree-inner {
+  overflow: visible;
+}
+.props.is-settling {
+  overflow: clip;
 }
 @keyframes landed {
   from {
     background-color: color-mix(in oklab, var(--accent) 26%, transparent);
   }
+}
+.tab.is-landed {
+  z-index: 1;
 }
 .tab.is-dragging {
   opacity: 0.5;

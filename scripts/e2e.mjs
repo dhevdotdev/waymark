@@ -15,7 +15,7 @@ const SHARDS = [
     ["surfaces"],
     ["surfaces", "reduced"],
   ],
-  [["editing"], ["organize"], ["properties"]],
+  [["editing"], ["organize"], ["properties"], ["list-motion"]],
   [["note-files"], ["recovery"], ["backup"], ["library"], ["sync"], ["mac-behaviours"]],
 ];
 

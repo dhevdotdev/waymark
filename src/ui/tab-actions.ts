@@ -1,6 +1,7 @@
 import type { View } from "../vault/trail";
 import type { Workspace } from "../vault/workspace";
 import { type MenuItem, showContextMenu } from "./context-menu";
+import { flashLanded } from "./list-motion";
 import { trackPointerDrag } from "./pointer-drag";
 
 interface TabActionsHost {
@@ -30,23 +31,23 @@ export class TabActions {
     host.strip.addEventListener("pointerdown", (e) => this.onDown(e));
   }
 
-  private landed(index: number): void {
+  private settled(): void {
     this.host.render();
     this.host.persist();
-    const tab = this.host.strip.querySelector<HTMLElement>(`.tab[data-tab="${index}"]`);
-    tab?.classList.add("is-landed");
-    tab?.addEventListener("animationend", () => tab.classList.remove("is-landed"), { once: true });
   }
 
   togglePin(index = this.host.workspace.activeIndex): void {
-    this.landed(this.host.workspace.togglePin(index));
+    this.host.workspace.togglePin(index);
+    this.settled();
   }
 
   /** Moves a tab one place, or says why it cannot go further. */
   step(delta: number, index = this.host.workspace.activeIndex): void {
-    const landed = this.host.workspace.move(index, index + delta);
-    if (landed === null) this.host.toast(delta < 0 ? "This tab is already first." : "This tab is already last.");
-    else this.landed(landed);
+    if (this.host.workspace.move(index, index + delta) === null) {
+      this.host.toast(delta < 0 ? "This tab is already first." : "This tab is already last.");
+    } else {
+      this.settled();
+    }
   }
 
   /** Brings the last closed tab back, or says why it cannot. */
@@ -125,7 +126,10 @@ export class TabActions {
       },
       drop: () => {
         const moved = to === from ? null : workspace.move(from, to);
-        if (moved !== null) this.landed(moved);
+        if (moved === null) return;
+        this.settled();
+        const tab = strip.querySelector<HTMLElement>(`.tab[data-tab="${moved}"]`);
+        if (tab) flashLanded(tab);
       },
     });
   }

@@ -35,7 +35,6 @@ export interface OpenOptions {
 
 export interface ShowOptions {
   anchor?: string;
-  entering?: number;
   find?: string;
   followed?: boolean;
   keepScroll?: boolean;

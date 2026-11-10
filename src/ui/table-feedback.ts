@@ -1,13 +1,11 @@
 import { parseTable } from "../vault/markdown-table";
 import { describeTableChange, type TableChange } from "../vault/table-change";
+import { fadeAway, timing, tokenPx } from "./list-motion";
+import { reducedMotion } from "./media";
 import type { TableAt } from "./table-actions";
 
-const ENTER_MS = 180;
-const MOVE_MS = 200;
-const LEAVE_MS = 160;
-const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
-const EASE_IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
-const NUDGE_PX = 6;
+const entering = () => timing("--t-menu", "--ease-out");
+const travelling = () => timing("--t-menu", "--ease-in-out");
 
 export interface Snapshot {
   lines: string[];
@@ -40,7 +38,7 @@ export function snapshot(root: HTMLElement, lines: string[]): Snapshot {
   return { lines, cells, texts, labels };
 }
 
-/** Marks cells with a tint that fades on its own. It is a colour change, so it stays under Reduce Motion. */
+/** Marks cells with a tint that goes on its own: a fade after the pointer, a plain hold after the keyboard. */
 function mark(cells: (HTMLElement | null)[]): void {
   const present = cells.filter((cell): cell is HTMLElement => cell !== null);
   for (const cell of present) cell.classList.remove("is-marked");
@@ -70,21 +68,13 @@ function ghost(root: HTMLElement, before: Snapshot, keys: string[]): void {
     layer.append(cell);
   }
   root.append(layer);
-  layer.animate({ opacity: [1, 0] }, { duration: LEAVE_MS, easing: EASE_OUT }).finished.finally(() => layer.remove());
-}
-
-function slideFrom(cell: HTMLElement | null, x: number, y: number): void {
-  if (!cell || (x === 0 && y === 0)) return;
-  cell.animate({ transform: [`translate(${x}px, ${y}px)`, "translate(0, 0)"] }, { duration: MOVE_MS, easing: EASE_IN_OUT });
+  fadeAway(layer, timing("--t-press", "--ease-out"));
 }
 
 function arrive(cells: (HTMLElement | null)[], x: number, y: number): void {
-  for (const cell of cells) {
-    cell?.animate(
-      { opacity: [0, 1], transform: [`translate(${x}px, ${y}px)`, "translate(0, 0)"] },
-      { duration: ENTER_MS, easing: EASE_OUT },
-    );
-  }
+  const options = entering();
+  for (const cell of cells)
+    cell?.animate({ opacity: [0, 1], transform: [`translate(${x}px, ${y}px)`, "translate(0, 0)"] }, options);
 }
 
 /** Where each moved index ended up: the mover goes straight there, the ones it passed shift one place. */
@@ -96,6 +86,7 @@ function shiftedIndex(index: number, from: number, to: number): number {
 }
 
 function slideMoved(root: HTMLElement, before: Snapshot, axis: "row" | "column", from: number, to: number): void {
+  const options = travelling();
   for (const cell of allCells(root)) {
     const row = Number(cell.dataset.row);
     const column = Number(cell.dataset.column);
@@ -103,7 +94,9 @@ function slideMoved(root: HTMLElement, before: Snapshot, axis: "row" | "column",
     const old = before.cells.get(key);
     if (!old) continue;
     const now = cell.getBoundingClientRect();
-    slideFrom(cell, old.left - now.left, old.top - now.top);
+    const x = old.left - now.left;
+    const y = old.top - now.top;
+    if (x !== 0 || y !== 0) cell.animate({ transform: [`translate(${x}px, ${y}px)`, "translate(0, 0)"] }, options);
   }
 }
 
@@ -134,13 +127,11 @@ function removedKeys(before: Snapshot, change: Extract<TableChange, { kind: "row
 }
 
 function slideAligned(root: HTMLElement, before: Snapshot, column: number): void {
+  const options = travelling();
   for (const cell of columnCells(root, column)) {
     const old = before.texts.get(keyOf(Number(cell.dataset.row), column));
     if (old === undefined) continue;
-    cell.animate(
-      { transform: [`translateX(${old - textLeft(cell)}px)`, "translateX(0)"] },
-      { duration: MOVE_MS, easing: EASE_IN_OUT },
-    );
+    cell.animate({ transform: [`translateX(${old - textLeft(cell)}px)`, "translateX(0)"] }, options);
   }
 }
 
@@ -165,24 +156,26 @@ function moved(
 /** Shows what a change did, using only the two versions of the table, so undo and redo confirm themselves too. */
 export function reveal(root: HTMLElement, before: Snapshot, after: string[], focus: TableAt | null, pointer: boolean): void {
   for (const animation of root.getAnimations({ subtree: true })) animation.cancel();
-  const motion = pointer && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const cell of root.querySelectorAll(".is-marked")) cell.classList.remove("is-marked");
+  const motion = pointer && !reducedMotion();
+  const rise = tokenPx("--rise");
   const change = describeTableChange(parseTable(before.lines), parseTable(after));
   switch (change.kind) {
     case "rowsAdded": {
       const cells = range(change.from, change.count).flatMap((row) => rowCells(root, row));
       mark(cells);
-      if (motion) arrive(cells, 0, -NUDGE_PX);
+      if (motion) arrive(cells, 0, -rise);
       break;
     }
     case "columnsAdded": {
       const cells = range(change.from, change.count).flatMap((column) => columnCells(root, column));
       mark(cells);
-      if (motion) arrive(cells, -NUDGE_PX, 0);
+      if (motion) arrive(cells, -rise, 0);
       break;
     }
     case "rowsRemoved":
     case "columnsRemoved":
-      ghost(root, before, removedKeys(before, change));
+      if (motion) ghost(root, before, removedKeys(before, change));
       break;
     case "rowMoved":
       moved(root, before, "row", change, focus?.row ?? -1, motion);
