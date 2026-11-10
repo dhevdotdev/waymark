@@ -1,4 +1,5 @@
 import type { Hit } from "../vault/search";
+import { parseSearchQuery, usesFilters } from "../vault/search-query";
 
 const MAX_HITS = 60;
 
@@ -104,7 +105,7 @@ export class SearchPane {
   private hint(): HTMLElement {
     const hint = document.createElement("div");
     hint.className = "empty-state is-compact";
-    hint.innerHTML = `<p>Searches the titles, headings and text of every note. Words can match anywhere; put a phrase in "quotes" to match it exactly.</p><p><kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>↵</kbd> open at the match · <kbd>⌘↵</kbd> new tab</p>`;
+    hint.innerHTML = `<p>Searches the titles, headings and text of every note. Words can match anywhere; put a phrase in "quotes" to match it exactly. <code>path:Folder</code> keeps to one place and <code>-word</code> leaves a word out.</p><p><kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>↵</kbd> open at the match · <kbd>⌘↵</kbd> new tab</p>`;
     return hint;
   }
 
@@ -112,9 +113,12 @@ export class SearchPane {
     const empty = document.createElement("div");
     empty.className = "empty-state is-compact";
     const strong = document.createElement("strong");
-    strong.textContent = `No note contains “${this.query.trim()}”`;
+    const narrowed = usesFilters(parseSearchQuery(this.query));
+    strong.textContent = narrowed ? `No note matches “${this.query.trim()}”` : `No note contains “${this.query.trim()}”`;
     const p = document.createElement("p");
-    p.textContent = "Try fewer words or the start of a word. Note titles are also in the palette (⌘K).";
+    p.textContent = narrowed
+      ? "Try removing a filter. path: matches part of a note's folder or name."
+      : "Try fewer words or the start of a word. Note titles are also in the palette (⌘K).";
     empty.append(strong, p);
     return empty;
   }

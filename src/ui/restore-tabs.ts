@@ -4,6 +4,7 @@ import type { Workspace } from "../vault/workspace";
 interface SavedTabs {
   tabs: unknown[];
   active?: number;
+  pinned?: number[];
 }
 
 /** Opens the note asked for, otherwise the tabs saved last time, otherwise a sensible first note. */
@@ -12,7 +13,7 @@ export function restoreTabs(workspace: Workspace, index: VaultIndex, saved: Save
   if (wanted?.kind === "found") {
     workspace.startWith({ kind: "note", path: wanted.path });
   } else if (saved?.tabs?.length) {
-    workspace.restore({ tabs: saved.tabs, active: saved.active ?? 0 }, (view) =>
+    workspace.restore({ tabs: saved.tabs, active: saved.active ?? 0, pinned: saved.pinned }, (view) =>
       view.kind === "base"
         ? index.bases.includes(view.path)
         : view.kind !== "blank" && index.notes.includes(view.kind === "note" ? view.path : view.note),

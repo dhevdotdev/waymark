@@ -32,7 +32,10 @@ export function renderTabStrip(
     el.dataset.tab = String(i);
     el.dataset.tip = title;
     el.classList.toggle("is-graph-tab", view.kind === "graph");
-    el.innerHTML = `<button class="icon-btn tab-close" data-tab-close aria-label="Close tab">${icons.close}</button><span class="tab-title"></span>`;
+    el.classList.toggle("is-pinned", !!tab.pinned);
+    el.innerHTML = tab.pinned
+      ? `<span class="tab-pin" aria-label="Pinned">${icons.pin}</span><span class="tab-title"></span>`
+      : `<button class="icon-btn tab-close" data-tab-close aria-label="Close tab">${icons.close}</button><span class="tab-title"></span>`;
     el.querySelector(".tab-title")!.textContent = title;
     if (tab.id === entering) requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove("is-entering")));
     frag.append(el);

@@ -22,6 +22,10 @@ export interface SyncControllerDeps {
 /** Keeps the status bar and the sync panel in step with the repository. Background work only ever fetches. */
 export class SyncController {
   readonly panel: GitPanel;
+
+  get busy(): boolean {
+    return this.panel.state.kind === "busy";
+  }
   readonly backup: Backup;
   private backgroundTimer = 0;
   private refreshTimer = 0;

@@ -18,6 +18,8 @@ export const icons = {
     `<path d="M3 5h5.5M11.5 5H13M3 11h1.5M7.5 11H13"/><circle cx="10" cy="5" r="1.6"/><circle cx="6" cy="11" r="1.6"/>`,
   ),
   table: svg(`<rect x="2.5" y="3" width="11" height="10" rx="1.2"/><path d="M2.5 6.5h11M2.5 9.8h11M6.5 6.5V13"/>`),
+  pin: svg(`<path d="M6 2.5h4l-.5 4 2 2.5h-7l2-2.5zM8 9v4.5"/>`),
+  sort: svg(`<path d="M4 3v10M2 11l2 2 2-2M9 4h5M9 8h3.5M9 12h2"/>`),
   bookmark: svg(`<path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/>`),
   note: svg(`<path d="M4.5 2.5h4.6L12 5.4v8.1H4.5z"/><path d="M9 2.5v3h3"/>`),
   folder: svg(`<path d="M2.5 4.5a1 1 0 0 1 1-1h2.6l1.4 1.5h5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>`),

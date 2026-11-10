@@ -157,11 +157,6 @@ async fn file_stats(
 }
 
 #[tauri::command]
-async fn clipboard_text() -> CmdResult<String> {
-    Ok(clipboard::text())
-}
-
-#[tauri::command]
 async fn read_many(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Vec<Option<String>>> {
     let root = vault.root().map_err(plain_err)?;
     blocking(move || {
@@ -592,7 +587,8 @@ pub fn run() {
             list_files,
             read_text,
             file_stats,
-            clipboard_text,
+            clipboard::clipboard_text,
+            clipboard::clipboard_write,
             read_many,
             write_note,
             vault_settings,

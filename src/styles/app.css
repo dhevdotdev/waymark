@@ -1560,3 +1560,80 @@ kbd {
 .is-recolouring *::after {
   transition: none !important;
 }
+
+/* Moving notes and tabs. Only marks change until the drop, so nothing shifts under the pointer. */
+.sidebar-inner.is-dragging-note,
+.sidebar-inner.is-dragging-note * {
+  cursor: grabbing;
+}
+.nav-item.is-drag-source {
+  opacity: 0.45;
+}
+.tree-head.is-drop-target {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.tree.is-drop-root {
+  border-radius: var(--r-control);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.tree-drag-chip {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 80;
+  max-inline-size: 240px;
+  overflow: clip;
+  padding: var(--s1) var(--s2);
+  border-radius: var(--r-control);
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(.nav-item, .tab).is-landed {
+  animation: landed 620ms var(--ease-out);
+}
+@keyframes landed {
+  from {
+    background-color: color-mix(in oklab, var(--accent) 26%, transparent);
+  }
+}
+.tab.is-dragging {
+  opacity: 0.5;
+}
+.tab-drop {
+  position: fixed;
+  z-index: 80;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.tab-pin {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  color: var(--ink-3);
+}
+.tab-pin svg {
+  inline-size: 13px;
+  block-size: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.tab.is-pinned {
+  max-inline-size: min(var(--tab-limit, 180px), 180px);
+}
+[data-act="sort-files"].is-on {
+  color: var(--accent);
+}

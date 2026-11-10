@@ -37,6 +37,8 @@ export interface Prefs {
   rail: boolean;
   railPane: "links" | "info";
   sidebarWidth: number;
+  /** How notes are ordered within a folder. Kept with the app's preferences, never in the vault. */
+  fileSort: "name" | "modified";
   diffWrap: boolean;
   keySound: SwitchProfile | "off";
   keyVolume: KeyVolume;
@@ -57,6 +59,7 @@ const DEFAULTS: Prefs = {
   rail: true,
   railPane: "links",
   sidebarWidth: 268,
+  fileSort: "name",
   diffWrap: true,
   keySound: "tactile",
   keyVolume: "medium",

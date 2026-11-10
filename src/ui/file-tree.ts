@@ -13,6 +13,12 @@ export class FileTree {
   private current = "";
   /** Shown above the folders. */
   leading: HTMLElement | null = null;
+  private byDate = false;
+  private times: { index: VaultIndex; seconds: Map<string, number> } | null = null;
+  private timesLoading: VaultIndex | null = null;
+  private lastCurrent = "";
+  /** Reads when each note last changed, for sorting by date. */
+  fileTimes: ((paths: string[]) => Promise<Map<string, number>>) | null = null;
 
   constructor(
     private readonly box: HTMLElement,
@@ -26,13 +32,18 @@ export class FileTree {
 
   /** Rebuilds if the vault's files changed, then marks and reveals `current`. */
   render(index: VaultIndex, current: string): void {
+    this.lastCurrent = current;
+    if (this.needsTimes(index)) {
+      if (this.box.querySelector(".tree")) this.reveal(current);
+      return;
+    }
     if (this.builtFor !== index || !this.box.querySelector(".tree")) {
       this.folders.clear();
       this.notes.clear();
       const tree = document.createElement("div");
       tree.className = "tree";
       if (this.leading) tree.append(this.leading);
-      tree.append(...this.children(buildTree([...index.notes, ...index.bases]), 0, index));
+      tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
       const keep = this.box.scrollTop;
       this.box.replaceChildren(tree);
       this.box.scrollTop = keep;
@@ -40,6 +51,62 @@ export class FileTree {
       this.current = "";
     }
     this.reveal(current);
+  }
+
+  /** Sets the order before the first draw. */
+  startSorted(byDate: boolean): void {
+    this.byDate = byDate;
+  }
+
+  /** Switches between name order and newest first, then redraws. */
+  sortByDate(on: boolean, index: VaultIndex, current: string): void {
+    this.byDate = on;
+    this.builtFor = null;
+    this.render(index, current);
+  }
+
+  private needsTimes(index: VaultIndex): boolean {
+    if (!this.byDate || !this.fileTimes || this.times?.index === index) return false;
+    if (this.timesLoading !== index) {
+      this.timesLoading = index;
+      const done = (seconds: Map<string, number>) => {
+        this.times = { index, seconds };
+        this.timesLoading = null;
+        this.builtFor = null;
+        this.render(index, this.lastCurrent);
+      };
+      this.fileTimes([...index.notes, ...index.bases]).then(done, () => done(new Map()));
+    }
+    return true;
+  }
+
+  /** Newest first, compared by the second so files written together in one checkout fall back to name order. */
+  private noteOrder(index: VaultIndex): ((a: string, b: string) => number) | undefined {
+    if (!this.byDate || this.times?.index !== index) return undefined;
+    const { seconds } = this.times;
+    return (a, b) => (seconds.get(b) ?? 0) - (seconds.get(a) ?? 0);
+  }
+
+  /** Opens one folder, for a note being dragged over it. */
+  openFolder(path: string): void {
+    if (this.opened.has(path)) return;
+    this.setOpen(path, true);
+    this.onChange();
+  }
+
+  isOpen(path: string): boolean {
+    return this.opened.has(path);
+  }
+
+  /** Marks a note's row briefly, wherever it now sits, so a move can be seen to have landed. */
+  markLanded(path: string): void {
+    const row = this.notes.get(path);
+    if (!row) return;
+    row.scrollIntoView({ block: "nearest" });
+    row.classList.remove("is-landed");
+    void row.offsetWidth;
+    row.classList.add("is-landed");
+    row.addEventListener("animationend", () => row.classList.remove("is-landed"), { once: true });
   }
 
   toggle(path: string): void {

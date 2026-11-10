@@ -156,6 +156,7 @@ export class Reader {
       notePath: () => this.notePath,
       open: (path, newTab) => this.open(path, { newTab, focus: true }),
       redraw: () => this.redraw(),
+      syncBusy: () => this.sync.busy,
     });
 
     this.sync = new SyncController({
@@ -251,7 +252,7 @@ export class Reader {
     return this.tab?.trail.current.view.kind === "blank";
   }
 
-  private get notePath(): string {
+  get notePath(): string {
     const view = this.tab.trail.current.view;
     return view.kind === "note" ? view.path : "";
   }
@@ -322,7 +323,8 @@ export class Reader {
 
   closeTab(index: number): void {
     this.saveScroll();
-    if (this.workspace.close(index)) void this.show({ keyboard: true });
+    if (this.workspace.tabs[index]?.pinned) toast("Unpin this tab to close it.");
+    else if (this.workspace.close(index)) void this.show({ keyboard: true });
   }
 
   /** The graph is a tab, as in Obsidian: an open one comes forward, otherwise it opens beside the current tab. */
@@ -435,7 +437,6 @@ export class Reader {
       this.handleEscape(inField);
       return;
     }
-    if (e.key === "F2" && e.target instanceof HTMLElement && e.target.closest(".cm-table-widget")) return;
     if (this.commands.handleKey(e, inField)) {
       e.preventDefault();
       e.stopPropagation();
@@ -619,7 +620,7 @@ export class Reader {
     return view.kind === "graph" ? "Graph" : "New tab";
   };
 
-  private renderTabs(entering?: number): void {
+  renderTabs(entering?: number): void {
     renderTabStrip(this.els.tabs, this.workspace, this.viewLabel, entering);
     this.els.shell.classList.toggle("single-tab", this.workspace.tabs.length === 1);
   }

@@ -11,7 +11,7 @@ const order = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" 
 const fileName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** The vault's folders exactly as they are on disk: folders first, then notes, in natural name order. */
-export function buildTree(notes: string[]): TreeFolder {
+export function buildTree(notes: string[], noteOrder?: (a: string, b: string) => number): TreeFolder {
   const root: TreeFolder = { name: "", path: "", folders: [], notes: [], count: 0 };
   const byPath = new Map<string, TreeFolder>([["", root]]);
   for (const note of notes) {
@@ -34,7 +34,7 @@ export function buildTree(notes: string[]): TreeFolder {
   }
   for (const folder of byPath.values()) {
     folder.folders.sort((a, b) => order.compare(a.name, b.name));
-    folder.notes.sort((a, b) => order.compare(fileName(a), fileName(b)));
+    folder.notes.sort((a, b) => noteOrder?.(a, b) || order.compare(fileName(a), fileName(b)));
   }
   return root;
 }

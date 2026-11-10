@@ -90,6 +90,7 @@ export const native = {
   openVault: (path: string) => call<VaultInfo>("open_vault", { path }),
   reveal: (path?: string) => call<void>("reveal", { path }),
   clipboardText: () => (isDesktop ? call<string>("clipboard_text") : navigator.clipboard.readText()),
+  copyText: (text: string) => (isDesktop ? call<void>("clipboard_write", { text }) : navigator.clipboard.writeText(text)),
   setDockIcon: (family: string) => call<void>("set_dock_icon", { family }),
   async setWindowColor(color: [number, number, number]): Promise<void> {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");

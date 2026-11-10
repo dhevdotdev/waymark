@@ -1,6 +1,7 @@
 import MiniSearch from "minisearch";
 import { parseFrontmatter } from "./frontmatter";
 import { plainText } from "./links";
+import { parseSearchQuery, passesFilters, type SearchQuery, usesFilters } from "./search-query";
 
 export interface Hit {
   path: string;
@@ -46,7 +47,10 @@ export class SearchIndex {
   }
 
   search(query: string, limit = 40): Hit[] {
-    const q = query.trim();
+    const parsed = parseSearchQuery(query);
+    if (usesFilters(parsed)) return this.filtered(parsed, limit);
+    /* A filter still being typed counts for nothing, so it must not reach the words searched for. */
+    const q = parsed.phrases.length ? query.trim() : parsed.words.join(" ");
     if (!q) return [];
     const phrase = /^".+"$/.test(q) ? q.slice(1, -1).toLowerCase() : null;
     const matches = this.mini.search(phrase ?? q);
@@ -68,6 +72,29 @@ export class SearchIndex {
       });
     }
     hits.sort((a, b) => b.score - a.score);
+    return hits.slice(0, limit);
+  }
+
+  /** Only words and phrases are looked for and marked. Filters narrow the list and never count as a match. */
+  private filtered(query: SearchQuery, limit: number): Hit[] {
+    const looked = [...query.phrases, ...query.words];
+    const titleOf = (id: string) => this.mini.getStoredFields(id)?.title as string;
+    const found = looked.length
+      ? this.mini.search(looked.join(" ")).map((r) => ({ id: r.id as string, score: r.score, terms: r.terms }))
+      : [...this.texts.keys()].map((id) => ({ id, score: 0, terms: [] as string[] }));
+    const hits = found
+      .filter(({ id }) => passesFilters(query, id, `${titleOf(id)}\n${this.texts.get(id) ?? ""}`))
+      .map(({ id, score, terms }): Hit => {
+        const marked = query.phrases.length ? query.phrases.map((p) => p.toLowerCase()) : terms;
+        return {
+          path: id,
+          title: titleOf(id),
+          score,
+          terms: marked,
+          snippet: marked.length ? snippet(this.texts.get(id) ?? "", marked) : null,
+        };
+      });
+    hits.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
     return hits.slice(0, limit);
   }
 }

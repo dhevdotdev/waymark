@@ -10,12 +10,14 @@ import type { FileTree } from "./file-tree";
 import { icons } from "./icons";
 import { nameInPlace } from "./inline-name";
 import type { NoteEditing } from "./note-editing";
+import { copyLink } from "./note-links";
 import { Palette, type PaletteItem } from "./palette";
 import { plural } from "./plural";
 import { confirmAction, promptText } from "./prompts";
 import { moveSpot } from "./reading-spots";
 import { type RowAction, RowActions } from "./row-actions";
 import { renameRecent } from "./start-page";
+import { TreeDrag } from "./tree-drag";
 
 export interface NoteFilesHost {
   sidebar: HTMLElement;
@@ -31,6 +33,8 @@ export interface NoteFilesHost {
   bookmarks: Bookmarks;
   /** Redraws whatever depends on which files exist. */
   redraw: () => Promise<void>;
+  /** True while Git is changing files in the vault. */
+  syncBusy: () => boolean;
 }
 
 interface LinkUpdate {
@@ -62,6 +66,13 @@ export class NoteFiles {
     );
     host.sidebar.addEventListener("contextmenu", (e) => this.onContextMenu(e));
     this.rows = new RowActions(host.sidebar, (row) => this.rowActions(row));
+    new TreeDrag({
+      box: host.sidebar,
+      tree: host.tree,
+      folderOf,
+      labelOf: (path) => host.vault.index.title(path),
+      drop: (path, folder) => void this.moveToFolder(path, folder),
+    });
   }
 
   async newNote(folder?: string): Promise<void> {
@@ -272,6 +283,23 @@ export class NoteFiles {
     });
   }
 
+  /** A drop in the file list. A note of that name already there is left alone, and the move does not happen. */
+  async moveToFolder(path: string, folder: string): Promise<boolean> {
+    const to = inFolder(folder, `${nameOf(path)}.md`);
+    if (to === path) return false;
+    const clash = this.host.vault.index.notes.some((note) => note.toLowerCase() === to.toLowerCase());
+    if (clash) {
+      this.host.toast(`“${nameOf(path)}” is already in ${folder ? folderName(folder) : "the vault root"}. Nothing was moved.`);
+      return false;
+    }
+    const moved = await this.move(path, to);
+    if (moved) {
+      if (folder) this.host.tree.openFolder(folder);
+      this.host.tree.markLanded(to);
+    }
+    return moved;
+  }
+
   private move(from: string, to: string): Promise<boolean> {
     return this.relocate(new Map([[from, to]]), () => this.host.vault.source.renameNote(from, to));
   }
@@ -284,6 +312,10 @@ export class NoteFiles {
   private async relocate(moved: ReadonlyMap<string, string>, moveFiles: () => Promise<void>): Promise<boolean> {
     const { editing, toast } = this.host;
     if (this.moveRunning) return false;
+    if (this.host.syncBusy()) {
+      toast("Sync is running. Try this again when it finishes.");
+      return false;
+    }
     if (!(await editing.flush())) {
       toast("Choose what to keep in the note you are editing first.");
       return false;
@@ -417,6 +449,7 @@ export class NoteFiles {
       { label: "Open in new tab", run: () => void this.host.open(path, true) },
       { label: "Rename…", run: () => void this.startRename(path) },
       { label: "Move to…", run: () => this.promptMove(path) },
+      { label: "Copy link", run: () => void copyLink(this.host.vault.index, path, null, this.host.toast) },
       ...this.reveal(path),
       { label: "Move to Trash", startsGroup: true, danger: true, run: () => void this.remove(path) },
     ];

@@ -2,11 +2,14 @@ import { native } from "../platform";
 import { ancestors } from "../vault/tree";
 import { type Bookmark, currentHeading } from "./bookmarks";
 import { type Command, labelOf } from "./commands";
+import { showContextMenu } from "./context-menu";
+import { bindHeadingLinks, copyLink } from "./note-links";
 import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
 import { plural } from "./plural";
 import type { Reader } from "./reader";
 import { applySound } from "./settings";
+import { TabActions } from "./tab-actions";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -28,6 +31,44 @@ export function readerCommands(r: Reader): Command[] {
   const { prefs } = deps;
   const dark = () => deps.scheme() === "dark";
   const toggleAppearance = () => deps.setAppearance(dark() ? "light" : "dark");
+  const tabs = new TabActions({
+    strip: r.els.tabs,
+    workspace: r.workspace,
+    render: () => r.renderTabs(),
+    persist: () => r.persist(),
+    close: (index) => r.closeTab(index),
+  });
+  bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
+  const { tree } = r.sidebar;
+  const sortButton = () => r.els.sidebar.parentElement?.querySelector<HTMLElement>('[data-act="sort-files"]');
+  tree.fileTimes = async (paths) => {
+    const stats = await r.vault.source.fileStats(paths);
+    return new Map(Object.entries(stats).map(([path, stat]) => [path, Math.floor(stat.mtime / 1000)]));
+  };
+  tree.startSorted(prefs.value.fileSort === "modified");
+  requestAnimationFrame(() => sortButton()?.classList.toggle("is-on", prefs.value.fileSort === "modified"));
+  const setSort = (mode: "name" | "modified") => {
+    prefs.update((p) => {
+      p.fileSort = mode;
+    });
+    tree.sortByDate(mode === "modified", r.vault.index, r.current);
+    sortButton()?.classList.toggle("is-on", mode === "modified");
+    toast(mode === "modified" ? "Notes sorted by date modified" : "Notes sorted by name");
+  };
+  const sortMenu = () => {
+    const box = sortButton()?.getBoundingClientRect();
+    if (!box) return;
+    const mode = prefs.value.fileSort;
+    showContextMenu(
+      box.right,
+      box.bottom + 4,
+      [
+        { label: "Name", checked: mode === "name", run: () => setSort("name") },
+        { label: "Date modified", checked: mode === "modified", run: () => setSort("modified") },
+      ],
+      { alignEnd: true },
+    );
+  };
   const tabNumbers: Command[] = Array.from({ length: 9 }, (_, i) => ({
     id: `tab-${i + 1}`,
     keys: [`mod+${i + 1}`],
@@ -68,6 +109,26 @@ export function readerCommands(r: Reader): Command[] {
       },
     },
     { id: "collapse-folders", label: "Collapse all folders", run: () => r.sidebar.tree.collapseAll() },
+    { id: "sort-files", run: sortMenu },
+    { id: "sort-by-name", label: "Sort notes by name", run: () => setSort("name") },
+    { id: "sort-by-date", label: "Sort notes by date modified", keywords: "newest recent", run: () => setSort("modified") },
+    {
+      id: "copy-note-link",
+      label: "Copy link to this note",
+      keywords: "wikilink",
+      needsNote: true,
+      run: () => void copyLink(r.vault.index, r.current, null, toast),
+    },
+    {
+      id: "copy-heading-link",
+      label: "Copy link to this heading",
+      keywords: "wikilink section",
+      needsNote: true,
+      run: () => void copyLink(r.vault.index, r.current, currentHeading(r.els.scroller), toast),
+    },
+    { id: "pin-tab", label: "Pin or unpin this tab", keywords: "keep", run: () => tabs.togglePin() },
+    { id: "move-tab-left", label: "Move tab left", run: () => tabs.step(-1, toast) },
+    { id: "move-tab-right", label: "Move tab right", run: () => tabs.step(1, toast) },
     {
       id: "rename-note",
       label: "Rename this note",

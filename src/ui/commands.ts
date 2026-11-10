@@ -56,6 +56,8 @@ export class CommandTable {
 
   /** Runs the command bound to this key press. Returns whether one ran. */
   handleKey(e: KeyboardEvent, inField: boolean): boolean {
+    /* In a table cell F2 belongs to the grid: it switches between editing and moving. */
+    if (e.key === "F2" && e.target instanceof HTMLElement && e.target.closest(".cm-table-widget")) return false;
     const command = this.byChord.get(chordOf(e));
     if (!command || (inField && !command.inField) || (command.needsNote && !this.env.hasNote())) return false;
     command.run("key");
