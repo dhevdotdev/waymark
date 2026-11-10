@@ -359,9 +359,19 @@ export function readerCommands(r: Reader): Command[] {
     { id: "forward", keys: ["mod+]"], needsNote: true, run: () => void r.go(1) },
     { id: "previous-tab", keys: ["mod+shift+[", "ctrl+shift+tab"], needsNote: true, inField: true, run: () => r.cycleTab(-1) },
     { id: "next-tab", keys: ["mod+shift+]", "ctrl+tab"], needsNote: true, inField: true, run: () => r.cycleTab(1) },
-    { id: "close-tab", keys: ["mod+w"], needsNote: true, run: () => r.closeTab(r.workspace.activeIndex) },
+    { id: "close-tab", keys: ["mod+w"], inField: () => r.onBlank, run: () => closeFrontTab(r) },
     ...tabNumbers,
   ];
+}
+
+/** A blank tab may close with its palette open, and hands back the tab it was opened from. */
+function closeFrontTab(r: Reader): void {
+  if (r.workspace.isEmpty) return;
+  if (!r.onBlank || r.workspace.active.pinned) r.closeTab(r.workspace.activeIndex);
+  else if (r.workspace.tabs.length > 1) {
+    r.palette.close();
+    r.dismissBlank();
+  }
 }
 
 function commandItem(command: Command): PaletteItem {

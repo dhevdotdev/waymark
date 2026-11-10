@@ -539,6 +539,40 @@ try {
     (await tabs()) === "Apple,Refs,Welcome" && (await page.locator(".tab.is-pinned").count()) === 1,
     await tabs(),
   );
+  {
+    const countTabs = () => page.locator(".tab").count();
+    const before = await countTabs();
+    await page.locator(".tab").nth(1).click();
+    await pause(150);
+    const opener = await activeTab();
+    await page.keyboard.press("Meta+t");
+    await pause(200);
+    check(
+      "a new tab opens blank behind the palette",
+      (await activeTab()) === "New tab" && (await page.locator(".palette").count()) === 1,
+    );
+    check("the palette's field has focus", await page.evaluate(() => document.activeElement?.matches(".palette input")));
+    await page.keyboard.press("Meta+w");
+    await pause(200);
+    check("⌘W closes a blank tab from the palette field", (await countTabs()) === before, String(await countTabs()));
+    check("the palette closes with it", (await page.locator(".palette:not(.is-leaving)").count()) === 0);
+    check("the tab it opened beside comes back", (await activeTab()) === opener, await activeTab());
+    await page.keyboard.press("Meta+t");
+    await pause(200);
+    await page.keyboard.press("Escape");
+    await pause(120);
+    check("Escape closed the palette and kept the blank tab", (await activeTab()) === "New tab");
+    await page.keyboard.press("Meta+w");
+    await pause(200);
+    check("⌘W closes a blank tab with the palette shut too", (await countTabs()) === before && (await activeTab()) === opener);
+    await page.keyboard.press("Meta+k");
+    await pause(120);
+    await page.keyboard.press("Meta+w");
+    await pause(120);
+    check("⌘W over a note leaves the tab alone while typing", (await countTabs()) === before);
+    await page.keyboard.press("Escape");
+    await pause(120);
+  }
   check("a pinned tab has no close button", (await page.locator(".tab.is-pinned .tab-close").count()) === 0);
   await page.locator(".tab.is-pinned").click();
   await pause(150);

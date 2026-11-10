@@ -12,8 +12,8 @@ export interface Command {
   keys?: string[];
   hint?: string;
   keywords?: string;
-  /** The shortcut also fires while typing in a field. */
-  inField?: boolean;
+  /** The shortcut also fires while typing in a field, always or only while this returns true. */
+  inField?: boolean | (() => boolean);
   /** Hidden and unbound outside the desktop app. */
   desktop?: boolean;
   /** Unavailable until a note is open. */
@@ -64,7 +64,8 @@ export class CommandTable {
     /* In a table cell F2 belongs to the grid: it switches between editing and moving. */
     if (e.key === "F2" && e.target instanceof HTMLElement && e.target.closest(".cm-table-widget")) return false;
     const command = this.byChord.get(chordOf(e));
-    if (!command || (inField && !command.inField) || (command.needsNote && !this.env.hasNote())) return false;
+    if (!command || (command.needsNote && !this.env.hasNote())) return false;
+    if (inField && !(typeof command.inField === "function" ? command.inField() : command.inField)) return false;
     this.lastKey = { id: command.id, at: performance.now() };
     command.run("key");
     return true;

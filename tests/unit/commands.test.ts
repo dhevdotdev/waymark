@@ -41,6 +41,16 @@ describe("CommandTable", () => {
     expect(table.handleKey(key({ key: "k", metaKey: true }), true)).toBe(true);
   });
 
+  it("can allow a shortcut while typing only in some states", () => {
+    const run = vi.fn();
+    let allowed = false;
+    const table = make([{ keys: ["mod+w"], inField: () => allowed, run }]);
+    expect(table.handleKey(key({ key: "w", metaKey: true }), true)).toBe(false);
+    allowed = true;
+    expect(table.handleKey(key({ key: "w", metaKey: true }), true)).toBe(true);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
   it("leaves desktop shortcuts unbound in the browser", () => {
     const table = make([{ keys: ["mod+shift+s"], desktop: true }], { desktop: false, hasNote: () => true });
     expect(table.handleKey(key({ key: "s", metaKey: true, shiftKey: true }), false)).toBe(false);
