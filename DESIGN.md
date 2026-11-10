@@ -167,6 +167,10 @@ Moving a note or folder to the Trash offers Undo. It puts the item back at its e
 
 With text selected in the note editor, ⌘K makes it a link, the same as the bubble's Link button. Otherwise it opens the palette, as ⌘P and ⌘O always do. A selection inside a table cell keeps the palette, because a cell has no Link button.
 
+## The file list and the keyboard
+
+The file list is one Tab stop. Up and Down move between rows, Right opens a folder and then enters it, Left closes it and then goes to its parent, Enter opens, and Home and End reach the ends. Closed folders are skipped. The focus ring is drawn inside the row, because folder contents are clipped for their open and close animation.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

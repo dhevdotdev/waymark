@@ -6,6 +6,7 @@ import { isNarrow } from "./media";
 import { bindEdgeDrag } from "./panel-resize";
 import { SearchPane, type SearchPaneHost } from "./search-pane";
 import type { ShellElements } from "./shell";
+import { bindTreeKeys } from "./tree-keys";
 
 type SideMode = "files" | "search";
 
@@ -30,6 +31,7 @@ export class Sidebar {
     private readonly host: SidebarHost,
   ) {
     this.tree = new FileTree(els.sidebar, new Set(openFolders), () => host.persist());
+    bindTreeKeys(els.sidebar, this.tree);
     this.searchPane = new SearchPane(els.searchPane, {
       ...host,
       close: () => this.showFiles(),

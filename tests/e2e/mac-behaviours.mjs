@@ -249,6 +249,82 @@ await pause(200);
 await page.keyboard.press("Meta+e");
 await pause(500);
 
+/* The file list */
+const focused = () =>
+  page.evaluate(
+    () => document.activeElement?.dataset.path ?? document.activeElement?.dataset.folder ?? document.activeElement?.tagName,
+  );
+const tabStops = () => page.locator(".sidebar .tree :is(.tree-head, .nav-item)[tabindex='0']").count();
+await pause(200);
+check("the file list is one Tab stop", (await tabStops()) === 1, String(await tabStops()));
+await page.evaluate(() => window.waymark.reader.sidebar.tree.collapseAll());
+await pause(300);
+const heads = await page.$$eval(".sidebar .tree-head[data-folder]", (h) => h.map((x) => x.dataset.folder));
+await page.locator(".sidebar .tree [tabindex='0']").focus();
+await page.locator(`.tree-head[data-folder="${heads[0]}"]`).focus();
+await page.keyboard.press("ArrowDown");
+await pause(60);
+check("Down moves to the next row", (await focused()) === heads[1], await focused());
+await page.keyboard.press("ArrowUp");
+await pause(60);
+check("Up moves back", (await focused()) === heads[0], await focused());
+await page.keyboard.press("ArrowRight");
+await pause(300);
+check(
+  "Right opens a folder",
+  await page.locator(`.tree-head[data-folder="${heads[0]}"]`).evaluate((h) => h.getAttribute("aria-expanded") === "true"),
+);
+await page.keyboard.press("ArrowRight");
+await pause(60);
+const child = await focused();
+check("Right again enters it", child !== heads[0] && String(child).startsWith(`${heads[0]}/`), child);
+await page.keyboard.press("ArrowLeft");
+await pause(60);
+check("Left goes to the parent", (await focused()) === heads[0], await focused());
+await page.keyboard.press("ArrowLeft");
+await pause(300);
+check(
+  "Left closes it",
+  await page.locator(`.tree-head[data-folder="${heads[0]}"]`).evaluate((h) => h.getAttribute("aria-expanded") === "false"),
+);
+await page.keyboard.press("ArrowDown");
+await pause(60);
+check("closed folders are skipped", (await focused()) === heads[1], await focused());
+await page.keyboard.press("End");
+await pause(60);
+const lastRow = await focused();
+check("End reaches the last row", typeof lastRow === "string" && lastRow.endsWith(".md"), lastRow);
+await page.keyboard.press("Enter");
+await pause(450);
+check(
+  "Enter opens the note",
+  (await page.evaluate(() => window.waymark.reader.notePath)) === lastRow,
+  await page.evaluate(() => window.waymark.reader.notePath),
+);
+check("still one Tab stop after moving around", (await tabStops()) === 1, String(await tabStops()));
+const ring = await page.evaluate((path) => {
+  const row = document.querySelector(`.nav-item[data-path="${CSS.escape(path)}"]`);
+  row.focus();
+  const style = getComputedStyle(row);
+  return style.outlineOffset;
+}, lastRow);
+check("the focus ring is drawn inside the row", ring === "-2px", ring);
+await page.locator(`.nav-item[data-path="${lastRow}"]`).click({ button: "right" });
+await pause(150);
+await page.locator(".context-item", { hasText: "Rename" }).click();
+await pause(200);
+const nameBox = page.locator(".tree-name-input");
+await page.keyboard.press("ArrowLeft");
+await page.keyboard.type("z");
+await pause(100);
+check(
+  "inline rename keeps its keys",
+  (await nameBox.inputValue()).startsWith("z") && (await nameBox.inputValue()).length > 1,
+  await nameBox.inputValue(),
+);
+await page.keyboard.press("Escape");
+await pause(200);
+
 check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 await browser.close();
 await app.close();
