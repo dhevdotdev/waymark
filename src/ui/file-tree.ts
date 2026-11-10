@@ -1,9 +1,14 @@
 import { isBaseFile, type VaultIndex } from "../vault/index";
 import { ancestors, buildTree, type TreeFolder } from "../vault/tree";
 import { icons } from "./icons";
+import { isPointerAction } from "./input-origin";
+import { flashLanded } from "./list-motion";
+import { captureTree, settleTree } from "./tree-motion";
 
 const CHEVRON = `<svg class="tree-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
+/** Long enough for a sort by date to read file times before the rebuild it waits on. */
+const EDIT_WINDOW_MS = 1000;
 
 /** The folder tree in the sidebar. Rows are built once per index and updated in place. */
 export class FileTree {
@@ -17,6 +22,7 @@ export class FileTree {
   private times: { index: VaultIndex; seconds: Map<string, number> } | null = null;
   private timesLoading: VaultIndex | null = null;
   private lastCurrent = "";
+  private editExpectedUntil = 0;
   /** Reads when each note last changed, for sorting by date. */
   fileTimes: ((paths: string[]) => Promise<Map<string, number>>) | null = null;
 
@@ -38,19 +44,38 @@ export class FileTree {
       return;
     }
     if (this.builtFor !== index || !this.box.querySelector(".tree")) {
-      this.folders.clear();
-      this.notes.clear();
-      const tree = document.createElement("div");
-      tree.className = "tree";
-      if (this.leading) tree.append(this.leading);
-      tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
-      const keep = this.box.scrollTop;
-      this.box.replaceChildren(tree);
-      this.box.scrollTop = keep;
-      this.builtFor = index;
-      this.current = "";
+      const before = this.takeExpectedEdit() ? captureTree(this.box) : null;
+      this.rebuild(index);
+      this.reveal(current);
+      if (before) settleTree(this.box, before);
+      return;
     }
     this.reveal(current);
+  }
+
+  /** The next rebuild is the result of this action. Changes arriving from outside are never expected, so they stay instant. */
+  expectEdit(): void {
+    this.editExpectedUntil = isPointerAction() ? performance.now() + EDIT_WINDOW_MS : 0;
+  }
+
+  private takeExpectedEdit(): boolean {
+    const expected = performance.now() < this.editExpectedUntil;
+    this.editExpectedUntil = 0;
+    return expected;
+  }
+
+  private rebuild(index: VaultIndex): void {
+    this.folders.clear();
+    this.notes.clear();
+    const tree = document.createElement("div");
+    tree.className = "tree";
+    if (this.leading) tree.append(this.leading);
+    tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
+    const keep = this.box.scrollTop;
+    this.box.replaceChildren(tree);
+    this.box.scrollTop = keep;
+    this.builtFor = index;
+    this.current = "";
   }
 
   /** Sets the order before the first draw. */
@@ -103,10 +128,7 @@ export class FileTree {
     const row = this.notes.get(path);
     if (!row) return;
     row.scrollIntoView({ block: "nearest" });
-    row.classList.remove("is-landed");
-    void row.offsetWidth;
-    row.classList.add("is-landed");
-    row.addEventListener("animationend", () => row.classList.remove("is-landed"), { once: true });
+    flashLanded(row);
   }
 
   toggle(path: string): void {

@@ -1922,6 +1922,17 @@ kbd {
 :root[data-input="keyboard"] .is-landed {
   animation-timing-function: step-end;
 }
+.tree-ghost {
+  position: absolute;
+  margin: 0;
+  pointer-events: none;
+}
+.tree {
+  position: relative;
+}
+.tree.is-settling .tree-folder.is-open > .tree-body > .tree-inner {
+  overflow: visible;
+}
 @keyframes landed {
   from {
     background-color: color-mix(in oklab, var(--accent) 26%, transparent);
