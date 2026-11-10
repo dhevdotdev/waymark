@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
@@ -45,7 +45,8 @@ async function writeNote(root: string, body: { path: string; text: string; expec
   return { kind: "saved" };
 }
 
-const FILE_ACTIONS = new Set(["/rename", "/trash", "/trash-folder", "/attachment", "/keep-in-trash"]);
+const devTrash = new Map<number, { original: string; inTrash: string }>();
+const FILE_ACTIONS = new Set(["/rename", "/trash", "/untrash", "/trash-folder", "/attachment", "/keep-in-trash"]);
 
 function insideVault(root: string, rel: string): string {
   const abs = path.resolve(root, rel);
@@ -68,10 +69,29 @@ async function respondToFileAction(root: string, url: URL, req: IncomingMessage,
     if (path.basename(name) !== name || !name.endsWith(".md")) throw new Error("not a note name");
     await mkdir(path.join(root, ".dev-trash"), { recursive: true });
     await writeFile(path.join(root, ".dev-trash", name), text);
-  } else if (url.pathname === "/trash") {
-    await unlink(insideVault(root, JSON.parse(body.toString()).path));
-  } else if (url.pathname === "/trash-folder") {
-    await rm(insideVault(root, JSON.parse(body.toString()).path), { recursive: true });
+  } else if (url.pathname === "/trash" || url.pathname === "/trash-folder") {
+    const original = insideVault(root, JSON.parse(body.toString()).path);
+    const token = devTrash.size + 1;
+    const parked = path.join(root, ".dev-trash", String(token));
+    await mkdir(parked, { recursive: true });
+    const inTrash = path.join(parked, path.basename(original));
+    await rename(original, inTrash);
+    devTrash.set(token, { original, inTrash });
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ token }));
+    return;
+  } else if (url.pathname === "/untrash") {
+    const entry = devTrash.get(JSON.parse(body.toString()).token);
+    if (!entry) throw new Error("gone");
+    await stat(entry.original).then(
+      () => {
+        throw new Error("exists");
+      },
+      () => undefined,
+    );
+    await mkdir(path.dirname(entry.original), { recursive: true });
+    await rename(entry.inTrash, entry.original);
+    devTrash.delete(JSON.parse(body.toString()).token);
   } else {
     const { from, to } = JSON.parse(body.toString());
     const target = insideVault(root, to);

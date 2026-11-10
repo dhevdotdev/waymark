@@ -26,12 +26,15 @@ export interface VaultSource {
   writeNote(path: string, text: string, expected: string | null): Promise<WriteOutcome>;
   /** Moves a note. Fails rather than landing on anything that exists. */
   renameNote(from: string, to: string): Promise<void>;
-  trashNote(path: string): Promise<void>;
+  /** Returns a token that `untrash` can use to put it back. */
+  trashNote(path: string): Promise<number>;
   /** Puts text in the macOS Trash as a new file named `name`, so a version being replaced can be recovered. */
   keepInTrash(name: string, text: string): Promise<void>;
   /** Moves a folder and everything in it. Fails rather than landing on anything that exists. */
   renameFolder(from: string, to: string): Promise<void>;
-  trashFolder(path: string): Promise<void>;
+  trashFolder(path: string): Promise<number>;
+  /** Puts a trashed item back exactly where it was, refusing if something is there now. */
+  untrash(token: number): Promise<void>;
   /** Adds an image or PDF. Fails rather than replacing a file. */
   writeAttachment(path: string, bytes: Uint8Array): Promise<void>;
   settings(): Promise<VaultSettings>;
@@ -43,6 +46,7 @@ export interface VaultSource {
 const post = async (url: string, body: BodyInit, failure: string) => {
   const res = await fetch(url, { method: "POST", headers: { "x-waymark": "1" }, body });
   if (!res.ok) throw new Error(failure);
+  return res;
 };
 
 export function devVaultSource(): VaultSource {
@@ -64,7 +68,11 @@ export function devVaultSource(): VaultSource {
       await post("/@vault/rename", JSON.stringify({ from, to }), `Could not move ${from}`);
     },
     async trashNote(path) {
-      await post("/@vault/trash", JSON.stringify({ path }), `Could not remove ${path}`);
+      const res = await post("/@vault/trash", JSON.stringify({ path }), `Could not remove ${path}`);
+      return (await res.json()).token;
+    },
+    async untrash(token) {
+      await post("/@vault/untrash", JSON.stringify({ token }), "It could not be put back.");
     },
     async keepInTrash(name, text) {
       await post("/@vault/keep-in-trash", JSON.stringify({ name, text }), `Could not keep ${name}`);
@@ -73,7 +81,8 @@ export function devVaultSource(): VaultSource {
       await post("/@vault/rename", JSON.stringify({ from, to }), `Could not rename ${from}`);
     },
     async trashFolder(path) {
-      await post("/@vault/trash-folder", JSON.stringify({ path }), `Could not remove ${path}`);
+      const res = await post("/@vault/trash", JSON.stringify({ path }), `Could not remove ${path}`);
+      return (await res.json()).token;
     },
     async writeAttachment(path, bytes) {
       await post(`/@vault/attachment?path=${encodeURIComponent(path)}`, bytes as BodyInit, `Could not add ${path}`);

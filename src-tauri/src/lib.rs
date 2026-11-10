@@ -9,8 +9,8 @@ mod vault;
 mod window_state;
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer, notify::RecursiveMode};
@@ -277,15 +277,36 @@ async fn keep_in_trash(name: String, text: String) -> CmdResult<()> {
 }
 
 #[tauri::command]
-async fn trash_note(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
+async fn trash_note(
+    vault: State<'_, Vault>,
+    log: State<'_, Arc<trash::TrashLog>>,
+    path: String,
+) -> CmdResult<u64> {
     if !path.to_ascii_lowercase().ends_with(".md") {
         return Err(plain_err("Only notes can be moved to the Trash"));
     }
     let target = vault.resolve(&path).map_err(plain_err)?;
     let gate = vault.write_gate();
+    let log = log.inner().clone();
     blocking(move || {
         let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
-        trash::move_to_trash(&target).map_err(plain_err)
+        let in_trash = trash::move_to_trash(&target).map_err(plain_err)?;
+        Ok(log.record(target, in_trash))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn untrash(
+    vault: State<'_, Vault>,
+    log: State<'_, Arc<trash::TrashLog>>,
+    token: u64,
+) -> CmdResult<()> {
+    let gate = vault.write_gate();
+    let log = log.inner().clone();
+    blocking(move || {
+        let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
+        log.restore(token).map_err(plain_err)
     })
     .await
 }
@@ -302,13 +323,19 @@ async fn rename_folder(vault: State<'_, Vault>, from: String, to: String) -> Cmd
 }
 
 #[tauri::command]
-async fn trash_folder(vault: State<'_, Vault>, path: String) -> CmdResult<()> {
+async fn trash_folder(
+    vault: State<'_, Vault>,
+    log: State<'_, Arc<trash::TrashLog>>,
+    path: String,
+) -> CmdResult<u64> {
     let root = vault.root().map_err(plain_err)?;
     let gate = vault.write_gate();
+    let log = log.inner().clone();
     blocking(move || {
         let _writing = gate.lock().unwrap_or_else(|e| e.into_inner());
         let target = folders::real_folder(&root, &path).map_err(plain_err)?;
-        trash::move_to_trash(&target).map_err(plain_err)
+        let in_trash = trash::move_to_trash(&target).map_err(plain_err)?;
+        Ok(log.record(target, in_trash))
     })
     .await
 }
@@ -565,6 +592,7 @@ pub fn run() {
         .plugin(navigation::guard())
         .manage(Vault::default())
         .manage(Watcher::default())
+        .manage(Arc::new(trash::TrashLog::default()))
         .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || {
@@ -611,6 +639,7 @@ pub fn run() {
             keep_in_trash,
             rename_folder,
             trash_folder,
+            untrash,
             write_attachment,
             finish_quit,
             reveal,

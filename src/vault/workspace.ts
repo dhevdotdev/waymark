@@ -16,6 +16,11 @@ export interface SavedWorkspace {
 const isBlank = (tab: Tab) => tab.trail.current.view.kind === "blank";
 const MOST_CLOSED = 20;
 
+export interface ForgottenTab {
+  tab: Tab;
+  trail: Trail;
+}
+
 export type Reopened = { kind: "nothing" } | { kind: "gone"; view: View } | { kind: "opened" };
 
 /** The open tabs and which one is showing. Each tab owns a trail of where it has been. */
@@ -143,11 +148,24 @@ export class Workspace {
     for (const tab of [...this.tabs, ...this.closed.map((entry) => entry.tab)]) tab.trail.replaceNote(from, to);
   }
 
-  /** A note is gone, so a tab showing it goes back to being blank. */
-  forgetNote(path: string): void {
+  /** A note is gone, so a tab showing it goes back to being blank. Returns what `bringBack` needs. */
+  forgetNote(path: string): ForgottenTab[] {
+    const forgotten: ForgottenTab[] = [];
     for (const tab of this.tabs) {
       const { view } = tab.trail.current;
-      if (view.kind === "note" && view.path === path) tab.trail = new Trail({ kind: "blank" });
+      if (view.kind !== "note" || view.path !== path) continue;
+      forgotten.push({ tab, trail: tab.trail });
+      tab.trail = new Trail({ kind: "blank" });
+    }
+    return forgotten;
+  }
+
+  /** The note came back, so its tabs do too: in place if they are still blank, at the end if they were closed. */
+  bringBack(forgotten: ForgottenTab[]): void {
+    for (const { tab, trail } of forgotten) {
+      if (!this.tabs.includes(tab)) this.tabs.push(tab);
+      else if (!isBlank(tab)) continue;
+      tab.trail = trail;
     }
   }
 

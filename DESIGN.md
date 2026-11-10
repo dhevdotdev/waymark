@@ -159,6 +159,10 @@ The window comes back where it was and the size it was, placed before it is show
 
 A two-finger swipe across the note goes back or forward by the same path as ⌘[ and ⌘]. One swipe is one step, however long its momentum lasts. A swipe that starts over something that scrolls sideways, such as a wide table, stays with that thing. Mouse buttons 4 and 5 do the same where the system delivers them.
 
+## Undoing a delete
+
+Moving a note or folder to the Trash offers Undo. It puts the item back at its exact path, out of the Trash so no duplicate stays there, and brings its tabs back. If something now exists at that path it stays in the Trash and says why.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

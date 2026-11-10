@@ -157,6 +157,45 @@ check(
 await page.keyboard.press("Meta+g");
 await pause(400);
 
+/* Undo a delete */
+const inVault = (name) => `${app.vault}/${name}`;
+const moreAction = async (selector, label) => {
+  await page.locator(selector).first().click({ button: "right" });
+  await pause(150);
+  await page.locator(".context-item", { hasText: label }).click();
+  await pause(150);
+  const confirm = page.locator('.prompt button:has-text("Move to Trash")');
+  if (await confirm.count()) await confirm.click();
+  await pause(400);
+};
+const undoButton = page.locator(".toast .toast-action", { hasText: "Undo" });
+await writeFile(inVault("Doomed.md"), "# Doomed\n\nExact   bytes  \n");
+await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
+await pause(250);
+await open("Doomed.md");
+const tabsBefore = await page.$$eval(".tab", (t) => t.length);
+await moreAction('.nav-item[data-path="Doomed.md"]', "Move to Trash");
+check("the note left the vault", !existsSync(inVault("Doomed.md")));
+check("the toast offers Undo", (await undoButton.count()) === 1);
+await undoButton.click();
+await pause(500);
+check("Undo restores the exact bytes", (await readFile(inVault("Doomed.md"), "utf8")) === "# Doomed\n\nExact   bytes  \n");
+check(
+  "its tab is back",
+  (await title()) === "Doomed" && (await page.$$eval(".tab", (t) => t.length)) === tabsBefore,
+  await title(),
+);
+check("it says so", (await toastText()).includes("Put back"), await toastText());
+await moreAction('.nav-item[data-path="Doomed.md"]', "Move to Trash");
+await writeFile(inVault("Doomed.md"), "someone else\n");
+await undoButton.click();
+await pause(400);
+check("Undo refuses to overwrite", (await readFile(inVault("Doomed.md"), "utf8")) === "someone else\n");
+check("and says why", !(await toastText()).includes("Put back"), await toastText());
+await rm(inVault("Doomed.md"));
+await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
+await pause(200);
+
 check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 await browser.close();
 await app.close();

@@ -1,4 +1,4 @@
-import { native } from "./platform";
+import { git, native } from "./platform";
 import type { SelfTestContext } from "./selftest-recovery";
 import { confirmAction } from "./ui/prompts";
 import { showWelcome } from "./ui/welcome";
@@ -134,7 +134,23 @@ async function checkProperties({ app, reader, vault, check, until, wait }: SelfT
   reader.inspector.setPane("links");
 }
 
+async function checkTrashUndo({ vault, check }: SelfTestContext): Promise<void> {
+  const before = await vault.source.readText("Refs.md");
+  const status = JSON.stringify(await git.status());
+  const token = await vault.source.trashNote("Refs.md");
+  check("a trashed note leaves the vault", !(await vault.source.list()).includes("Refs.md"));
+  await vault.source.untrash(token);
+  check("Undo restores a trashed note byte for byte", (await vault.source.readText("Refs.md")) === before);
+  check("Undo leaves Git status as it was", JSON.stringify(await git.status()) === status);
+  const refused = await vault.source.untrash(token).then(
+    () => false,
+    () => true,
+  );
+  check("a used Undo cannot run twice", refused);
+}
+
 export async function runOrganize(ctx: SelfTestContext): Promise<void> {
+  await checkTrashUndo(ctx);
   await checkTable(ctx);
   await checkClipboard(ctx);
   await checkMove(ctx);

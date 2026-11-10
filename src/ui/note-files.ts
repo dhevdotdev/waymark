@@ -3,7 +3,7 @@ import type { PrefStore } from "../prefs";
 import { isBaseFile } from "../vault/index";
 import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
 import type { VaultStore } from "../vault/store";
-import type { Workspace } from "../vault/workspace";
+import type { ForgottenTab, Workspace } from "../vault/workspace";
 import type { Bookmarks } from "./bookmarks";
 import { type MenuItem, showContextMenu } from "./context-menu";
 import type { FileTree } from "./file-tree";
@@ -27,7 +27,7 @@ export interface NoteFilesHost {
   workspace: Workspace;
   editing: NoteEditing;
   tree: FileTree;
-  toast: (message: string) => void;
+  toast: (message: string, action?: { label: string; run: () => void }) => void;
   notePath: () => string;
   open: (path: string, newTab?: boolean) => Promise<void>;
   bookmarks: Bookmarks;
@@ -142,8 +142,9 @@ export class NoteFiles {
       await editing.flush();
       editing.setFrozen(true);
     }
+    let token: number;
     try {
-      await vault.source.trashNote(path);
+      token = await vault.source.trashNote(path);
     } catch (error) {
       editing.setFrozen(false);
       toast(error instanceof Error ? error.message : "The note could not be moved to the Trash.");
@@ -151,9 +152,27 @@ export class NoteFiles {
     }
     if (beingEdited) editing.discard();
     await vault.applyChanges([]);
-    workspace.forgetNote(path);
+    const forgotten = workspace.forgetNote(path);
     await redraw();
-    toast("Moved to the Trash");
+    this.offerUndo(token, [path], forgotten);
+  }
+
+  private offerUndo(token: number, notes: string[], forgotten: ForgottenTab[]): void {
+    this.host.toast("Moved to the Trash", { label: "Undo", run: () => void this.undoTrash(token, notes, forgotten) });
+  }
+
+  private async undoTrash(token: number, notes: string[], forgotten: ForgottenTab[]): Promise<void> {
+    const { vault, workspace, toast, redraw } = this.host;
+    try {
+      await vault.source.untrash(token);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "It could not be put back.");
+      return;
+    }
+    await vault.applyChanges(notes);
+    workspace.bringBack(forgotten);
+    await redraw();
+    toast("Put back");
   }
 
   async startRenameFolder(folder: string): Promise<void> {
@@ -187,8 +206,9 @@ export class NoteFiles {
       await editing.flush();
       editing.setFrozen(true);
     }
+    let token: number;
     try {
-      await vault.source.trashFolder(folder);
+      token = await vault.source.trashFolder(folder);
     } catch (error) {
       editing.setFrozen(false);
       toast(error instanceof Error ? error.message : "The folder could not be moved to the Trash.");
@@ -196,9 +216,9 @@ export class NoteFiles {
     }
     if (beingEdited) editing.discard();
     await vault.applyChanges([]);
-    for (const note of notes) workspace.forgetNote(note);
+    const forgotten = notes.flatMap((note) => workspace.forgetNote(note));
     await redraw();
-    toast("Moved to the Trash");
+    this.offerUndo(token, notes, forgotten);
   }
 
   private async defaultFolder(): Promise<string> {
