@@ -354,6 +354,57 @@ try {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   check("Reduce Motion keeps the landing mark", marked === 1, String(marked));
 
+  {
+    const focusedRow = () =>
+      page.evaluate(
+        () => document.activeElement?.dataset.path ?? document.activeElement?.dataset.folder ?? document.activeElement?.tagName,
+      );
+    const redrawWithout = (removed) =>
+      page.evaluate((gone) => {
+        const { reader } = window.waymark;
+        const index = reader.vault.index;
+        const copy = Object.assign(Object.create(Object.getPrototypeOf(index)), index, {
+          notes: index.notes.filter((n) => !gone.some((g) => n === g || n.startsWith(`${g}/`))),
+        });
+        reader.sidebar.renderTree(copy, reader.current);
+      }, removed);
+    await page.evaluate(() => {
+      window.waymark.reader.sidebar.tree.openFolder("Sorted");
+    });
+    await pause(250);
+    await page.locator('.nav-item[data-path="Sorted/Banana.md"]').focus();
+    const tree = page.locator(".sidebar .tree").first();
+    const list = page.locator(".sidebar-inner");
+    await list.evaluate((b) => {
+      b.style.maxBlockSize = "120px";
+      b.scrollTop = 40;
+    });
+    const scrollBefore = await list.evaluate((b) => b.scrollTop);
+    await redrawWithout([]);
+    check("a rebuild keeps focus on the same row", (await focusedRow()) === "Sorted/Banana.md", await focusedRow());
+    check("only that row holds the Tab stop", (await tree.locator('[tabindex="0"]').count()) === 1);
+    check(
+      "a rebuild keeps the tree's scroll",
+      scrollBefore > 0 && (await list.evaluate((b) => b.scrollTop)) === scrollBefore,
+      String(scrollBefore),
+    );
+    await list.evaluate((b) => b.style.removeProperty("max-block-size"));
+    await redrawWithout(["Sorted/Banana.md"]);
+    check("a removed row hands focus to its folder", (await focusedRow()) === "Sorted", await focusedRow());
+    await redrawWithout([]);
+    await page.locator('.nav-item[data-path="Sorted/Banana.md"]').focus();
+    await redrawWithout(["Sorted"]);
+    const fallback = await focusedRow();
+    check("when the folder goes too, focus lands on a row", typeof fallback === "string" && fallback.endsWith(".md"), fallback);
+    await redrawWithout([]);
+    await page.evaluate(() => document.activeElement?.blur());
+    await redrawWithout([]);
+    check("a rebuild does not pull focus into the tree", (await focusedRow()) === "BODY", await focusedRow());
+    await page.evaluate(() => {
+      const { reader } = window.waymark;
+      reader.sidebar.renderTree(reader.vault.index, reader.current);
+    });
+  }
   /* Tabs (#20) */
   await openNote("Welcome");
   const openTab = (note) => page.evaluate((n) => window.waymark.reader.open(`${n}.md`, { newTab: true, focus: true }), note);

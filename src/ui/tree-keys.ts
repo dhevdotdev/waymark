@@ -1,11 +1,11 @@
-const ROW = ".tree-head, .nav-item";
+export const ROW = ".tree-head, .nav-item";
 
 interface TreeActions {
   toggle: (folder: string) => void;
   isOpen: (folder: string) => boolean;
 }
 
-function isShown(row: Element): boolean {
+export function isShown(row: Element): boolean {
   if (row.classList.contains("is-naming")) return false;
   for (let body = row.closest(".tree-body"); body; body = body.parentElement?.closest(".tree-body") ?? null) {
     if (!body.parentElement?.classList.contains("is-open")) return false;
