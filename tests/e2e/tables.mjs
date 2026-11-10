@@ -7,6 +7,7 @@ import { serveFixture } from "./serve.mjs";
 const results = [];
 const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail !== "" ? `  (${detail})` : ""}`);
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
+const DOC_END = process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End";
 
 const PLOT = `# Plot plan
 
@@ -1061,7 +1062,7 @@ try {
 
   await open("Long");
   await page.locator(".cm-content").click({ position: { x: 100, y: 200 } });
-  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press(DOC_END);
   await pause(200);
   await page.locator(".cm-line", { hasText: "End." }).click();
   await page.keyboard.press("Home");

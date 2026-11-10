@@ -122,10 +122,11 @@ try {
   await openNote("Field guide");
   await page.evaluate(() => {
     window.copied = [];
-    navigator.clipboard.writeText = (text) => {
+    const writeText = (text) => {
       window.copied.push(text);
       return Promise.resolve();
     };
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   });
   const copied = () => page.evaluate(() => window.copied.at(-1));
   await row("Links/Field guide.md").click({ button: "right" });
@@ -164,7 +165,10 @@ try {
   await pause(120);
   check("a heading in Edit copies the same link", (await copied()) === "[[Field guide#Water]]", await copied());
   await page.evaluate(() => {
-    navigator.clipboard.writeText = () => Promise.reject(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: () => Promise.reject(new Error("denied")) },
+      configurable: true,
+    });
   });
   await page.locator(".cm-line.cm-h2", { hasText: "Water" }).click({ button: "right" });
   await pause(120);
