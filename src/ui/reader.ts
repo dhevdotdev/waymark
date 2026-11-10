@@ -578,6 +578,7 @@ export class Reader {
   private showGraph(view: GraphTabView): void {
     if (this.find.isOpen) this.find.close();
     this.current = view.note;
+    const opened = !this.graph;
     if (!this.graph) {
       this.graph = new GraphView(this.els.reader, this.vault, {
         open: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
@@ -598,7 +599,7 @@ export class Reader {
     this.renderTabChrome();
     this.renderTree();
     requestAnimationFrame(() => this.graph?.show(view.note, view.scope));
-    this.graph.focus();
+    this.graph.arrive(opened);
     this.persist();
   }
 

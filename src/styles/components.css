@@ -675,11 +675,6 @@
   translate: 0 var(--rise);
   transition-duration: var(--t-exit);
 }
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
 .sheet {
   width: min(980px, 100%);
   height: min(680px, 100%);
@@ -865,11 +860,18 @@
   min-inline-size: 0;
   min-block-size: 0;
   background: var(--paper);
-  animation: fade-in var(--t-modal) var(--ease-out);
 }
 .graph-stage {
   position: absolute;
   inset: 0;
+}
+.graph-announce {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: clip;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .graph-toolbar,
 .graph-foot {

@@ -10,16 +10,19 @@ export interface PointerDragHandlers {
   drop: () => void;
 }
 
-/** Follows a press until release. Escape cancels, and the click a finished drag would cause never reaches the page. */
+/** Follows one pointer from its press until release. Escape or a cancelled pointer ends it without a drop, and the click a finished drag would cause never reaches the page. */
 export function trackPointerDrag(down: PointerEvent, handlers: PointerDragHandlers): void {
   let dragging = false;
   const stop = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onCancel);
+    window.removeEventListener("lostpointercapture", onCancel);
     window.removeEventListener("keydown", onKey, true);
     handlers.finish();
   };
   const onMove = (e: PointerEvent) => {
+    if (e.pointerId !== down.pointerId) return;
     if (!dragging) {
       if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG_START_PX) return;
       dragging = true;
@@ -27,7 +30,11 @@ export function trackPointerDrag(down: PointerEvent, handlers: PointerDragHandle
     }
     handlers.move(e);
   };
-  const onUp = () => {
+  const onCancel = (e: PointerEvent) => {
+    if (e.pointerId === down.pointerId) stop();
+  };
+  const onUp = (e: PointerEvent) => {
+    if (e.pointerId !== down.pointerId) return;
     stop();
     if (!dragging) return;
     const swallow = (e: Event) => e.stopPropagation();
@@ -43,5 +50,7 @@ export function trackPointerDrag(down: PointerEvent, handlers: PointerDragHandle
   };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onCancel);
+  window.addEventListener("lostpointercapture", onCancel);
   window.addEventListener("keydown", onKey, true);
 }
