@@ -1,4 +1,5 @@
 import { fuzzy, highlightMarks } from "./fuzzy";
+import { markKeyboardOrigin } from "./input-origin";
 
 export interface PaletteItem {
   id: string;
@@ -203,6 +204,7 @@ export class Palette {
     const item = this.shown[i];
     if (!item) return;
     this.close();
+    markKeyboardOrigin();
     item.run({ newTab });
   }
 }

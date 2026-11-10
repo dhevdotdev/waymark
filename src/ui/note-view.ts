@@ -43,10 +43,12 @@ export class NoteView {
   }
 
   /** Replaces the column with a rendered note and returns its article element. */
-  mount(path: string, body: DocumentFragment, animate: boolean): HTMLElement {
+  mount(path: string, body: DocumentFragment, followed: boolean): HTMLElement {
     const doc = document.createElement("article");
     doc.className = "doc";
-    if (animate) doc.classList.add("doc-enter");
+    /* A second link followed during the fade must not dip the page again. */
+    const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
+    if (followed && isPointerAction() && !midFade) doc.classList.add("doc-enter");
     doc.append(this.heading(path), body);
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);

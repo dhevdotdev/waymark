@@ -286,6 +286,7 @@ export class Reader {
         anchor: opts.anchor,
         entering: opts.keyboard ? undefined : tab.id,
         find: opts.find,
+        followed: opts.via === "link",
         keyboard: opts.keyboard,
       });
       return;
@@ -298,7 +299,7 @@ export class Reader {
     this.saveScroll();
     if (opts.via === "link") this.tab.trail.follow(view);
     else this.tab.trail.jump(view);
-    await this.show({ anchor: opts.anchor, find: opts.find });
+    await this.show({ anchor: opts.anchor, find: opts.find, followed: opts.via === "link" });
   }
 
   async go(delta: -1 | 1): Promise<void> {
@@ -518,8 +519,7 @@ export class Reader {
     metrics.lastRenderMs = rendered.ms;
     metrics.lastGrammarMs = rendered.grammarMs;
 
-    const animate = changedNote && !opts.quiet && !opts.keyboard && !opts.restoring;
-    const doc = this.noteView.mount(path, rendered.fragment, animate);
+    const doc = this.noteView.mount(path, rendered.fragment, changedNote && opts.followed === true);
     this.els.scroller.scrollTop = opts.keepScroll ? prevScroll : entry.scroll;
     if (!opts.keepScroll && !opts.anchor && !opts.find && (!entry.scroll || opts.restoring)) this.spots.restore(path);
     if (opts.anchor) this.noteView.scrollToAnchor(opts.anchor);
