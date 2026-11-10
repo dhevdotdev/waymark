@@ -365,6 +365,72 @@ try {
   await pause(120);
   const tabs = () => page.$$eval(".tab .tab-title", (t) => t.map((x) => x.textContent).join());
   const activeTab = () => page.textContent(".tab.is-active .tab-title");
+
+  {
+    const strip = () =>
+      page.evaluate(() => ({
+        stops: [...document.querySelectorAll(".tab")].map((t) => t.tabIndex).join(),
+        active: document.querySelector(".tab.is-active .tab-title").textContent,
+        focusIsActiveTab: document.activeElement === document.querySelector(".tab.is-active"),
+        focusIsClose: document.activeElement?.matches("[data-tab-close]") ?? false,
+      }));
+    check("only the active tab is a Tab stop", (await strip()).stops === "0,-1,-1", (await strip()).stops);
+    await page.keyboard.press("Tab");
+    await page.locator(".tab.is-active").focus();
+    await page.keyboard.press("ArrowRight");
+    const moved = await strip();
+    check("ArrowRight selects the next tab at once", moved.active === "Refs" && moved.focusIsActiveTab, JSON.stringify(moved));
+    check("the Tab stop follows the selection", moved.stops === "-1,0,-1", moved.stops);
+    await page.keyboard.press("End");
+    check("End reaches the last tab", (await strip()).active === "Apple" && (await strip()).focusIsActiveTab);
+    await page.keyboard.press("ArrowRight");
+    check("ArrowRight wraps to the first tab", (await strip()).active === "Welcome" && (await strip()).focusIsActiveTab);
+    await page.keyboard.press("ArrowLeft");
+    check("ArrowLeft wraps to the last tab", (await strip()).active === "Apple");
+    await page.keyboard.press("Home");
+    check("Home reaches the first tab", (await strip()).active === "Welcome");
+    for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowRight", { delay: 0 });
+    await pause(250);
+    const rapid = await strip();
+    check(
+      "rapid arrows land on the right tab and keep focus",
+      rapid.active === "Refs" && rapid.focusIsActiveTab,
+      JSON.stringify(rapid),
+    );
+    await page.waitForFunction(() => document.querySelector(".doc")?.textContent.length > 0);
+
+    await page.locator(".tab.is-active [data-tab-close]").focus();
+    const closeStyle = await page.locator(".tab.is-active [data-tab-close]").evaluate((b) => ({
+      opacity: getComputedStyle(b).opacity,
+      transition: getComputedStyle(b).transitionDuration,
+    }));
+    check(
+      "a focused close control is fully visible at once",
+      closeStyle.opacity === "1" && /^0s/.test(closeStyle.transition),
+      JSON.stringify(closeStyle),
+    );
+    await page.evaluate(() => window.waymark.reader.renderTabs());
+    check("a redraw keeps focus on the close control", (await strip()).focusIsClose);
+    await page.keyboard.press("Enter");
+    await pause(200);
+    const closed = await strip();
+    check(
+      "closing from the keyboard moves focus to the tab that takes over",
+      closed.focusIsActiveTab && closed.stops.split(",").length === 2,
+      JSON.stringify(closed),
+    );
+    await page.keyboard.press("Meta+Shift+t");
+    await pause(200);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.locator(".tab").first().click();
+    await pause(120);
+    const afterClick = await strip();
+    check(
+      "a click selects a tab without taking focus or showing a ring",
+      !afterClick.focusIsActiveTab,
+      JSON.stringify(afterClick),
+    );
+  }
   check("tabs start in the order they opened", (await tabs()) === "Welcome,Refs,Apple", await tabs());
   const t0 = await page.locator(".tab").nth(0).boundingBox();
   const t2 = await page.locator(".tab").nth(2).boundingBox();

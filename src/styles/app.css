@@ -315,6 +315,12 @@ kbd {
     background: var(--selected);
   }
 }
+.tab:is(:focus-visible, :has(:focus-visible)) .tab-close {
+  opacity: 1;
+}
+:root[data-input="keyboard"] .tab-close {
+  transition: none;
+}
 
 .sync-btn {
   display: flex;

@@ -600,7 +600,7 @@ export class Reader {
     this.renderTabChrome(entering);
     this.renderTree();
     requestAnimationFrame(() => this.graph?.show(view.note, view.scope));
-    this.graph.focus();
+    if (!this.els.tabs.contains(document.activeElement)) this.graph.focus();
     this.persist();
   }
 

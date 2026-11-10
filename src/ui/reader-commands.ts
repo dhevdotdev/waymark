@@ -39,6 +39,7 @@ export function readerCommands(r: Reader): Command[] {
     render: () => r.renderTabs(),
     persist: () => r.persist(),
     close: (index) => r.closeTab(index),
+    activate: (index) => r.switchTab(index),
     toast,
     saveScroll: () => r.saveScroll(),
     show: () => void r.show({ keyboard: true }),
