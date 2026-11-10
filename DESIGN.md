@@ -143,6 +143,10 @@ Each round was judged from WebKit screenshots of real notes, not from mockups.
 | 3 | Scrolling to a block shifted the whole window chrome | The shell clips instead of hiding overflow, so programmatic scrolls stay in the reader |
 | 3 | The sanitizer removed the copy and fold buttons | Buttons are allowed. Only renderer-emitted `data-*` attributes survive, so note HTML cannot trigger app actions |
 
+## Where a link goes
+
+Hovering a web or mail link shows its real address under the link, in Read and Edit: the site in full and strong, the rest quieter, three lines at most with the middle of the path cut. The address is read from the link when it is shown, `http://` stays visible, and international hosts stay in their `xn--` form because a decoded name can imitate another site.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

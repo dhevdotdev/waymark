@@ -1,23 +1,36 @@
+import { fillDestination, linkDestination, outsideLink, placeUnderLink } from "./link-tooltip";
+
 const SHOW_DELAY_MS = 550;
 const WARM_MS = 800;
 
-/** Shows `data-tip` labels under `root`. A tooltip opened soon after another skips the delay. */
+const targetOf = (el: Element): HTMLElement | null => el.closest<HTMLElement>("[data-tip]") ?? outsideLink(el);
+
+/** Shows `data-tip` labels and where outside links go. A tooltip opened soon after another skips the delay. */
 export function bindTooltips(root: HTMLElement): void {
   let tip: HTMLElement | null = null;
   let timer = 0;
   let warmUntil = 0;
   let pressed: HTMLElement | null = null;
+  let current: HTMLElement | null = null;
 
   const hide = () => {
     clearTimeout(timer);
     tip?.remove();
     tip = null;
+    current = null;
   };
 
-  const show = (target: HTMLElement) => {
-    if (document.querySelector(".context-menu:not(.is-leaving)")) return;
+  const show = (target: HTMLElement, pointerY: number | null) => {
+    if (document.querySelector(".context-menu:not(.is-leaving)") || !target.isConnected) return;
     tip = document.createElement("div");
     tip.className = `tooltip${performance.now() < warmUntil ? " is-instant" : ""}`;
+    const destination = target.dataset.tip === undefined ? linkDestination(target) : null;
+    if (destination) {
+      document.body.append(tip);
+      fillDestination(tip, destination);
+      placeUnderLink(tip, target, pointerY);
+      return;
+    }
     tip.textContent = target.dataset.tip ?? "";
     if (target.dataset.key) {
       const kbd = document.createElement("kbd");
@@ -32,9 +45,21 @@ export function bindTooltips(root: HTMLElement): void {
     tip.style.top = `${above ? r.top - tip.offsetHeight - 6 : r.bottom + 6}px`;
   };
 
+  const arrive = (target: HTMLElement, pointerY: number | null) => {
+    hide();
+    current = target;
+    if (performance.now() < warmUntil) show(target, pointerY);
+    else timer = window.setTimeout(() => show(target, pointerY), SHOW_DELAY_MS);
+  };
+
+  const leave = () => {
+    if (tip) warmUntil = performance.now() + WARM_MS;
+    hide();
+  };
+
   root.addEventListener("pointerover", (e) => {
-    const target = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]");
-    if (!target || target === pressed || target.closest(".tab.is-active")) return;
+    const target = targetOf(e.target as HTMLElement);
+    if (!target || target === pressed || target === current || target.closest(".tab.is-active")) return;
     const label = target.querySelector<HTMLElement>(
       ":scope > :is(.nav-text, .rail-link-name, .tree-name, .start-title, .trail-name)",
     );
@@ -43,22 +68,30 @@ export function bindTooltips(root: HTMLElement): void {
       const title = target.querySelector<HTMLElement>(".tab-title");
       if (title && title.scrollWidth <= title.clientWidth) return;
     }
-    hide();
-    if (performance.now() < warmUntil) show(target);
-    else timer = window.setTimeout(() => show(target), SHOW_DELAY_MS);
+    arrive(target, e.clientY);
   });
 
   root.addEventListener("pointerout", (e) => {
-    const from = (e.target as HTMLElement).closest("[data-tip]");
+    const from = targetOf(e.target as HTMLElement);
     if (from && !from.contains(e.relatedTarget as Node)) {
       if (from === pressed) pressed = null;
-      if (tip) warmUntil = performance.now() + WARM_MS;
-      hide();
+      leave();
     }
   });
 
   root.addEventListener("pointerdown", (e) => {
-    pressed = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]");
+    pressed = targetOf(e.target as HTMLElement);
     hide();
   });
+
+  root.addEventListener("focusin", (e) => {
+    const link = e.target instanceof HTMLElement && e.target.matches(":focus-visible") ? outsideLink(e.target) : null;
+    if (link && link !== current) arrive(link, null);
+  });
+  root.addEventListener("focusout", (e) => {
+    if (e.target instanceof HTMLElement && e.target === current) leave();
+  });
+
+  document.addEventListener("scroll", hide, { capture: true, passive: true });
+  document.addEventListener("keydown", hide, { capture: true, passive: true });
 }

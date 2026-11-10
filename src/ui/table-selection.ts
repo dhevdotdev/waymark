@@ -1,9 +1,10 @@
 function overlaps(range: Range, cell: Element): boolean {
   const contents = document.createRange();
   contents.selectNodeContents(cell);
-  return (
-    range.compareBoundaryPoints(Range.START_TO_END, contents) > 0 && range.compareBoundaryPoints(Range.END_TO_START, contents) < 0
-  );
+  const endsAfterStart = range.compareBoundaryPoints(Range.START_TO_END, contents);
+  const startsBeforeEnd = range.compareBoundaryPoints(Range.END_TO_START, contents);
+  /* An empty cell has one position, so a selection beginning there touches it without passing through. */
+  return contents.collapsed ? endsAfterStart >= 0 && startsBeforeEnd <= 0 : endsAfterStart > 0 && startsBeforeEnd < 0;
 }
 
 function cellsSpanned(scroller: HTMLElement): Set<Element> {

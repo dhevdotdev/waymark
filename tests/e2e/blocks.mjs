@@ -14,6 +14,7 @@ const NOTES = {
   "Tall.md": `# Tall\n\nBefore.\n\n| Name | Detail | Count |\n| --- | --- | ---: |\n${rows(60)}\n\n${"After.\n\n".repeat(30)}`,
   "Breaks.md":
     "# Breaks\n\none\ntwo  \nthree\n\n> [!note] Title\n> first\n> second\n\n- item\n  more\n\n| Head |\n| --- |\n| a<br>b |\n",
+  "Empty corner.md": "# Empty corner\n\n|  | Symmetric | Asymmetric |\n| --- | --- | --- |\n| Keys | One | Two |\n",
   "Picking.md":
     "# Picking\n\nBefore the table.\n\n| Step | Party A | Party B |\n| --- | --- | --- |\n| Public value | `5^6 mod 23` | `5^15 mod 23` |\n| Received | 19 | 8 |\n\nAfter the table.\n",
   "Layout.md": "# Layout\n\n|  |  |\n| --- | --- |\n| left | right |\n| more | cells |\n",
@@ -223,6 +224,35 @@ async function run(scheme) {
   await page.mouse.up();
   await pause(60);
   check(label("dragging across cells fills them"), (await spanned()).length >= 2, JSON.stringify(await spanned()));
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await open("Empty corner.md");
+  const corner = await page.locator(".doc th").first().boundingBox();
+  const farCell = await page.locator(".doc td").last().boundingBox();
+  await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(farCell.x + 30, farCell.y + farCell.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await pause(80);
+  check(
+    label("a selection from an empty cell fills that cell too"),
+    (await page
+      .locator(".doc th")
+      .first()
+      .evaluate((c) => c.classList.contains("is-spanned"))) && (await page.locator(".doc .is-spanned").count()) === 6,
+    String(await page.locator(".doc .is-spanned").count()),
+  );
+  await page.evaluate(() => {
+    const cells = [...document.querySelectorAll(".doc :is(td, th)")];
+    getSelection().setBaseAndExtent(cells[0], 0, cells[1].firstChild, 3);
+  });
+  await pause(60);
+  check(
+    label("starting exactly at an empty cell counts"),
+    await page
+      .locator(".doc th")
+      .first()
+      .evaluate((c) => c.classList.contains("is-spanned")),
+  );
   await page.evaluate(() => getSelection().removeAllRanges());
   await open("Layout.md");
   const blank = await head();

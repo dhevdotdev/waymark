@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 
 /** Each group runs on its own CI machine. Every suite belongs to exactly one group, so none can be left out. */
 const SHARDS = [
-  [["tables"], ["blocks"], ["scrolling"]],
+  [["tables"], ["blocks"], ["scrolling"], ["link-tooltips"]],
   [["reader"], ["reader", "reduced"], ["edge"], ["dialogs"]],
   [["editing"], ["organize"], ["properties"]],
   [["note-files"], ["recovery"], ["backup"], ["library"], ["sync"]],

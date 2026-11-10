@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { destinationOf } from "./link-destination";
 
 const LOCAL_ASSET = /^\/@vault\/file\?|^vault:\/\/localhost\//;
 
@@ -72,6 +73,13 @@ function configure(): void {
     if (node.tagName === "IFRAME") node.setAttribute("sandbox", "");
     if (node instanceof HTMLAnchorElement && /^https?:/i.test(node.getAttribute("href") ?? "")) {
       node.setAttribute("rel", "noreferrer noopener");
+    }
+    if (node instanceof HTMLAnchorElement && /^(?:https?:|mailto:)/i.test(node.getAttribute("href") ?? "")) {
+      /* A native tooltip or spoken text written by the note must not contradict the real address. */
+      node.removeAttribute("title");
+      const destination = destinationOf(node.href);
+      if (destination) node.setAttribute("aria-description", `Goes to ${destination.site}${destination.rest}`);
+      else node.removeAttribute("aria-description");
     }
   });
 }

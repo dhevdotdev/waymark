@@ -566,6 +566,17 @@
 .tooltip.is-instant {
   animation: none;
 }
+.tooltip.is-destination {
+  display: block;
+  line-height: 1.35;
+  max-inline-size: min(360px, 100vw - 16px);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.tooltip-path {
+  color: var(--ink-3);
+  font-weight: 400;
+}
 @keyframes tip-in {
   from {
     opacity: 0;

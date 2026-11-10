@@ -191,3 +191,29 @@ describe("single line breaks", () => {
     expect((await strict("one\ntwo")).textContent).toContain("one\ntwo");
   });
 });
+
+describe("a link's destination cannot be forged", () => {
+  it("keeps only the renderer's account of where a raw HTML link goes", async () => {
+    const { div } = await render(
+      '<a href="https://real.test/x" data-tip="https://fake.test" data-href="https://fake.test" title="https://fake.test" aria-description="Goes to fake.test">go</a>',
+    );
+    const a = div.querySelector("a")!;
+    expect(a.hasAttribute("data-tip")).toBe(false);
+    expect(a.hasAttribute("data-href")).toBe(false);
+    expect(a.hasAttribute("title")).toBe(false);
+    expect(a.getAttribute("aria-description")).toBe("Goes to real.test/x");
+  });
+
+  it("describes Markdown and mail links, and drops a Markdown title", async () => {
+    const { div } = await render('[a](https://a.test/p "fake") [b](mailto:b@c.test)');
+    const [a, b] = div.querySelectorAll("a");
+    expect(a.hasAttribute("title")).toBe(false);
+    expect(a.getAttribute("aria-description")).toBe("Goes to a.test/p");
+    expect(b.getAttribute("aria-description")).toBe("Goes to b@c.test");
+  });
+
+  it("leaves note links alone", async () => {
+    const { div } = await render("[[A]] [b](B.md)");
+    for (const a of div.querySelectorAll("a")) expect(a.hasAttribute("aria-description")).toBe(false);
+  });
+});
