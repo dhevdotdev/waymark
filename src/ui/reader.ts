@@ -454,7 +454,7 @@ export class Reader {
   }
 
   /** Cancels a new tab: the tab it opened beside comes back, rather than whichever sits to the right. */
-  private dismissBlank(): void {
+  dismissBlank(): void {
     const blank = this.workspace.activeIndex;
     if (blank > 0) this.workspace.activeIndex = blank - 1;
     this.closeTab(blank);
@@ -599,7 +599,7 @@ export class Reader {
     this.renderTabChrome();
     this.renderTree();
     requestAnimationFrame(() => this.graph?.show(view.note, view.scope));
-    this.graph.arrive(opened);
+    this.graph.arrive(opened, this.els.tabs.contains(document.activeElement));
     this.persist();
   }
 

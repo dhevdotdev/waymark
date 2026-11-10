@@ -8,6 +8,16 @@ function overlayFor(content: HTMLElement): { overlay: HTMLElement; close: () => 
   return { overlay, close: () => fadeOut(overlay) };
 }
 
+/** Holds Tab inside a dialog, wrapping at the ends of its controls. */
+function holdTab(e: KeyboardEvent, controls: HTMLElement[]): void {
+  e.preventDefault();
+  e.stopPropagation();
+  const at = controls.indexOf(document.activeElement as HTMLElement);
+  const step = e.shiftKey ? -1 : 1;
+  const from = at < 0 && e.shiftKey ? 0 : at;
+  controls[(from + step + controls.length) % controls.length].focus();
+}
+
 /** Asks for a short piece of text. `validate` returns why a value cannot be used. Resolves null if cancelled. */
 export function promptText(options: {
   title: string;
@@ -20,6 +30,9 @@ export function promptText(options: {
   return new Promise((resolve) => {
     const form = document.createElement("form");
     form.className = "prompt";
+    form.setAttribute("role", "dialog");
+    form.setAttribute("aria-modal", "true");
+    form.setAttribute("aria-label", options.title);
     const title = document.createElement("h2");
     title.className = "prompt-title";
     title.textContent = options.title;
@@ -47,6 +60,7 @@ export function promptText(options: {
     const { overlay, close } = overlayFor(form);
     const finish = (value: string | null) => {
       close();
+      window.removeEventListener("keydown", onKey, true);
       if (returnFocus instanceof HTMLElement) returnFocus.focus({ preventScroll: true });
       resolve(value);
     };
@@ -54,12 +68,13 @@ export function promptText(options: {
     overlay.addEventListener("pointerdown", (e) => {
       if (e.target === overlay) finish(null);
     });
-    input.addEventListener("keydown", (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
         finish(null);
-      }
-    });
+      } else if (e.key === "Tab") holdTab(e, [input, cancel, submit]);
+    };
+    window.addEventListener("keydown", onKey, true);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const value = input.value.trim();
@@ -116,13 +131,8 @@ export function confirmAction(options: { title: string; body: string; action: st
       if (e.key === "Escape") {
         e.stopPropagation();
         finish(false);
-      } else if (e.key === "Tab") {
-        e.preventDefault();
-        e.stopPropagation();
-        const step = e.shiftKey ? -1 : 1;
-        const from = at < 0 && e.shiftKey ? 0 : at;
-        buttons[(from + step + buttons.length) % buttons.length].focus();
-      } else if (e.key === "Enter" && at < 0) {
+      } else if (e.key === "Tab") holdTab(e, buttons);
+      else if (e.key === "Enter" && at < 0) {
         e.preventDefault();
         e.stopPropagation();
         /* Return never takes a destructive action unless that button was reached on purpose. */

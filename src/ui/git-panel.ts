@@ -3,6 +3,7 @@ import type { PrefStore } from "../prefs";
 import { GitDetail } from "./git-detail";
 import { gitNotice } from "./git-notices";
 import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
+import { keepPlace } from "./keep-place";
 import { fadeOut } from "./overlays";
 import { plural } from "./plural";
 import type { Cue } from "./sound";
@@ -281,15 +282,18 @@ export class GitPanel {
   }
 
   private render(): void {
-    const root = this.root!;
+    keepPlace(this.root!, () => this.draw(this.root!));
+  }
+
+  private draw(root: HTMLElement): void {
     const st = this.status;
-    const typing = root.querySelector<HTMLTextAreaElement>(".commit-box textarea:focus");
     root.replaceChildren();
     root.classList.toggle("is-short", st?.isRepo === false);
 
     const head = el("header", "sync-head");
     const close = el("button", "icon-btn");
     close.setAttribute("aria-label", "Close");
+    close.dataset.control = "close";
     close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
     close.onclick = () => this.close();
     head.append(this.work.element, close);
@@ -352,6 +356,7 @@ export class GitPanel {
     ] as const) {
       const t = el("button", `seg-btn${this.tab === id ? " is-on" : ""}`, label);
       t.setAttribute("role", "tab");
+      t.dataset.control = `tab:${id}`;
       t.setAttribute("aria-selected", String(this.tab === id));
       t.onclick = () => {
         this.tab = id;
@@ -366,14 +371,10 @@ export class GitPanel {
     root.append(tabs);
 
     const body = el("div", "sync-body");
+    body.dataset.scrollKey = `${this.tab}:${this.historyPath}`;
     root.append(body);
     if (this.tab === "changes") this.renderChanges(body, st);
     else this.renderHistory(body);
-    if (typing) {
-      const box = root.querySelector<HTMLTextAreaElement>(".commit-box textarea");
-      box?.focus({ preventScroll: true });
-      box?.setSelectionRange(typing.selectionStart, typing.selectionEnd);
-    }
   }
 
   /** Why the usual comparison with a remote does not apply here, or null when it does. */
@@ -395,6 +396,7 @@ export class GitPanel {
     const actions = el("div", "sync-actions");
     const btn = (label: string, primary: boolean, enabled: boolean, onClick: () => void, hint?: string) => {
       const b = el("button", primary ? "btn btn-primary" : "btn", label);
+      b.dataset.control = label.replace(/ \d+$/, "");
       b.disabled = !enabled || this.busy;
       b.onclick = onClick;
       if (hint) b.title = hint;
@@ -469,9 +471,11 @@ export class GitPanel {
       el("span", "", base.replace(/\.md$/, "")),
       el("span", "change-dir", f.path.slice(0, -base.length).replace(/\/$/, "")),
     );
+    name.dataset.control = `open:${isStaged}:${f.path}`;
     name.onclick = () => void this.detail.showWorktreeDiff(f, isStaged);
     const act = el("button", "icon-btn change-act");
     act.setAttribute("aria-label", isStaged ? `Unstage ${base}` : `Stage ${base}`);
+    act.dataset.control = `act:${isStaged}:${f.path}`;
     act.innerHTML = isStaged
       ? `<svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg>`
       : `<svg viewBox="0 0 16 16"><path d="M8 4v8M4 8h8"/></svg>`;
@@ -501,6 +505,7 @@ export class GitPanel {
       const h = el("div", "change-head");
       h.append(el("span", "", `${label} · ${files.length}`));
       const all = el("button", "link-btn", isStaged ? "Unstage all" : "Stage all");
+      all.dataset.control = `all:${isStaged}`;
       all.onclick = () =>
         void this.run(isStaged ? "Unstaging" : "Staging", () =>
           isStaged ? git.unstage(files.map((f) => f.path)) : git.stage(files.map((f) => f.path)),
@@ -517,6 +522,7 @@ export class GitPanel {
     const msg = el("textarea");
     msg.placeholder = "Describe what changed";
     msg.rows = 3;
+    msg.dataset.control = "message";
     msg.value = this.message ?? this.defaultMessage(st);
     msg.addEventListener("input", () => {
       this.message = msg.value;
@@ -525,11 +531,13 @@ export class GitPanel {
     const hasRemote = Boolean(st.upstream);
     const publish = el("button", "btn btn-primary", hasRemote ? "Commit & Sync" : "Commit");
     publish.type = "submit";
+    publish.dataset.control = "publish";
     publish.disabled = this.busy;
     row.append(publish);
     if (hasRemote) {
       const localOnly = el("button", "btn", "Commit only");
       localOnly.type = "button";
+      localOnly.dataset.control = "commit-only";
       localOnly.disabled = this.busy;
       localOnly.onclick = () => void send(false);
       row.append(localOnly);
@@ -607,6 +615,7 @@ export class GitPanel {
       const scope = el("div", "history-scope");
       scope.append(el("span", "", "History of "), el("strong", "", this.host.title(this.historyPath)));
       const all = el("button", "link-btn", "Whole vault");
+      all.dataset.control = "whole-vault";
       all.onclick = () => {
         this.historyPath = null;
         this.commits = [];
@@ -624,6 +633,7 @@ export class GitPanel {
     for (const c of this.commits) {
       const li = el("li");
       const b = el("button", "commit-row");
+      b.dataset.control = `commit:${c.sha}`;
       b.append(el("span", "commit-subject", c.subject || "(no message)"));
       const meta = el("span", "commit-meta");
       meta.append(el("span", "", c.author), el("span", "", relative(c.date)), el("code", "", c.short));

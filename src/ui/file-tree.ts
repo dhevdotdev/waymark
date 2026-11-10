@@ -4,7 +4,8 @@ import { icons } from "./icons";
 import { isPointerAction } from "./input-origin";
 import { instantly } from "./instant";
 import { flashLanded } from "./list-motion";
-import { captureTree, settleTree } from "./tree-motion";
+import { isShown, ROW } from "./tree-keys";
+import { captureTree, settleTree, type TreeBefore } from "./tree-motion";
 
 const CHEVRON = `<svg class="tree-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
@@ -44,14 +45,33 @@ export class FileTree {
       if (this.box.querySelector(".tree")) this.reveal(current);
       return;
     }
+    let lost: HTMLElement | null = null;
+    let before: TreeBefore | null = null;
+    const moved = current !== this.current;
     if (this.builtFor !== index || !this.box.querySelector(".tree")) {
-      const before = this.takeExpectedEdit() ? captureTree(this.box) : null;
+      lost = this.focusedRow();
+      before = this.takeExpectedEdit() ? captureTree(this.box) : null;
       this.rebuild(index);
-      this.reveal(current);
-      if (before) settleTree(this.box, before);
-      return;
     }
-    this.reveal(current);
+    this.reveal(current, moved);
+    if (lost) this.refocus(lost);
+    if (before) settleTree(this.box, before);
+  }
+
+  private focusedRow(): HTMLElement | null {
+    const active = document.activeElement;
+    return active && this.box.contains(active) ? active.closest<HTMLElement>(ROW) : null;
+  }
+
+  /** Moves focus to the row that had it, or else the nearest folder still in the list, or else the open note. */
+  private refocus({ dataset: { path, folder } }: HTMLElement): void {
+    const head = (name: string) => this.folders.get(name)?.querySelector<HTMLElement>(":scope > .tree-head") ?? null;
+    const same = path ? (this.notes.get(path) ?? null) : head(folder ?? "");
+    const parents = ancestors(path ?? `${folder}/`)
+      .reverse()
+      .map(head);
+    const row = [same, ...parents, this.notes.get(this.current) ?? null].find((r) => r && isShown(r));
+    (row ?? this.box.querySelector<HTMLElement>(ROW))?.focus({ preventScroll: true });
   }
 
   /** The next rebuild is the result of this action. Changes arriving from outside are never expected, so they stay instant. */
@@ -225,24 +245,24 @@ export class FileTree {
   }
 
   /** Marks the open note and, when the note has changed, opens its folders and brings it into view. */
-  private reveal(path: string): void {
+  private reveal(path: string, bringIntoView = true): void {
     if (path === this.current) return;
     this.notes.get(this.current)?.classList.remove("is-current");
     this.current = path;
     const row = this.notes.get(path);
     if (!row) return;
     row.classList.add("is-current");
-    this.expandTo(path, row);
+    this.expandTo(path, row, bringIntoView);
     this.onChange();
   }
 
-  private expandTo(path: string, row: HTMLElement): void {
+  private expandTo(path: string, row: HTMLElement, bringIntoView: boolean): void {
     instantly(this.box, () => {
       for (const folder of ancestors(path)) this.setOpen(folder, true);
     });
     const view = this.box.getBoundingClientRect();
     const r = row.getBoundingClientRect();
-    if (r.top < view.top + 36 || r.bottom > view.bottom - 28) {
+    if (bringIntoView && (r.top < view.top + 36 || r.bottom > view.bottom - 28)) {
       this.box.scrollTop += r.top - view.top - view.height / 2 + r.height / 2;
     }
   }

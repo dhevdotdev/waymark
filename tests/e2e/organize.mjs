@@ -354,6 +354,57 @@ try {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   check("Reduce Motion keeps the landing mark", marked === 1, String(marked));
 
+  {
+    const focusedRow = () =>
+      page.evaluate(
+        () => document.activeElement?.dataset.path ?? document.activeElement?.dataset.folder ?? document.activeElement?.tagName,
+      );
+    const redrawWithout = (removed) =>
+      page.evaluate((gone) => {
+        const { reader } = window.waymark;
+        const index = reader.vault.index;
+        const copy = Object.assign(Object.create(Object.getPrototypeOf(index)), index, {
+          notes: index.notes.filter((n) => !gone.some((g) => n === g || n.startsWith(`${g}/`))),
+        });
+        reader.sidebar.renderTree(copy, reader.current);
+      }, removed);
+    await page.evaluate(() => {
+      window.waymark.reader.sidebar.tree.openFolder("Sorted");
+    });
+    await pause(250);
+    await page.locator('.nav-item[data-path="Sorted/Banana.md"]').focus();
+    const tree = page.locator(".sidebar .tree").first();
+    const list = page.locator(".sidebar-inner");
+    await list.evaluate((b) => {
+      b.style.maxBlockSize = "120px";
+      b.scrollTop = 40;
+    });
+    const scrollBefore = await list.evaluate((b) => b.scrollTop);
+    await redrawWithout([]);
+    check("a rebuild keeps focus on the same row", (await focusedRow()) === "Sorted/Banana.md", await focusedRow());
+    check("only that row holds the Tab stop", (await tree.locator('[tabindex="0"]').count()) === 1);
+    check(
+      "a rebuild keeps the tree's scroll",
+      scrollBefore > 0 && (await list.evaluate((b) => b.scrollTop)) === scrollBefore,
+      String(scrollBefore),
+    );
+    await list.evaluate((b) => b.style.removeProperty("max-block-size"));
+    await redrawWithout(["Sorted/Banana.md"]);
+    check("a removed row hands focus to its folder", (await focusedRow()) === "Sorted", await focusedRow());
+    await redrawWithout([]);
+    await page.locator('.nav-item[data-path="Sorted/Banana.md"]').focus();
+    await redrawWithout(["Sorted"]);
+    const fallback = await focusedRow();
+    check("when the folder goes too, focus lands on a row", typeof fallback === "string" && fallback.endsWith(".md"), fallback);
+    await redrawWithout([]);
+    await page.evaluate(() => document.activeElement?.blur());
+    await redrawWithout([]);
+    check("a rebuild does not pull focus into the tree", (await focusedRow()) === "BODY", await focusedRow());
+    await page.evaluate(() => {
+      const { reader } = window.waymark;
+      reader.sidebar.renderTree(reader.vault.index, reader.current);
+    });
+  }
   /* Tabs (#20) */
   await openNote("Welcome");
   const openTab = (note) => page.evaluate((n) => window.waymark.reader.open(`${n}.md`, { newTab: true, focus: true }), note);
@@ -365,6 +416,72 @@ try {
   await pause(120);
   const tabs = () => page.$$eval(".tab .tab-title", (t) => t.map((x) => x.textContent).join());
   const activeTab = () => page.textContent(".tab.is-active .tab-title");
+
+  {
+    const strip = () =>
+      page.evaluate(() => ({
+        stops: [...document.querySelectorAll(".tab")].map((t) => t.tabIndex).join(),
+        active: document.querySelector(".tab.is-active .tab-title").textContent,
+        focusIsActiveTab: document.activeElement === document.querySelector(".tab.is-active"),
+        focusIsClose: document.activeElement?.matches("[data-tab-close]") ?? false,
+      }));
+    check("only the active tab is a Tab stop", (await strip()).stops === "0,-1,-1", (await strip()).stops);
+    await page.keyboard.press("Tab");
+    await page.locator(".tab.is-active").focus();
+    await page.keyboard.press("ArrowRight");
+    const moved = await strip();
+    check("ArrowRight selects the next tab at once", moved.active === "Refs" && moved.focusIsActiveTab, JSON.stringify(moved));
+    check("the Tab stop follows the selection", moved.stops === "-1,0,-1", moved.stops);
+    await page.keyboard.press("End");
+    check("End reaches the last tab", (await strip()).active === "Apple" && (await strip()).focusIsActiveTab);
+    await page.keyboard.press("ArrowRight");
+    check("ArrowRight wraps to the first tab", (await strip()).active === "Welcome" && (await strip()).focusIsActiveTab);
+    await page.keyboard.press("ArrowLeft");
+    check("ArrowLeft wraps to the last tab", (await strip()).active === "Apple");
+    await page.keyboard.press("Home");
+    check("Home reaches the first tab", (await strip()).active === "Welcome");
+    for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowRight", { delay: 0 });
+    await pause(250);
+    const rapid = await strip();
+    check(
+      "rapid arrows land on the right tab and keep focus",
+      rapid.active === "Refs" && rapid.focusIsActiveTab,
+      JSON.stringify(rapid),
+    );
+    await page.waitForFunction(() => document.querySelector(".doc")?.textContent.length > 0);
+
+    await page.locator(".tab.is-active [data-tab-close]").focus();
+    const closeStyle = await page.locator(".tab.is-active [data-tab-close]").evaluate((b) => ({
+      opacity: getComputedStyle(b).opacity,
+      transition: getComputedStyle(b).transitionDuration,
+    }));
+    check(
+      "a focused close control is fully visible at once",
+      closeStyle.opacity === "1" && /^0s/.test(closeStyle.transition),
+      JSON.stringify(closeStyle),
+    );
+    await page.evaluate(() => window.waymark.reader.renderTabs());
+    check("a redraw keeps focus on the close control", (await strip()).focusIsClose);
+    await page.keyboard.press("Enter");
+    await pause(200);
+    const closed = await strip();
+    check(
+      "closing from the keyboard moves focus to the tab that takes over",
+      closed.focusIsActiveTab && closed.stops.split(",").length === 2,
+      JSON.stringify(closed),
+    );
+    await page.keyboard.press("Meta+Shift+t");
+    await pause(200);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.locator(".tab").first().click();
+    await pause(120);
+    const afterClick = await strip();
+    check(
+      "a click selects a tab without taking focus or showing a ring",
+      !afterClick.focusIsActiveTab,
+      JSON.stringify(afterClick),
+    );
+  }
   check("tabs start in the order they opened", (await tabs()) === "Welcome,Refs,Apple", await tabs());
   const t0 = await page.locator(".tab").nth(0).boundingBox();
   const t2 = await page.locator(".tab").nth(2).boundingBox();
@@ -422,6 +539,40 @@ try {
     (await tabs()) === "Apple,Refs,Welcome" && (await page.locator(".tab.is-pinned").count()) === 1,
     await tabs(),
   );
+  {
+    const countTabs = () => page.locator(".tab").count();
+    const before = await countTabs();
+    await page.locator(".tab").nth(1).click();
+    await pause(150);
+    const opener = await activeTab();
+    await page.keyboard.press("Meta+t");
+    await pause(200);
+    check(
+      "a new tab opens blank behind the palette",
+      (await activeTab()) === "New tab" && (await page.locator(".palette").count()) === 1,
+    );
+    check("the palette's field has focus", await page.evaluate(() => document.activeElement?.matches(".palette input")));
+    await page.keyboard.press("Meta+w");
+    await pause(200);
+    check("⌘W closes a blank tab from the palette field", (await countTabs()) === before, String(await countTabs()));
+    check("the palette closes with it", (await page.locator(".palette:not(.is-leaving)").count()) === 0);
+    check("the tab it opened beside comes back", (await activeTab()) === opener, await activeTab());
+    await page.keyboard.press("Meta+t");
+    await pause(200);
+    await page.keyboard.press("Escape");
+    await pause(120);
+    check("Escape closed the palette and kept the blank tab", (await activeTab()) === "New tab");
+    await page.keyboard.press("Meta+w");
+    await pause(200);
+    check("⌘W closes a blank tab with the palette shut too", (await countTabs()) === before && (await activeTab()) === opener);
+    await page.keyboard.press("Meta+k");
+    await pause(120);
+    await page.keyboard.press("Meta+w");
+    await pause(120);
+    check("⌘W over a note leaves the tab alone while typing", (await countTabs()) === before);
+    await page.keyboard.press("Escape");
+    await pause(120);
+  }
   check("a pinned tab has no close button", (await page.locator(".tab.is-pinned .tab-close").count()) === 0);
   await page.locator(".tab.is-pinned").click();
   await pause(150);

@@ -190,9 +190,46 @@ await page.click(".diagram-expand");
 await pause(500);
 const lb = await page.evaluate(() => document.querySelector(".lightbox svg")?.getBoundingClientRect().width ?? 0);
 check("diagram enlarges", lb > 900, `${lb.toFixed(0)}px wide`);
+check(
+  "the close control takes focus without a ring from the pointer",
+  await page.locator(".lightbox-close").evaluate((b) => document.activeElement === b && !b.matches(":focus-visible")),
+);
+await page.locator(".lightbox-sheet svg").click();
+await pause(250);
+check("clicking the diagram keeps it enlarged", (await page.locator(".lightbox:not(.is-leaving)").count()) === 1);
+const closeBox = await page.locator(".lightbox-close").boundingBox();
+const sheetBox = await page.locator(".lightbox-sheet").boundingBox();
+check(
+  "the close control is visible and clear of the content",
+  closeBox && closeBox.width >= 24 && closeBox.y + closeBox.height <= sheetBox.y + 1,
+  JSON.stringify(closeBox),
+);
+await page.keyboard.press("Tab");
+check("Tab stays on the close control", await page.locator(".lightbox-close").evaluate((b) => document.activeElement === b));
+await page.mouse.move(sheetBox.x + 60, sheetBox.y + 60);
+await page.mouse.down();
+await page.mouse.move(4, 400);
+await page.mouse.up();
+await pause(250);
+check("dragging out of the diagram keeps it open", (await page.locator(".lightbox:not(.is-leaving)").count()) === 1);
+await page.locator(".lightbox-close").click();
+await pause(300);
+check("the close control closes it", (await page.locator(".lightbox").count()) === 0);
+await page.click(".diagram-expand");
+await pause(400);
+await page.mouse.click(4, 400);
+await pause(300);
+check("clicking the backdrop closes it", (await page.locator(".lightbox").count()) === 0);
+await page.focus(".diagram-expand");
+await page.keyboard.press("Enter");
+await pause(400);
 await page.keyboard.press("Escape");
 await pause(300);
 check("Escape closes the enlarged diagram", (await page.locator(".lightbox").count()) === 0);
+check(
+  "closing returns focus to the expand button",
+  await page.evaluate(() => document.activeElement?.classList.contains("diagram-expand")),
+);
 
 // Appearance switch redraws the diagram in the new palette
 const fill0 = await page.evaluate(
@@ -255,8 +292,10 @@ const paletteSizeFor = async (query) => {
 const paletteSizes = [];
 for (const query of ["", "show", "tide", "a", "zzzzqqq"]) paletteSizes.push(await paletteSizeFor(query));
 check(
-  "the palette keeps one height while typing",
-  new Set(paletteSizes.map((s) => s.height)).size === 1,
+  "the palette sizes to its results up to its maximum",
+  paletteSizes.every((s) => s.height <= 460) &&
+    Math.max(...paletteSizes.map((s) => s.height)) === 460 &&
+    paletteSizes[4].height < 200,
   JSON.stringify(paletteSizes),
 );
 const typedRows = paletteSizes.slice(1, 4);

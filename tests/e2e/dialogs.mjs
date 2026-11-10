@@ -98,6 +98,107 @@ try {
   await page.evaluate(() => {
     for (const overlay of document.querySelectorAll(".prompt-overlay")) overlay.remove();
   });
+
+  /* The palette sizes to its results up to a maximum, and its field never moves. */
+  const paletteBox = () =>
+    page.evaluate(() => {
+      const box = document.querySelector(".palette").getBoundingClientRect();
+      const field = document.querySelector(".palette-field").getBoundingClientRect();
+      const list = document.querySelector(".palette-list");
+      return { height: box.height, fieldTop: field.top, overflows: list.scrollHeight > list.clientHeight };
+    });
+  await page.keyboard.press("Meta+k");
+  await pause(80);
+  const recent = await paletteBox();
+  await page.keyboard.type("zzzzqqqq");
+  await pause(80);
+  const none = await paletteBox();
+  check("no result leaves a short palette", none.height < 200, String(none.height));
+  check("the field stays put when the results shrink", none.fieldTop === recent.fieldTop, `${recent.fieldTop} ${none.fieldTop}`);
+  check(
+    "the palette does not animate its height",
+    await page.locator(".palette").evaluate((p) => {
+      const { transitionProperty, transitionDuration } = getComputedStyle(p);
+      return transitionDuration === "0s" || !/height|all/.test(transitionProperty);
+    }),
+  );
+  await page.locator(".palette-field input").fill(`${"long ".repeat(400)}`);
+  await pause(80);
+  const wordy = await paletteBox();
+  check("a very long query stays within the maximum", wordy.height <= 460, String(wordy.height));
+  await page.locator(".palette-field input").fill(">");
+  await pause(80);
+  const many = await paletteBox();
+  const fieldHeight = await page.locator(".palette-field").evaluate((f) => f.getBoundingClientRect().height);
+  check("a long list does not squash the field", fieldHeight === 52, String(fieldHeight));
+  check("many results stop at the maximum and scroll", many.height === 460 && many.overflows, JSON.stringify(many));
+  check("the field stays put at the maximum", many.fieldTop === recent.fieldTop);
+  await page.keyboard.press("Escape");
+  await pause(80);
+
+  /* The text prompt is a modal dialog: Tab stays inside it and focus goes back afterwards. */
+  const askName = () =>
+    page.evaluate(async () => {
+      const { promptText } = await import(/* @vite-ignore */ `${location.origin}/src/ui/prompts.ts`);
+      const opener = document.querySelector('.nav-item[data-path="Linker.md"]');
+      opener.focus();
+      window.answer = "unanswered";
+      void promptText({
+        title: "Name this",
+        value: "Draft",
+        action: "OK",
+        validate: (v) => (v ? null : "A name is needed"),
+      }).then((v) => {
+        window.answer = v;
+      });
+    });
+  const focused = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return a.tagName === "INPUT" ? "input" : a.textContent.trim() || a.tagName;
+    });
+  await askName();
+  await pause(80);
+  const dialog = page.locator(".prompt");
+  check(
+    "the prompt is a modal dialog",
+    (await dialog.getAttribute("role")) === "dialog" && (await dialog.getAttribute("aria-modal")) === "true",
+  );
+  check("the prompt has a name", (await dialog.getAttribute("aria-label")) === "Name this");
+  check("the prompt opens on its field", (await focused()) === "input");
+  const walk = [];
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Tab");
+    walk.push(await focused());
+  }
+  check("Tab walks the prompt and wraps", walk.join() === "Cancel,OK,input", walk.join());
+  await page.keyboard.press("Shift+Tab");
+  check("Shift+Tab wraps backwards", (await focused()) === "OK", await focused());
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Escape");
+  await pause(150);
+  check("Escape cancels from a button too", (await page.evaluate(() => window.answer)) === null);
+  check(
+    "cancelling returns focus to what opened it",
+    (await page.evaluate(() => document.activeElement.dataset.path)) === "Linker.md",
+  );
+  await askName();
+  await pause(80);
+  await page.locator(".prompt input").fill("");
+  await page.keyboard.press("Enter");
+  await pause(80);
+  check("a refused value keeps the dialog open", (await page.locator(".prompt-note.is-problem").count()) === 1);
+  await page.locator(".prompt-title").click();
+  await page.keyboard.press("Tab");
+  check("Tab still lands inside after a click on plain text", (await focused()) === "input", await focused());
+  await page.locator(".prompt input").fill("Fine");
+  await page.keyboard.press("Enter");
+  await pause(150);
+  check("an accepted value resolves", (await page.evaluate(() => window.answer)) === "Fine");
+  check(
+    "accepting returns focus to what opened it",
+    (await page.evaluate(() => document.activeElement.dataset.path)) === "Linker.md",
+  );
 } catch (e) {
   check("the run finished", false, String(e).split("\n")[0]);
 } finally {

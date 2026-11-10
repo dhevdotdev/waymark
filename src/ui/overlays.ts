@@ -1,3 +1,4 @@
+import { icons } from "./icons";
 import { isPointerAction } from "./input-origin";
 
 /** While one of these is open it answers Escape itself, so the window must not act on the key too. */
@@ -43,8 +44,12 @@ export function toast(message: string, action?: { label: string; run: () => void
 }
 
 export function lightbox(content: Element): void {
+  const returnFocus = document.activeElement;
   const box = document.createElement("div");
   box.className = "overlay lightbox";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.setAttribute("aria-label", "Enlarged view");
   const sheet = document.createElement("div");
   sheet.className = "lightbox-sheet";
   if (content instanceof SVGElement) {
@@ -53,20 +58,34 @@ export function lightbox(content: Element): void {
     content.removeAttribute("height");
   }
   sheet.append(content);
-  box.append(sheet);
+  const closer = document.createElement("button");
+  closer.type = "button";
+  closer.className = "icon-btn lightbox-close";
+  closer.setAttribute("aria-label", "Close");
+  closer.innerHTML = icons.close;
+  box.append(sheet, closer);
   const close = () => {
     fadeOut(box);
     window.removeEventListener("keydown", onKey, true);
+    if (returnFocus instanceof HTMLElement) returnFocus.focus({ preventScroll: true });
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       e.stopPropagation();
       close();
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      closer.focus();
     }
   };
-  box.addEventListener("click", close);
+  /* A press, as on the other sheets, so a drag that starts inside and ends outside closes nothing. */
+  box.addEventListener("pointerdown", (e) => {
+    if (e.target === box) close();
+  });
+  closer.addEventListener("click", close);
   window.addEventListener("keydown", onKey, true);
   document.body.append(box);
+  closer.focus({ preventScroll: true });
 }
 
 /** Calls `close` on Escape or a press outside `inside`. Returns a function that stops listening. */

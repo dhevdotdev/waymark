@@ -10,6 +10,7 @@ interface TabActionsHost {
   render: () => void;
   persist: () => void;
   close: (index: number) => void;
+  activate: (index: number) => void;
   toast: (message: string) => void;
   saveScroll: () => void;
   show: () => void;
@@ -29,6 +30,11 @@ export class TabActions {
   constructor(private readonly host: TabActionsHost) {
     host.strip.addEventListener("contextmenu", (e) => this.onMenu(e));
     host.strip.addEventListener("pointerdown", (e) => this.onDown(e));
+    host.strip.addEventListener("keydown", (e) => this.onKey(e));
+    /* Selecting a tab with the pointer leaves focus where it was, as it does on a toolbar. */
+    host.strip.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).closest(".tab")) e.preventDefault();
+    });
   }
 
   private settled(): void {
@@ -57,6 +63,25 @@ export class TabActions {
     if (result.kind === "opened") this.host.show();
     else if (result.kind === "nothing") this.host.toast("No closed tabs to reopen.");
     else this.host.toast(`${nameOf(result.view)} is no longer in the vault, so its tab can't come back.`);
+  }
+
+  /** Arrow keys move along the strip and select as they go, wrapping at the ends. */
+  private onKey(e: KeyboardEvent): void {
+    if (!(e.target as HTMLElement).closest(".tab") || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const { activeIndex, tabs } = this.host.workspace;
+    const last = tabs.length - 1;
+    const targets: Record<string, number> = {
+      ArrowLeft: activeIndex === 0 ? last : activeIndex - 1,
+      ArrowRight: activeIndex === last ? 0 : activeIndex + 1,
+      Home: 0,
+      End: last,
+    };
+    const to = targets[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.host.activate(to);
+    this.host.render();
   }
 
   private onMenu(e: MouseEvent): void {

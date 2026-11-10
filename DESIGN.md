@@ -20,7 +20,10 @@ Every state has a visible way in and a visible way out.
 - The sidebar always shows a `Files | Search` switch. Search keeps its query and results while you are in Files. Escape returns to Files, and the X only clears the field.
 - The graph is a tab, as in Obsidian. ⌘G brings an open graph forward or opens one beside the current tab. Clicking a note in it replaces it in that tab, and Back returns to it. Escape steps back or closes the tab.
 - Anything that covers something closes with Escape and has a visible control. The button that opened a view stays pressed while the view is open.
+- The lightbox closes from its backdrop, its close control or Escape, never from a click on what it shows.
+- A status refresh or a file list rebuild keeps focus and scroll where they were. If the focused item has gone, focus moves to the sheet that holds it, or to the nearest folder in the list.
 - A new tab is a real tab labelled "New tab", blank behind the palette. The first note or graph opened replaces it and leaves nothing to go back to. Escape closes the palette, a second Escape closes the tab, and a blank tab is never restored after a restart.
+- ⌘W closes a blank tab even while its palette holds focus, and the tab it opened beside comes back, as with Escape. The last tab stays.
 - The palette is anchored at its top edge and sizes to its results up to a maximum, so the field and the rows above never move. Headings appear only before a query.
 - The Dock icon follows the theme family while Waymark runs, recoloured from one artwork by `scripts/theme-icons.mjs`. macOS shows the bundled Catppuccin icon whenever the app is closed.
 - Note history can bring back an older version. It is written to the working file as an ordinary uncommitted change, so it goes through the normal review and commit. Anything that Git does not hold is first saved as a copy beside the note, after asking. Git's history is never rewritten.
@@ -47,6 +50,7 @@ Every state has a visible way in and a visible way out.
 - Notes move by dragging them in the file list, along the same path as Move to…, so links are rewritten and a note of the same name is never overwritten. The rows hold still during a drag unless the pointer rests on a closed folder, which opens it, or reaches the edge of the list, which scrolls it. A move is refused while Git is changing files, and says so. Escape cancels.
 - Notes can be ordered by date modified. The choice is kept with the app's preferences, never in the vault. Date means the file's time on disk, so a fresh clone stamps its notes within about a second, and they fall back to name order until they are edited. Notes a pull changes rise to the top. Folders stay in name order.
 - Tabs reorder by dragging and from the tab's menu or the palette. Pinned tabs sit together at the left, survive a relaunch and cannot be closed by accident: closing one says to unpin it first.
+- The active tab is the strip's one Tab stop. Left, Right, Home and End move along the strip and select as they go, and focus follows. A click selects a tab without taking focus. A focused close control shows at full strength at once.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
 - Nothing sits between the path row and the note. The trail is a section in the right panel, so a note starts at the same height whether or not its tab has a trail.

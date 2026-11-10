@@ -76,9 +76,10 @@ export class GraphView {
     this.bind();
   }
 
-  /** Takes the keyboard. Only a graph just opened with the pointer fades in; a tab switch, Back or a shortcut shows it at once. */
-  arrive(opened: boolean): void {
-    if (!this.arrived || document.activeElement === document.body) this.canvas.canvas.focus({ preventScroll: true });
+  /** Takes the keyboard unless `keepFocus`. Only a graph just opened with the pointer fades in; a tab switch, Back or a shortcut shows it at once. */
+  arrive(opened: boolean, keepFocus = false): void {
+    const take = !keepFocus && (!this.arrived || document.activeElement === document.body);
+    if (take) this.canvas.canvas.focus({ preventScroll: true });
     this.arrived = true;
     if (!opened || !isPointerAction()) return;
     this.root.animate({ opacity: [0, 1] }, { duration: tokenMs("--t-exit"), easing: tokenEasing("--ease-out") });
