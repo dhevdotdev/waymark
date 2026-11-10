@@ -196,7 +196,7 @@ export class TrailPanel {
   /** Scrolls the panel just enough to show the current stop. */
   reveal(): void {
     const row = this.rows.get(this.current);
-    const body = this.root.closest<HTMLElement>(".rail-body");
+    const body = this.root.closest<HTMLElement>(".rail-trail");
     if (!row || !body || !row.offsetParent) return;
     const room = ROW / 2;
     const bounds = body.getBoundingClientRect();

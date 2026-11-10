@@ -302,7 +302,7 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   const before = titleTop();
   readout?.click();
   await wait(250);
-  const pane = document.querySelector<HTMLElement>('[data-pane="trail"]');
+  const pane = document.querySelector<HTMLElement>('[data-lower-pane="trail"]');
   check(
     "the readout opens the trail panel",
     pane !== null && !pane.hidden && document.querySelectorAll(".trail-row").length === 3,
@@ -310,10 +310,10 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   check("opening the trail leaves the note where it was", titleTop() === before, titleTop());
   document.querySelector<HTMLElement>(".trail-row:not(.is-current)")?.click();
   await wait(400);
-  check("clicking a stop moves the tab and leaves the trail open", !pane?.hidden && reader.inspector.pane === "trail");
+  check("clicking a stop moves the tab and leaves the trail open", !pane?.hidden && reader.inspector.lower === "trail");
   reader.trail.togglePanel();
   await wait(100);
-  check("closing puts the panel back", reader.inspector.pane === "links");
+  check("closing puts the panel back", reader.inspector.lower === "graph");
   reader.openGraph("vault");
   await wait(1500);
   check("graph opens", !!document.querySelector(".graph-view canvas"));

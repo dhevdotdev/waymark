@@ -1,7 +1,7 @@
 import type { View } from "../vault/trail";
 import type { Tab } from "../vault/workspace";
 import { icons } from "./icons";
-import type { Inspector, RailPane } from "./inspector";
+import type { Inspector, RailLower } from "./inspector";
 import { toast } from "./overlays";
 import type { ShellElements } from "./shell";
 import { TrailPanel } from "./trail-panel";
@@ -24,7 +24,7 @@ export class TrailActions {
   private readonly empty = document.createElement("p");
   private readonly tabButton: HTMLElement;
   private undoLast: (() => void) | null = null;
-  private returnTo: { pane: RailPane; railWasHidden: boolean } | null = null;
+  private returnTo: { lower: RailLower; railWasHidden: boolean } | null = null;
 
   constructor(
     private readonly els: ShellElements,
@@ -45,7 +45,7 @@ export class TrailActions {
     this.empty.className = "rail-empty";
     this.empty.textContent = "Follow a link and the notes this tab passes through collect here.";
     els.trailPane.append(this.panel.root, this.empty);
-    this.tabButton = els.shell.querySelector<HTMLElement>('[data-rail="trail"]')!;
+    this.tabButton = els.shell.querySelector<HTMLElement>('[data-lower="trail"]')!;
   }
 
   /** The panel only sits beside notes, so the graph, a base and a blank tab have nothing to open. */
@@ -96,16 +96,16 @@ export class TrailActions {
   togglePanel(): void {
     if (!this.available) return;
     const inspector = this.host.inspector();
-    if (inspector.isShowing && inspector.pane === "trail") {
-      const before = this.returnTo ?? { pane: "links" as const, railWasHidden: false };
+    if (inspector.isShowing && inspector.lower === "trail") {
+      const before = this.returnTo ?? { lower: "graph" as const, railWasHidden: false };
       this.returnTo = null;
-      inspector.setPane(before.pane);
+      inspector.setLower(before.lower);
       if (before.railWasHidden) inspector.toggle();
       this.els.scroller.focus({ preventScroll: true });
       return;
     }
-    this.returnTo = { pane: inspector.pane, railWasHidden: !inspector.isShowing };
-    inspector.setPane("trail");
+    this.returnTo = { lower: inspector.lower, railWasHidden: !inspector.isShowing };
+    inspector.setLower("trail");
     if (!inspector.isShowing) inspector.toggle();
     this.panel.focusCurrent();
   }

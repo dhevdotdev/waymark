@@ -103,9 +103,11 @@ export class Reader {
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
         paneChanged: () => this.trail.panel.reveal(),
+        lowerChanged: (lower) => prefs.update((next) => Object.assign(next, { railLower: lower })),
         railToggled: (open) => prefs.update((next) => Object.assign(next, { rail: open })),
       },
       p.railPane,
+      p.railLower,
     );
 
     this.editing = new NoteEditing({

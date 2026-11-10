@@ -897,9 +897,6 @@ kbd {
 }
 
 /* The trail's panel: one row per stop, with side branches stepped in under the stop they left from. */
-.shell.on-trail .rail-graph {
-  display: none;
-}
 .trail {
   position: relative;
 }
@@ -1169,7 +1166,8 @@ kbd {
 .rail-tabs {
   flex: none;
 }
-.rail-tabs .seg-btn {
+.rail-tabs .seg-btn,
+.rail-lower-tabs .seg-btn {
   padding: 0 6px;
   font-variant-numeric: tabular-nums;
 }
@@ -1341,14 +1339,46 @@ kbd {
   border-radius: var(--r-chip);
   background: var(--fill);
 }
-.rail-graph {
+/* The lower half keeps one height, so choosing Trail or Graph leaves Links and Info where they are. */
+.rail-lower {
   flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  block-size: clamp(170px, 44%, 340px);
   margin-inline: -8px;
   padding: 10px 8px 0;
-  border-top: 1px solid var(--rule);
+  border-block-start: 1px solid var(--rule);
 }
-.rail-graph.is-empty {
+.rail-lower-tabs {
+  flex: none;
+}
+.rail-trail {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.rail-trail::-webkit-scrollbar {
   display: none;
+}
+.rail-graph {
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rail-graph-head {
+  justify-content: flex-end;
+  padding-block-end: 2px;
+}
+.rail-graph-empty,
+.rail-graph.is-empty :is(.rail-graph-head, .local-graph) {
+  display: none;
+}
+.rail-graph.is-empty .rail-graph-empty {
+  display: block;
 }
 
 /* ---------- Status bar: the vault's state and whole-vault views ---------- */
@@ -1412,10 +1442,17 @@ kbd {
   background: var(--selected);
   color: var(--ink);
 }
+.local-graph {
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+}
 .local-graph canvas {
   display: block;
+  flex: 1;
+  min-block-size: 0;
   width: 100%;
-  height: 168px;
   touch-action: none;
 }
 .local-graph canvas:focus-visible {

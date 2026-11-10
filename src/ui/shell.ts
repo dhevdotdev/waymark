@@ -87,14 +87,19 @@ function template(options: ShellOptions): string {
           <div class="seg seg-full rail-tabs" role="tablist">
             <button class="seg-btn" role="tab" data-rail="links">Links</button>
             <button class="seg-btn" role="tab" data-rail="info">Info</button>
-            <button class="seg-btn" role="tab" data-rail="trail">Trail</button>
           </div>
           <div class="rail-body">
             <div class="rail-pane rail-links" data-pane="links"></div>
             <div class="rail-pane rail-info" data-pane="info"></div>
-            <div class="rail-pane rail-trail" data-pane="trail"></div>
           </div>
-          <div class="rail-graph"></div>
+          <section class="rail-lower" aria-label="This tab's trail and the local graph">
+            <div class="seg seg-full rail-lower-tabs" role="tablist">
+              <button class="seg-btn" role="tab" data-lower="graph">Graph</button>
+              <button class="seg-btn" role="tab" data-lower="trail">Trail</button>
+            </div>
+            <div class="rail-pane rail-graph" data-lower-pane="graph"></div>
+            <div class="rail-pane rail-trail" data-lower-pane="trail"></div>
+          </section>
         </div>
       </aside>
       <footer class="statusbar">

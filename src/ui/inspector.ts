@@ -8,12 +8,14 @@ import { railFloats } from "./media";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import type { ShellElements } from "./shell";
 
-export type RailPane = "links" | "info" | "trail";
+export type RailPane = "links" | "info";
+export type RailLower = "graph" | "trail";
 
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
   paneChanged: () => void;
   railToggled: (open: boolean) => void;
+  lowerChanged: (lower: RailLower) => void;
 }
 
 /** The right panel: links, note details and the local graph. It also owns the heading outline on the reading pane. */
@@ -23,18 +25,20 @@ export class Inspector {
   private localGraph: LocalGraph | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
-  pane: RailPane;
+  lower: RailLower;
 
   constructor(
     private readonly els: ShellElements,
     private readonly vault: VaultStore,
     private readonly host: InspectorHost,
     pane: RailPane,
+    lower: RailLower,
   ) {
-    this.pane = pane;
+    this.lower = lower;
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
     this.setPane(pane);
+    this.showLower(lower);
   }
 
   render(path: string, rendered: RenderedNote): void {
@@ -54,8 +58,6 @@ export class Inspector {
 
   setPane(pane: RailPane): void {
     const { shell, railBody } = this.els;
-    this.pane = pane;
-    shell.classList.toggle("on-trail", pane === "trail");
     for (const button of shell.querySelectorAll<HTMLElement>("[data-rail]")) {
       const on = button.dataset.rail === pane;
       button.classList.toggle("is-on", on);
@@ -64,6 +66,24 @@ export class Inspector {
     for (const el of shell.querySelectorAll<HTMLElement>("[data-pane]")) el.hidden = el.dataset.pane !== pane;
     railBody.scrollTop = 0;
     this.refreshHistory();
+  }
+
+  /** The panel's lower half, so the trail and the links can be read side by side. */
+  setLower(lower: RailLower): void {
+    this.showLower(lower);
+    this.host.lowerChanged(lower);
+  }
+
+  private showLower(lower: RailLower): void {
+    const { shell } = this.els;
+    this.lower = lower;
+    shell.classList.toggle("on-trail", lower === "trail");
+    for (const button of shell.querySelectorAll<HTMLElement>("[data-lower]")) {
+      const on = button.dataset.lower === lower;
+      button.classList.toggle("is-on", on);
+      button.setAttribute("aria-selected", String(on));
+    }
+    for (const el of shell.querySelectorAll<HTMLElement>("[data-lower-pane]")) el.hidden = el.dataset.lowerPane !== lower;
     this.host.paneChanged();
   }
 
@@ -199,7 +219,7 @@ export class Inspector {
     const incoming = links.in.get(this.current) ?? new Set<string>();
     const ids = new Set([...out, ...incoming]);
     if (!this.localGraph) {
-      box.innerHTML = `<div class="rail-title"><span>Graph</span><button class="link-btn" data-act="graph-local">Expand</button></div>`;
+      box.innerHTML = `<div class="rail-title rail-graph-head"><button class="link-btn" data-act="graph-local">Expand</button></div><p class="rail-empty rail-graph-empty">No links to or from this note.</p>`;
       this.localGraph = new LocalGraph((id, newTab) => this.host.openFromGraph(id, newTab));
       box.append(this.localGraph.root);
     }

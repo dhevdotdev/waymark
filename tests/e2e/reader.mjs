@@ -388,7 +388,7 @@ await page.evaluate(async () => {
 });
 await pause(400);
 const readout = page.locator(".trail-readout");
-const trailPane = page.locator('[data-pane="trail"]');
+const trailPane = page.locator('[data-lower-pane="trail"]');
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 const slotPlace = () =>
   page.locator(".trail-slot").evaluate((s) => {
@@ -433,6 +433,7 @@ const titleBeforeOpen = await titleTop();
 await readout.click();
 await pause(200);
 check("the readout opens the trail in the panel", await trailPane.isVisible());
+check("the trail sits beside the links, both on screen", await page.locator('[data-pane="links"]').isVisible());
 check("opening the trail leaves the note where it was", (await titleTop()) === titleBeforeOpen, `${titleBeforeOpen}`);
 check(
   "the readout shows the trail is open",
@@ -514,7 +515,8 @@ await page.locator(".doc").click({ position: { x: 4, y: 4 } });
 await readout.click();
 await pause(200);
 check("the readout closes the trail again", !(await trailPane.isVisible()));
-check("closing goes back to the pane that was showing", await page.locator('[data-pane="links"]').isVisible());
+check("closing goes back to what was showing", await page.locator('[data-lower-pane="graph"]').isVisible());
+check("closing leaves the links alone", await page.locator('[data-pane="links"]').isVisible());
 await page.keyboard.press("Meta+y");
 await pause(200);
 const onCurrentRow = await focusedRow();
@@ -582,7 +584,7 @@ check(
   "removing the last other stop empties the trail and keeps the note",
   !(await readout.isVisible()) && (await page.locator(".trail").isHidden()),
 );
-await page.click('[data-rail="links"]');
+await page.click('[data-lower="graph"]');
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
 await pause(450);
@@ -614,7 +616,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   await p.waitForTimeout(300);
   const body = () =>
     p.evaluate(() => {
-      const b = document.querySelector(".rail-body");
+      const b = document.querySelector(".rail-trail");
       const box = b.getBoundingClientRect();
       const rows = [...document.querySelectorAll(".trail-row")];
       const seen = (r) => r.getBoundingClientRect().top >= box.top - 1 && r.getBoundingClientRect().bottom <= box.bottom + 1;
@@ -639,7 +641,10 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   check("every row is one line high", opened.heights === 1);
   check("no row runs out of the panel", opened.inside);
   const title0 = await p.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
-  await p.mouse.move(1180, 250);
+  const links = () => p.evaluate(() => document.querySelector(".rail-body").scrollTop);
+  const linksBefore = await links();
+  const trailBox = await p.locator(".rail-trail").boundingBox();
+  await p.mouse.move(trailBox.x + trailBox.width / 2, trailBox.y + trailBox.height / 2);
   await p.mouse.wheel(0, -3000);
   await p.waitForTimeout(200);
   const atStart = await body();
@@ -648,9 +653,26 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   await p.waitForTimeout(200);
   const atEnd = await body();
   check("the real wheel reaches the last stop", atEnd.top > 0 && atEnd.last, JSON.stringify(atEnd));
+  check("scrolling the trail leaves the links alone", (await links()) === linksBefore);
   check(
     "scrolling the trail leaves the note alone",
     (await p.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === title0,
+  );
+  const stopsBefore = await p.locator(".trail-row").count();
+  const unseen = await p.evaluate(() => {
+    const onTrail = new Set([...document.querySelectorAll(".trail-name")].map((n) => n.textContent));
+    return [...document.querySelectorAll(".rail-links .rail-link")].findIndex(
+      (l) => !onTrail.has(l.querySelector(".rail-link-name").textContent),
+    );
+  });
+  await p.locator(".rail-links .rail-link").nth(unseen).click();
+  await p.waitForTimeout(400);
+  check(
+    "a link followed from the list adds a stop with both still showing",
+    unseen >= 0 &&
+      (await p.locator(".trail-row").count()) === stopsBefore + 1 &&
+      (await p.locator('[data-pane="links"]').isVisible()) &&
+      (await p.locator('[data-lower-pane="trail"]').isVisible()),
   );
   await p.setViewportSize({ width: 560, height: 560 });
   await p.waitForTimeout(250);
@@ -678,6 +700,9 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   await p.locator(".trail-row:not(.is-current)").first().click();
   await p.waitForTimeout(400);
   check("at 560 px clicking a stop leaves the trail open", (await narrow()).rail < 560 - 200);
+  await p.locator(".rail-links .rail-link").first().click();
+  await p.waitForTimeout(400);
+  check("at 560 px following a link from the list leaves the trail open", (await narrow()).rail < 560 - 200);
   await p.keyboard.press("Escape");
   await p.waitForTimeout(450);
   check("Escape slides it away", (await narrow()).rail >= 560);

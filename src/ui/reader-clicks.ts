@@ -1,5 +1,5 @@
 import { isDesktop, native } from "../platform";
-import type { RailPane } from "./inspector";
+import type { RailLower, RailPane } from "./inspector";
 import { reducedMotion } from "./media";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
 import { lightbox } from "./overlays";
@@ -14,7 +14,8 @@ function closeTabOf(r: Reader, el: HTMLElement): void {
 }
 
 function followLink(r: Reader, shell: HTMLElement, link: HTMLElement, e: MouseEvent): void {
-  if (link.closest(".sidebar, .rail")) shell.classList.remove(...PEEKS);
+  if (link.closest(".sidebar") || (link.closest(".rail") && !shell.classList.contains("on-trail")))
+    shell.classList.remove(...PEEKS);
   e.preventDefault();
   r.preview.hide();
   if (link.classList.contains("is-ambiguous")) {
@@ -54,6 +55,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
         r.inspector.setPane(pane);
       },
     ],
+    ["[data-lower]", (el) => r.inspector.setLower(el.dataset.lower as RailLower)],
     [".search-hit", (el, e) => r.sidebar.searchPane.openHit(Number(el.dataset.hit), e.metaKey)],
     [".doc button.task-box[data-task-line]", (el) => void r.editing.toggleTask(el)],
     [".code-copy", (el) => void copyCode(el as HTMLButtonElement, () => r.deps.sound.play("copy"))],
