@@ -34,9 +34,12 @@ export function labelOf(command: Command): string | null {
   return typeof label === "function" ? label() : label;
 }
 
+const MENU_ECHO_MS = 250;
+
 export class CommandTable {
   private readonly byId = new Map<string, Command>();
   private readonly byChord = new Map<string, Command>();
+  private lastKey: { id: string; at: number } | null = null;
 
   constructor(
     readonly all: readonly Command[],
@@ -60,8 +63,25 @@ export class CommandTable {
     if (e.key === "F2" && e.target instanceof HTMLElement && e.target.closest(".cm-table-widget")) return false;
     const command = this.byChord.get(chordOf(e));
     if (!command || (inField && !command.inField) || (command.needsNote && !this.env.hasNote())) return false;
+    this.lastKey = { id: command.id, at: performance.now() };
     command.run("key");
     return true;
+  }
+
+  /** Whether the command can run right now. */
+  canRun(id: string): boolean {
+    const command = this.byId.get(id);
+    return !!command && (!command.needsNote || this.env.hasNote()) && (!command.when || command.when());
+  }
+
+  keysOf(id: string): readonly string[] {
+    return this.byId.get(id)?.keys ?? [];
+  }
+
+  /** A menu choice. The key press that also matched this command has already run it. */
+  runFromMenu(id: string): void {
+    if (this.lastKey?.id === id && performance.now() - this.lastKey.at < MENU_ECHO_MS) return;
+    this.run(id, "click");
   }
 
   /** Commands the palette may offer right now, in table order. */

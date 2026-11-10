@@ -171,6 +171,10 @@ With text selected in the note editor, ⌘K makes it a link, the same as the bub
 
 The file list is one Tab stop. Up and Down move between rows, Right opens a folder and then enters it, Left closes it and then goes to its parent, Enter opens, and Home and End reach the ends. Closed folders are skipped. The focus ring is drawn inside the row, because folder contents are clipped for their open and close animation.
 
+## Menu bar
+
+File, View and Go hold the app's main commands, and Settings… is under Waymark. Every item runs through the command registry, and an item that cannot run now is greyed out. A press that both the page and the menu see runs once. There is no Help menu, because nothing real exists to point it at.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

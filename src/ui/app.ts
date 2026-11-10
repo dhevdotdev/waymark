@@ -4,6 +4,7 @@ import { Highlighter } from "../render/highlight";
 import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
+import { bindAppMenu } from "./app-menu";
 import { resolveColor } from "./colors";
 import { type Metrics, Reader } from "./reader";
 import { Sound } from "./sound";
@@ -49,6 +50,7 @@ export class App {
       void this.prefs.flush();
     });
     if (isDesktop) await native.onVaultChanged((paths) => void this.reader?.onVaultChanged(paths));
+    await native.onMenuCommand((id) => this.reader?.commands.runFromMenu(id));
     await native.saveBeforeQuit(async () => {
       this.reader?.spots.record();
       await this.reader?.editing.close();
@@ -136,6 +138,7 @@ export class App {
         this.welcome();
       },
     });
+    if (isDesktop) void bindAppMenu(this.reader);
     await this.reader.start(t0, initial);
   }
 

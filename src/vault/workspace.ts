@@ -106,6 +106,10 @@ export class Workspace {
     return { kind: "opened" };
   }
 
+  get hasClosed(): boolean {
+    return this.closed.length > 0;
+  }
+
   get pinnedCount(): number {
     return this.tabs.filter((tab) => tab.pinned).length;
   }

@@ -149,7 +149,32 @@ async function checkTrashUndo({ vault, check }: SelfTestContext): Promise<void> 
   check("a used Undo cannot run twice", refused);
 }
 
+async function checkMenu({ reader, check, wait }: SelfTestContext): Promise<void> {
+  const items = await native.menuItems();
+  check("the menu bar is populated", items.length > 20, items.length);
+  const chord = (keys: string) => keys.replace("CmdOrCtrl", "mod").toLowerCase();
+  const mismatched = items.filter(({ id, keys }) => keys !== null && !reader.commands.keysOf(id).includes(chord(keys)));
+  check(
+    "every menu shortcut matches its command",
+    mismatched.length === 0,
+    mismatched.map((m) => m.id),
+  );
+  await wait(200);
+  const enabled = async (id: string) => (await native.menuItems()).find((m) => m.id === id)?.enabled;
+  check("Reopen Closed Tab starts greyed out", (await enabled("reopen-tab")) === false);
+  await reader.open("Refs.md", { newTab: true, focus: true });
+  await wait(300);
+  reader.closeTab(reader.workspace.activeIndex);
+  await wait(300);
+  check("it lights up once a tab has closed", (await enabled("reopen-tab")) === true);
+  reader.commands.run("reopen-tab", "click");
+  await wait(300);
+  reader.closeTab(reader.workspace.activeIndex);
+  await wait(200);
+}
+
 export async function runOrganize(ctx: SelfTestContext): Promise<void> {
+  await checkMenu(ctx);
   await checkTrashUndo(ctx);
   await checkTable(ctx);
   await checkClipboard(ctx);

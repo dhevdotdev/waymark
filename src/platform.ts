@@ -112,6 +112,13 @@ export const native = {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(url);
   },
+  menuItems: () => call<{ id: string; keys: string | null; enabled: boolean }[]>("menu_items"),
+  setMenuEnabled: (states: Record<string, boolean>) => call<void>("set_menu_enabled", { states }),
+  async onMenuCommand(handler: (id: string) => void): Promise<void> {
+    if (!isDesktop) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen<string>("menu-command", (e) => handler(e.payload));
+  },
   async onVaultChanged(handler: (paths: string[]) => void): Promise<void> {
     if (!isDesktop) return;
     const { listen } = await import("@tauri-apps/api/event");

@@ -64,3 +64,23 @@ describe("CommandTable", () => {
     expect(table.listed().map((c) => c.id)).toEqual(["a", "c"]);
   });
 });
+
+describe("menu choices", () => {
+  const run = vi.fn();
+  const table = () => new CommandTable([{ id: "x", keys: ["mod+j"], run }], { desktop: true, hasNote: () => true });
+  const press = (t: CommandTable) => t.handleKey(new KeyboardEvent("keydown", { key: "j", metaKey: true }), false);
+
+  it("runs a command", () => {
+    run.mockClear();
+    table().runFromMenu("x");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not run twice when the key and the menu both see one press", () => {
+    run.mockClear();
+    const t = table();
+    press(t);
+    t.runFromMenu("x");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+});

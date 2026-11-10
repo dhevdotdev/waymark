@@ -2,6 +2,7 @@ mod clipboard;
 mod dock_icon;
 mod folders;
 mod git;
+mod menu;
 mod navigation;
 mod selftest;
 mod trash;
@@ -530,63 +531,17 @@ async fn write_prefs(app: AppHandle, prefs: serde_json::Value) -> CmdResult<()> 
     .await
 }
 
-/// The standard Mac menus, without Close Window: ⌘W closes a tab in Waymark.
-fn build_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
-    let app_menu = SubmenuBuilder::new(app, "Waymark")
-        .item(&PredefinedMenuItem::about(
-            app,
-            Some("About Waymark"),
-            None,
-        )?)
-        .separator()
-        .item(&PredefinedMenuItem::services(app, None)?)
-        .separator()
-        .item(&PredefinedMenuItem::hide(app, None)?)
-        .item(&PredefinedMenuItem::hide_others(app, None)?)
-        .item(&PredefinedMenuItem::show_all(app, None)?)
-        .separator()
-        .item(&PredefinedMenuItem::quit(app, None)?)
-        .build()?;
-    let edit = SubmenuBuilder::new(app, "Edit")
-        .item(&PredefinedMenuItem::undo(app, None)?)
-        .item(&PredefinedMenuItem::redo(app, None)?)
-        .separator()
-        .item(&PredefinedMenuItem::cut(app, None)?)
-        .item(&PredefinedMenuItem::copy(app, None)?)
-        .item(&PredefinedMenuItem::paste(app, None)?)
-        .item(&PredefinedMenuItem::select_all(app, None)?)
-        .build()?;
-    let view = SubmenuBuilder::new(app, "View")
-        .item(&PredefinedMenuItem::fullscreen(app, None)?)
-        .build()?;
-    let window = SubmenuBuilder::new(app, "Window")
-        .item(&PredefinedMenuItem::minimize(app, None)?)
-        .item(&PredefinedMenuItem::maximize(app, Some("Zoom"))?)
-        .build()?;
-    MenuBuilder::new(app)
-        .items(&[&app_menu, &edit, &view, &window])
-        .build()
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            app.set_menu(build_menu(app.handle())?)?;
+            menu::install(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
                 window_state::restore(&window);
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if matches!(
-                event,
-                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
-            ) {
-                window_state::note_change(window);
-            }
-        })
+        .on_window_event(window_state::on_event)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(navigation::guard())
@@ -640,6 +595,8 @@ pub fn run() {
             rename_folder,
             trash_folder,
             untrash,
+            menu::menu_items,
+            menu::set_menu_enabled,
             write_attachment,
             finish_quit,
             reveal,

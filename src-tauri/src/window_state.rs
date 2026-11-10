@@ -7,6 +7,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Runtime, WebviewWindow, Window,
+    WindowEvent,
 };
 
 const LEAST: (f64, f64) = (560.0, 420.0);
@@ -152,10 +153,16 @@ fn snapshot<R: Runtime>(window: &Window<R>, previous: Option<Saved>) -> Option<S
     })
 }
 
+pub fn on_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
+    if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+        note_change(window);
+    }
+}
+
 static SAVE_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// Saves shortly after the window stops moving, so a drag writes the file once.
-pub fn note_change<R: Runtime>(window: &Window<R>) {
+fn note_change<R: Runtime>(window: &Window<R>) {
     if SAVE_PENDING.swap(true, Ordering::SeqCst) {
         return;
     }
