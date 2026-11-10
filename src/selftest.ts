@@ -293,6 +293,27 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   await wait(250);
   reader.inspector.setPane("links");
+
+  for (const stop of vault.index.notes.filter((n) => n !== target).slice(0, 2))
+    await reader.open(stop, { via: "link", focus: true });
+  const readout = document.querySelector<HTMLElement>(".trail-readout");
+  check("a followed link shows the trail readout", readout !== null && !readout.hidden, readout?.textContent);
+  const titleTop = () => document.querySelector(".doc-title")?.getBoundingClientRect().top;
+  const before = titleTop();
+  readout?.click();
+  await wait(250);
+  const pane = document.querySelector<HTMLElement>('[data-pane="trail"]');
+  check(
+    "the readout opens the trail panel",
+    pane !== null && !pane.hidden && document.querySelectorAll(".trail-row").length === 3,
+  );
+  check("opening the trail leaves the note where it was", titleTop() === before, titleTop());
+  document.querySelector<HTMLElement>(".trail-row:not(.is-current)")?.click();
+  await wait(400);
+  check("clicking a stop moves the tab and leaves the trail open", !pane?.hidden && reader.inspector.pane === "trail");
+  reader.trail.togglePanel();
+  await wait(100);
+  check("closing puts the panel back", reader.inspector.pane === "links");
   reader.openGraph("vault");
   await wait(1500);
   check("graph opens", !!document.querySelector(".graph-view canvas"));
