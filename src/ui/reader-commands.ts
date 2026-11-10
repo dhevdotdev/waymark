@@ -242,7 +242,7 @@ export function readerCommands(r: Reader): Command[] {
       label: "Toggle sidebar",
       keys: ["mod+\\"],
       hint: "⌘\\",
-      run: (origin) => (origin === "key" ? r.sidebar.toggleInstantly() : r.sidebar.toggle()),
+      run: () => r.sidebar.toggle(),
     },
     {
       id: "rail",

@@ -99,14 +99,6 @@ export class Sidebar {
     });
   }
 
-  /** Toggles with no transition, so a keyboard user sees the result at once. */
-  toggleInstantly(): void {
-    const { shell } = this.els;
-    shell.classList.add("no-anim");
-    this.toggle();
-    requestAnimationFrame(() => requestAnimationFrame(() => shell.classList.remove("no-anim")));
-  }
-
   private ensureVisible(): void {
     if (isNarrow()) this.els.shell.classList.add("sidebar-peek");
     else if (this.els.shell.classList.contains("sidebar-closed")) this.toggle(true);

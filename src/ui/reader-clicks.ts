@@ -1,4 +1,5 @@
 import { isDesktop, native } from "../platform";
+import { isPointerAction } from "./input-origin";
 import type { RailPane } from "./inspector";
 import { reducedMotion } from "./media";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
@@ -70,7 +71,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
         e.preventDefault();
         document
           .getElementById(el.dataset.target!)
-          ?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+          ?.scrollIntoView({ block: "start", behavior: isPointerAction() && !reducedMotion() ? "smooth" : "auto" });
       },
     ],
     ["a.wikilink, a.wikilink-plain, .nav-item[data-path]", (el, e) => followLink(r, shell, el, e)],

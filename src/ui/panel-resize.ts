@@ -14,7 +14,7 @@ export interface EdgeDrag {
 /** Drags an edge to resize what it belongs to. The size applies live and is saved once, on release. */
 export function bindEdgeDrag(handle: HTMLElement, drag: EdgeDrag): void {
   const { shell } = drag;
-  const classes = ["no-anim", "is-resizing", ...(drag.axis === "y" ? ["is-resizing-rows"] : [])];
+  const classes = ["is-resizing", ...(drag.axis === "y" ? ["is-resizing-rows"] : [])];
   handle.addEventListener("pointerdown", (down) => {
     down.preventDefault();
     const start = drag.read();

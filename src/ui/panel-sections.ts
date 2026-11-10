@@ -1,4 +1,5 @@
 import type { PrefStore } from "../prefs";
+import { instantly } from "./instant";
 import { railFloats } from "./media";
 import { bindEdgeDrag } from "./panel-resize";
 
@@ -52,7 +53,7 @@ export class PanelSections {
         save: () => prefs.update(() => undefined),
       });
     }
-    new ResizeObserver(() => this.fit()).observe(this.inner);
+    new ResizeObserver(() => instantly(this.inner, () => this.fit())).observe(this.inner);
     this.draw();
   }
 
@@ -77,6 +78,7 @@ export class PanelSections {
     this.setFolded(section, !this.folded[section]);
   }
 
+  /** The one change here that moves: a fold, when the pointer asked for it. */
   setFolded(section: RailSection, folded: boolean): void {
     this.folded[section] = folded;
     this.draw();
@@ -90,14 +92,14 @@ export class PanelSections {
   setEmpty(section: RailSection, empty: boolean): void {
     if (this.vacant[section] === empty) return;
     this.vacant[section] = empty;
-    this.draw();
+    instantly(this.inner, () => this.draw());
   }
 
   /** The trail section is as tall as its stops, up to the height it has been given. */
   setTrailRows(rows: number): void {
     if (rows === this.trailRows) return;
     this.trailRows = rows;
-    this.fit();
+    instantly(this.inner, () => this.fit());
   }
 
   private draw(): void {

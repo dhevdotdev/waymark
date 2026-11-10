@@ -102,10 +102,7 @@ kbd {
 .shell.rail-closed {
   --col-right: 0px;
 }
-.shell.no-anim,
-.shell.no-anim .sidebar-inner,
-.shell.no-anim .files-actions,
-.shell.no-anim .sidebar-search {
+:root[data-input="keyboard"] :is(.sidebar-inner, .sidebar-search, .files-actions) {
   transition: none;
 }
 
@@ -150,9 +147,6 @@ kbd {
 }
 .shell.sidebar-closed .titlebar-lead {
   box-shadow: none;
-}
-.shell.no-anim .titlebar-lead {
-  transition: none;
 }
 .titlebar-nav,
 .titlebar-trail {
@@ -1600,12 +1594,7 @@ kbd {
 }
 @media (prefers-reduced-motion: no-preference) {
   .rail-section {
-    transition:
-      block-size var(--t-menu) var(--ease-out),
-      opacity var(--t-menu) var(--ease-out);
-    @starting-style {
-      opacity: 0;
-    }
+    transition: block-size var(--t-menu) var(--ease-out);
   }
   .rail-section-chevron {
     transition: rotate var(--t-menu) var(--ease-out);
@@ -1613,6 +1602,10 @@ kbd {
   .rail-section.is-folded .rail-section-body {
     transition: visibility 0s linear var(--t-menu);
   }
+}
+:root[data-input="keyboard"] .rail :is(.rail-section, .rail-section-chevron, .rail-section-body, .seg-btn),
+.rail-inner.is-instant :is(.rail-section, .rail-section-chevron, .rail-section-body) {
+  transition: none;
 }
 .rail-trail {
   overflow-y: auto;
@@ -1780,6 +1773,9 @@ kbd {
   .shell.rail-peek .rail {
     translate: 0 0;
   }
+  :root[data-input="keyboard"] .rail {
+    transition: none;
+  }
   .rail-inner {
     width: 100%;
   }
@@ -1815,16 +1811,30 @@ kbd {
     translate: calc(-100% - 16px) 0;
     transition: translate var(--t-slide) var(--ease-out);
   }
-  .shell.sidebar-peek .reader::after {
+  .reader::after {
     content: "";
     position: absolute;
     inset: 0;
     z-index: 3;
     background: var(--scrim);
+    opacity: 0;
     pointer-events: none;
+    transition: opacity var(--t-slide) var(--ease-out);
+  }
+  .shell.sidebar-peek .reader::after {
+    opacity: 1;
   }
   .shell.sidebar-peek .sidebar {
     translate: 0 0;
+  }
+  :root[data-input="keyboard"] .sidebar,
+  :root[data-input="keyboard"] .reader::after {
+    transition: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reader::after {
+      transition-duration: var(--t-exit);
+    }
   }
   .shell :is(.sidebar-inner, .sidebar-search) {
     opacity: 1;
