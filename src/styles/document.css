@@ -846,19 +846,7 @@ button.callout-title:focus-visible {
 
 /* Heading anchors land with a brief accent flash so the eye finds the target. */
 .doc .is-target {
-  animation: target-flash 600ms var(--ease-out);
   border-radius: var(--r-chip);
-}
-@keyframes target-flash {
-  0%,
-  25% {
-    background: var(--accent-soft);
-    box-shadow: 0 0 0 6px var(--accent-soft);
-  }
-  100% {
-    background: transparent;
-    box-shadow: 0 0 0 6px transparent;
-  }
 }
 
 /* Selection */
