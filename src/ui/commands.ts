@@ -1,3 +1,5 @@
+import { markKeyboardOrigin } from "./input-origin";
+
 /** How a command was started, for the few commands that behave differently per surface. */
 export type Origin = "key" | "click" | "palette";
 
@@ -81,6 +83,7 @@ export class CommandTable {
   /** A menu choice. The key press that also matched this command has already run it. */
   runFromMenu(id: string): void {
     if (this.lastKey?.id === id && performance.now() - this.lastKey.at < MENU_ECHO_MS) return;
+    markKeyboardOrigin();
     this.run(id, "click");
   }
 
