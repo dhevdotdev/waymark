@@ -38,19 +38,43 @@ export class FileTree {
       return;
     }
     if (this.builtFor !== index || !this.box.querySelector(".tree")) {
+      /* Read before the bookmarks move into the new tree, which shrinks the old one and clamps its scroll. */
+      const keep = this.box.scrollTop;
+      const focused = this.focusedRow();
       this.folders.clear();
       this.notes.clear();
       const tree = document.createElement("div");
       tree.className = "tree";
       if (this.leading) tree.append(this.leading);
       tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
-      const keep = this.box.scrollTop;
       this.box.replaceChildren(tree);
       this.box.scrollTop = keep;
       this.builtFor = index;
+      this.restoreFocus(focused);
+      if (current === this.current) {
+        this.notes.get(current)?.classList.add("is-current");
+        return;
+      }
       this.current = "";
     }
     this.reveal(current);
+  }
+
+  private focusedRow(): HTMLElement | null {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && this.box.contains(active) ? active : null;
+  }
+
+  /** A rebuild replaces every row, so focus moves to the new row for the same file or folder. */
+  private restoreFocus(was: HTMLElement | null): void {
+    if (!was || document.activeElement === was) return;
+    const { folder, path } = was.dataset;
+    const row = was.isConnected
+      ? was
+      : folder !== undefined
+        ? this.folders.get(folder)?.querySelector<HTMLElement>(":scope > .tree-head")
+        : this.notes.get(path ?? "");
+    row?.focus({ preventScroll: true });
   }
 
   /** Sets the order before the first draw. */

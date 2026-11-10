@@ -1,6 +1,6 @@
 // Creating, renaming, moving and deleting notes, inserting into them, and the toolbars, against files on disk.
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
 import { watchPageErrors } from "./page-errors.mjs";
@@ -711,6 +711,75 @@ try {
   check("editing the search clears the old marks at once", (await searchMarks()) === 0, String(await searchMarks()));
   await page.click('[data-side="search"]');
   await pause(150);
+
+  const outside = (paths) => page.evaluate((p) => window.waymark.reader.onVaultChanged(p), paths);
+  const listed = (selector) => page.locator(`.sidebar-inner ${selector}`).count();
+  const treeState = () =>
+    page.evaluate(() => {
+      const box = document.querySelector(".sidebar-inner");
+      return {
+        scroll: box.scrollTop,
+        focused: document.activeElement?.dataset.folder ?? document.activeElement?.dataset.path ?? null,
+        open: [...box.querySelectorAll(".tree-folder.is-open > .tree-head")].map((h) => h.dataset.folder).join(),
+      };
+    });
+  for (const mode of ["Read", "Edit"]) {
+    await openNote("Writing");
+    if (mode === "Edit") {
+      await page.keyboard.press("Meta+e");
+      await pause(300);
+    }
+    if (!(await page.locator('.sidebar-inner .tree-folder.is-open > [data-folder="Apiary"]').count())) {
+      await page.locator('.sidebar-inner [data-folder="Apiary"]').click();
+    }
+    await page.evaluate(() => {
+      const box = document.querySelector(".sidebar-inner");
+      box.scrollTop = box.scrollHeight;
+      box.querySelector('[data-folder="Apiary"]').focus({ preventScroll: true });
+    });
+    await pause(250);
+    const before = await treeState();
+    const unchanged = async (what) => {
+      const now = await treeState();
+      check(
+        `${mode}: the file list keeps its scroll, focus and open folders when ${what}`,
+        JSON.stringify(now) === JSON.stringify(before),
+        `${JSON.stringify(before)} -> ${JSON.stringify(now)}`,
+      );
+    };
+    await writeFile(file(`Arrived ${mode}.md`), "new\n");
+    await outside([`Arrived ${mode}.md`]);
+    await pause(150);
+    check(
+      `${mode}: a note written outside the app appears in the file list`,
+      (await listed(`[data-path="Arrived ${mode}.md"]`)) === 1,
+    );
+    await unchanged("a note arrives");
+    await rename(file(`Arrived ${mode}.md`), file(`Renamed ${mode}.md`));
+    await outside([`Arrived ${mode}.md`, `Renamed ${mode}.md`]);
+    await pause(150);
+    check(
+      `${mode}: a note renamed outside the app is listed under its new name only`,
+      (await listed(`[data-path="Arrived ${mode}.md"]`)) === 0 && (await listed(`[data-path="Renamed ${mode}.md"]`)) === 1,
+    );
+    await unlink(file(`Renamed ${mode}.md`));
+    await outside([`Renamed ${mode}.md`]);
+    await pause(150);
+    check(
+      `${mode}: a note deleted outside the app leaves the file list`,
+      (await listed(`[data-path="Renamed ${mode}.md"]`)) === 0,
+    );
+    mkdirSync(file(`Outside ${mode}`));
+    await writeFile(file(`Outside ${mode}/Inner.md`), "inner\n");
+    await outside([`Outside ${mode}/Inner.md`]);
+    await pause(150);
+    check(
+      `${mode}: a folder made outside the app appears in the file list`,
+      (await listed(`[data-folder="Outside ${mode}"]`)) === 1,
+    );
+    await unchanged("files come and go");
+    if (mode === "Edit") await page.keyboard.press("Meta+e");
+  }
 
   check("Obsidian's settings are never touched", (await disk(".obsidian/app.json")) === obsidianBefore);
   check("nothing threw", errors.length === 0, errors[0]);
