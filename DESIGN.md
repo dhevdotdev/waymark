@@ -139,6 +139,10 @@ Each round was judged from WebKit screenshots of real notes, not from mockups.
 | 3 | Scrolling to a block shifted the whole window chrome | The shell clips instead of hiding overflow, so programmatic scrolls stay in the reader |
 | 3 | The sanitizer removed the copy and fold buttons | Buttons are allowed. Only renderer-emitted `data-*` attributes survive, so note HTML cannot trigger app actions |
 
+## Scrolling
+
+Native scrollbars are hidden everywhere and nothing rubber-bands past its edge. One thin bar per direction, drawn by the app, shows while you scroll with the wheel or keys or when the pointer comes within 12px of the edge, and fades after 800ms. It takes no layout space and can be dragged. Scrolling the app does on its own, such as coming back to a note, shows nothing. Resize handles and a trail row's remove button win over the bar.
+
 ## Motion and sound
 
 The rules come from Emil Kowalski's animation standards, good-css.com, Impeccable and taste-skill. Where those sources disagree, a short distillation records which rule Waymark follows.

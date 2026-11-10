@@ -410,7 +410,6 @@
   line-height: var(--leading-code);
   font-variant-ligatures: none;
   tab-size: 4;
-  scrollbar-width: thin;
 }
 .code pre code {
   font: inherit;
@@ -433,8 +432,6 @@
 .table-wrap {
   margin: var(--s2) 0 var(--s5);
   overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
   border-radius: var(--r-block);
   /* An outline takes no room, so the cells stay on the text column and the table's controls stay put. */
   outline: 1px solid var(--rule-strong);

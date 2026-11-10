@@ -690,7 +690,6 @@ button.task-box:focus-visible {
   padding: 6px;
   overflow: hidden;
   border-radius: var(--r-control);
-  scrollbar-width: none;
 }
 .shell:not(.is-graph, .is-blank, .is-editing) .floating-outline:not([hidden]) {
   display: flex;
@@ -927,7 +926,6 @@ button.task-box:focus-visible {
   min-inline-size: 220px;
   mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
   font-family: var(--font-ui);
-  scrollbar-width: none;
 }
 .doc-editing .cm-tooltip.cm-tooltip-autocomplete > ul > li {
   display: flex;

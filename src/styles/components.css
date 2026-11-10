@@ -305,7 +305,6 @@
   min-height: 0;
   overflow-y: auto;
   padding: 6px;
-  scrollbar-width: thin;
 }
 .palette-group {
   padding: 10px 10px 4px;
@@ -945,12 +944,7 @@
   min-inline-size: 0;
   inline-size: 100%;
   overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
   mask-image: linear-gradient(to right, transparent, black var(--fade-start), black calc(100% - var(--fade-end)), transparent);
-}
-.graph-groups::-webkit-scrollbar {
-  display: none;
 }
 .graph-groups.has-before {
   --fade-start: 28px;
@@ -1054,7 +1048,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 4px 12px 24px;
-  scrollbar-width: thin;
 }
 .sync-sheet .seg {
   margin: 4px 18px 10px;
@@ -1908,4 +1901,54 @@
 
 .palette-row.is-danger .palette-label {
   color: var(--danger-ink);
+}
+
+/* Scrollbars */
+.scrollbar {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  transition: opacity 200ms var(--ease-out);
+}
+.scrollbar.is-y {
+  inline-size: 12px;
+}
+.scrollbar.is-x {
+  block-size: 12px;
+}
+.scrollbar.is-on {
+  opacity: 1;
+  transition-duration: 90ms;
+}
+.scrollbar.is-near {
+  pointer-events: auto;
+}
+.scrollbar::before {
+  content: "";
+  position: absolute;
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--ink) 34%, transparent);
+  transition: background-color var(--t-hover) ease;
+}
+.scrollbar.is-y::before {
+  inset-block: 0;
+  inset-inline-end: 2px;
+  inline-size: 5px;
+}
+.scrollbar.is-x::before {
+  inset-inline: 0;
+  inset-block-end: 2px;
+  block-size: 5px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .scrollbar:hover::before {
+    background: color-mix(in oklab, var(--ink) 52%, transparent);
+  }
+}
+.scrollbar.is-held::before {
+  background: color-mix(in oklab, var(--ink) 62%, transparent);
 }

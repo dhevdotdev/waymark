@@ -1,11 +1,13 @@
 import "./styles/app.css";
 import { isDesktop } from "./platform";
 import { App } from "./ui/app";
+import { installScrollbars } from "./ui/scrollbars";
 import { devVaultSource } from "./vault/source";
 
 const root = document.getElementById("app")!;
 const params = new URLSearchParams(location.search);
 const app = new App(root);
+installScrollbars();
 (window as unknown as { waymark: App }).waymark = app;
 
 async function boot(): Promise<void> {

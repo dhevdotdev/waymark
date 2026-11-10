@@ -32,6 +32,13 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
   );
   check("the window colour can follow the theme", colourSet);
   check("the key sounds load under the content policy", await app.sound.keys.load("tactile"));
+  const edges = getComputedStyle(document.querySelector(".scroller")!);
+  check(
+    "the web view honours the scroll rules",
+    edges.overscrollBehaviorX === "none" && edges.overscrollBehaviorY === "none" && edges.scrollbarWidth === "none",
+    [edges.overscrollBehaviorX, edges.overscrollBehaviorY, edges.scrollbarWidth],
+  );
+  check("the app's own scrollbars are in place", document.querySelectorAll(".scrollbar").length === 2);
 }
 
 const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
