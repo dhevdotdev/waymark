@@ -95,7 +95,6 @@ export class TrailPanel {
       if (row === next) next = next.nextElementSibling;
       else this.root.insertBefore(row, next);
     }
-    this.root.style.setProperty("--trail-rows", String(entries.length));
   }
 
   private createRow(id: number): HTMLElement {
@@ -147,7 +146,6 @@ export class TrailPanel {
     fold.classList.toggle("is-folded", entry.collapsed);
     fold.setAttribute("aria-label", `${entry.collapsed ? "Show" : "Fold"} the branches from ${entry.label}`);
     const x = row.querySelector<HTMLElement>(".trail-x")!;
-    x.hidden = isCurrent;
     x.setAttribute("aria-label", `Remove ${entry.label} from the trail`);
   }
 

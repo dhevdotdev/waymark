@@ -283,7 +283,20 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
     !!firstCommit,
     document.querySelectorAll(".rail-history .rail-commit").length,
   );
-  firstCommit?.click();
+  check("a short history lists every version", document.querySelector(".rail-commit-more") === null);
+  await app.open("Long history.md");
+  await until(() => !!document.querySelector(".rail-commit-more"), 4000);
+  check(
+    "a long history lists thirty rows",
+    document.querySelectorAll(".rail-history .rail-commit:not(.rail-commit-more)").length === 30,
+  );
+  check("and offers the rest", document.querySelector(".rail-commit-more")?.textContent === "Show all 35 versions");
+  await app.open(target);
+  await until(
+    () => document.querySelector(".rail-commit-more") === null && !!document.querySelector(".rail-history .rail-commit"),
+    4000,
+  );
+  document.querySelector<HTMLElement>(".rail-history .rail-commit")?.click();
   await until(() => !!document.querySelector(".sheet-overlay"), 4000);
   check(
     "a history entry opens that commit's change",

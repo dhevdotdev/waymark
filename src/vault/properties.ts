@@ -2,7 +2,7 @@ import { type Document, isAlias, isMap, isScalar, isSeq, type Pair, Scalar, type
 import { type FrontmatterParts, frontmatterParts, type PropertyValue, parseYamlBlock, propertyValue } from "./frontmatter";
 import { lineEnding } from "./tasks";
 
-export type PropertyForm = "text" | "list" | "fixed";
+type PropertyForm = "text" | "list" | "fixed";
 
 export interface Property {
   key: string;

@@ -2,7 +2,7 @@ import { type Commit, type FileChange, type GitStatus, git, isDesktop } from "..
 import { relative } from "./git-panel-parts";
 
 const HISTORY_LIMIT = 100;
-const HISTORY_SHOWN = 4;
+const HISTORY_SHOWN = 30;
 
 export interface NoteHistoryHost {
   status: () => GitStatus | null;
@@ -76,10 +76,9 @@ export class NoteHistory {
     }
     if (!commits.length && !changed) nodes.push(emptyLine("Not committed yet."));
     if (commits.length > HISTORY_SHOWN) {
-      const all = document.createElement("button");
-      all.className = "link-btn rail-history-all";
-      all.textContent = `All ${commits.length}${capped ? "+" : ""} versions`;
-      all.addEventListener("click", () => this.host.showAllHistory(path));
+      const label = `Show all ${commits.length}${capped ? "+" : ""} versions`;
+      const all = this.row(label, "", () => this.host.showAllHistory(path));
+      all.classList.add("rail-commit-more");
       nodes.push(all);
     }
     box.replaceChildren(...nodes);

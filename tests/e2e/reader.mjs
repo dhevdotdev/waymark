@@ -552,6 +552,15 @@ await followLink();
 check("the trail stays open when a link in the note is followed", await trailPane.isVisible());
 const levels = await page.locator(".trail-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-level")));
 check("a second link from the same note branches", levels.join() === "1,2,1", levels.join());
+const trailHeight = () => page.locator('[data-section="trail"]').evaluate((e) => e.getBoundingClientRect().height);
+const graphTop = () => page.locator('[data-section="graph"]').evaluate((e) => e.getBoundingClientRect().top);
+check("the trail is as tall as its stops", (await trailHeight()) === 31 + 3 * 28 + 8, String(await trailHeight()));
+const graphWasAt = await graphTop();
+await page.locator('[data-fold-section="trail"]').click();
+await pause(320);
+check("the graph stays put while the trail changes height", (await graphTop()) === graphWasAt);
+await page.locator('[data-fold-section="trail"]').click();
+await pause(320);
 check("the readout counts the side branch", (await readout.locator(".trail-forks").textContent()) === "1");
 await page.keyboard.down("Meta");
 await page.locator(".tree-folder.is-open .nav-item").first().click();
@@ -588,7 +597,10 @@ check(
     .locator(".trail-x")
     .evaluate((e) => getComputedStyle(e).opacity === "1" && e.getBoundingClientRect().width >= 20),
 );
-check("the current note has no remove control", !(await page.locator(".trail-row.is-current .trail-x").isVisible()));
+check(
+  "the current note has a remove control like any other stop",
+  (await page.locator(".trail-row.is-current .trail-x").count()) === 1,
+);
 const foldButton = page.locator(".trail-fold").first();
 const titleBeforeFold = await titleTop();
 await foldButton.click();
@@ -666,14 +678,18 @@ await pause(250);
 await page.keyboard.press("Meta+z");
 await pause(250);
 check("Command-Z on the trail brings the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
+const onNote = await title();
 await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Delete");
-await pause(200);
+await pause(500);
 check(
-  "Delete on the current note says why it stays",
-  (await page.locator(".trail-row").count()) === beforeRemove &&
-    (await page.locator(".toast").textContent()).includes("another stop"),
+  "closing the note the tab is on steps back to another stop",
+  (await page.locator(".trail-row").count()) === beforeRemove - 1 && (await title()) !== onNote,
 );
+await page.locator(".toast-action").click();
+await pause(500);
+check("Undo returns to that note", (await page.locator(".trail-row").count()) === beforeRemove && (await title()) === onNote);
+await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Escape");
 await pause(100);
 check(
@@ -745,6 +761,8 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   check("a long trail has more than fits", opened.room > 0 && opened.count >= 24, JSON.stringify(opened));
   check("opening shows the current stop", opened.current);
   check("every row is one line high", opened.heights === 1);
+  const capped = await p.locator('[data-section="trail"]').evaluate((e) => e.getBoundingClientRect().height);
+  check("a long trail stops growing and scrolls", capped <= 270 && capped >= 120, String(capped));
   check("no row runs out of the panel", opened.inside);
   const title0 = await p.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
   const links = () => p.evaluate(() => document.querySelector(".rail-body").scrollTop);

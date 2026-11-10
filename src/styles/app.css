@@ -1348,6 +1348,12 @@ kbd {
     color: var(--ink);
   }
 }
+.rail-commit-more .rail-commit-subject {
+  color: var(--chrome-ink-3);
+}
+.rail-commit-meta:empty {
+  display: none;
+}
 .rail-commit-subject {
   overflow-wrap: anywhere;
   min-inline-size: 0;
@@ -1549,7 +1555,7 @@ kbd {
   overflow: clip;
 }
 [data-section="trail"] {
-  --section-h: clamp(120px, 29vh, 270px);
+  --section-h: min(clamp(120px, 29vh, 270px), calc(var(--head-h) + 1px + var(--trail-rows, 2) * 28px + 8px));
 }
 [data-section="graph"] {
   --section-h: clamp(130px, 22vh, 200px);

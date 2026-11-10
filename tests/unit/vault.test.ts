@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { stripComments } from "../../src/render/comments";
 import { detectCommunities } from "../../src/vault/communities";
-import { parseFrontmatter } from "../../src/vault/frontmatter";
+import { loadYaml, parseFrontmatter } from "../../src/vault/frontmatter";
 import { headingKey, VaultIndex } from "../../src/vault/index";
 import { Trail, type View } from "../../src/vault/trail";
 import { ancestors, buildTree } from "../../src/vault/tree";
@@ -60,6 +60,8 @@ describe("stripComments", () => {
 });
 
 describe("parseFrontmatter", () => {
+  beforeAll(loadYaml);
+
   it("reads scalars and lists", () => {
     const { data, body } = parseFrontmatter("---\nstatus: unread\naliases:\n  - One\n  - Two\ntags: [a, b]\n---\n# Hi\n");
     expect(data).toEqual({ status: "unread", aliases: ["One", "Two"], tags: ["a", "b"] });
@@ -270,12 +272,31 @@ describe("trail", () => {
     expect(here(t)).toBe("x");
   });
 
-  it("leaves the current note alone, because removing it would move the tab", () => {
+  it("steps back when the note the tab is on is removed", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
+    t.follow(note("c"));
     t.remove(t.current.id);
-    expect(t.size).toBe(2);
     expect(here(t)).toBe("b");
+    expect(t.size).toBe(2);
+    t.back();
+    expect(here(t)).toBe("a");
+  });
+
+  it("hands the tab to the next stop when the start is removed while the tab is on it", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
+    t.select(t.layout()[0].id);
+    t.remove(t.current.id);
+    expect(here(t)).toBe("b");
+    expect(t.size).toBe(1);
+  });
+
+  it("keeps the last stop", () => {
+    const t = new Trail(note("a"));
+    t.remove(t.current.id);
+    expect(t.size).toBe(1);
+    expect(here(t)).toBe("a");
   });
 
   it("retraces Back without a removed stop", () => {

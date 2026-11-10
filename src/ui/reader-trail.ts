@@ -65,6 +65,7 @@ export class TrailActions {
     const many = trail.size > 1;
     this.panel.root.hidden = !many;
     this.tabButton.textContent = many ? `Trail · ${trail.size}` : "Trail";
+    this.els.trailPane.parentElement?.style.setProperty("--trail-rows", String(entries.length));
     this.host.inspector().setEmpty("trail", !many);
     this.readout.hidden = !this.available;
     if (this.readout.hidden) return;
@@ -146,13 +147,11 @@ export class TrailActions {
     const { trail } = this.host.tab();
     const view = trail.view(id);
     if (!view) return;
-    if (id === trail.current.id) {
-      toast("This tab is on that note. Move to another stop to remove it.");
-      return;
-    }
     this.host.saveScroll();
     const saved = trail.save();
+    const movesTab = id === trail.current.id;
     trail.remove(id);
+    const update = () => (movesTab ? this.host.show() : this.host.chrome());
     const left = { size: trail.size, at: trail.current.id };
     this.undoLast = () => {
       this.undoLast = null;
@@ -161,10 +160,10 @@ export class TrailActions {
         return;
       }
       trail.revert(saved);
-      this.host.chrome();
+      update();
       this.host.persist();
     };
-    this.host.chrome();
+    update();
     this.host.persist();
     toast(`Removed ${this.host.label(view)}`, { label: "Undo", run: () => this.undoLast?.() });
   }

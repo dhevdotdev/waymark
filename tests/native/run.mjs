@@ -71,6 +71,10 @@ const SETUP = {
     git(base, "init", "-q", "-b", "main", vault);
     await writeFixtureVault(vault);
     await commitAll(vault, "fixture");
+    for (let version = 1; version <= 35; version++) {
+      await writeFile(path.join(vault, "Long history.md"), `Version ${version}.\n`);
+      await commitAll(vault, `version ${version}`);
+    }
     return vault;
   },
   git: vaultBehindRemote,

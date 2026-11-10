@@ -291,12 +291,12 @@ export class Trail {
 
   /**
    * Takes one stop off the trail. Its children move up to take its place, so
-   * nothing else is lost. The first child takes over when the start goes. The
-   * current note stays, because removing it would move the tab.
+   * nothing else is lost, and the first child takes over when the start goes.
+   * Removing the stop the tab is on steps the tab back to the one before it.
    */
   remove(id: number): void {
     const node = this.nodes.get(id);
-    if (!node || id === this.cur) return;
+    if (!node || this.nodes.size < 2) return;
     const children = this.childrenOf(id);
     const heir = node.parent === null ? children[0] : undefined;
     if (heir) {
@@ -304,12 +304,14 @@ export class Trail {
       this.root = heir.id;
     }
     for (const child of children) if (child !== heir) child.parent = heir ? heir.id : node.parent;
+    if (id === this.cur) this.cur = node.parent ?? heir!.id;
     const moved = new Set(children);
     const order = [...this.nodes.values()].flatMap((n) => (n === node ? children : moved.has(n) ? [] : [n]));
     this.nodes = new Map(order.map((n) => [n.id, n]));
     const steps = (visits: number[]) => visits.filter((v) => v !== id).filter((v, i, all) => v !== all[i - 1]);
     const earlier = steps(this.visits.slice(0, this.position + 1));
-    this.visits = steps(this.visits);
+    if (earlier.at(-1) !== this.cur) earlier.push(this.cur);
+    this.visits = steps([...earlier, ...this.visits.slice(this.position + 1)]);
     this.position = earlier.length - 1;
   }
 
