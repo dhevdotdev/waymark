@@ -1,5 +1,5 @@
 import MiniSearch from "minisearch";
-import { parseFrontmatter } from "./frontmatter";
+import { noteBody } from "./frontmatter";
 import { plainText } from "./links";
 import { parseSearchQuery, passesFilters, type SearchQuery, usesFilters } from "./search-query";
 
@@ -103,7 +103,7 @@ export class SearchIndex {
 const WHOLE_WORD_TERM_LENGTH = 2;
 
 function snippet(markdown: string, terms: string[]): Hit["snippet"] {
-  const { body } = parseFrontmatter(markdown);
+  const body = noteBody(markdown);
   const lower = body.toLowerCase();
   let best = -1;
   let term = "";

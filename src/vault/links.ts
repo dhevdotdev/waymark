@@ -1,4 +1,4 @@
-import { parseFrontmatter } from "./frontmatter";
+import { noteBody } from "./frontmatter";
 import { isAttachmentTarget, localTarget, MARKDOWN_DESTINATION, MARKDOWN_TITLE, type Resolution, type VaultIndex } from "./index";
 
 const CODE = /^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$|`[^`\n]*`/gm;
@@ -67,8 +67,8 @@ export class LinkGraph {
 
 /** Visible text of a note, for search: no frontmatter, comments, link syntax or Markdown markers. */
 export function plainText(markdown: string): string {
-  return parseFrontmatter(markdown)
-    .body.replace(/%%[\s\S]*?%%/g, "")
+  return noteBody(markdown)
+    .replace(/%%[\s\S]*?%%/g, "")
     .replace(/!?\[\[([^\]|]*?)(?:\|([^\]]*))?\]\]/g, (_, t, a) => a || t.replace(/#/g, " "))
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^>\s*\[![^\]]*\][+-]?/gm, "")

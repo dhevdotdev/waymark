@@ -1,6 +1,6 @@
 import { isDesktop, native } from "../platform";
 import { type BaseFile, type BaseRow, cellValue, columnLabel, parseBase, rowsFor } from "../vault/base-file";
-import { parseFrontmatter } from "../vault/frontmatter";
+import { loadYaml, parseFrontmatter } from "../vault/frontmatter";
 import type { VaultStore } from "../vault/store";
 import { plural } from "./plural";
 
@@ -37,6 +37,7 @@ export class BaseView {
 
   /** Rebuilds the view. `stale` is checked after each wait so an older render never lands on a newer tab. */
   async show(path: string, scrollTop: number, stale: () => boolean): Promise<void> {
+    await loadYaml();
     const { vault } = this.host;
     const text = await vault.source.readText(path).catch(() => null);
     if (stale()) return;

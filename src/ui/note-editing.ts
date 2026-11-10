@@ -3,11 +3,12 @@ import type { PrefStore } from "../prefs";
 import type { Highlighter } from "../render/highlight";
 import { Draft, type DraftState } from "../vault/draft";
 import type { VaultStore } from "../vault/store";
-import { lineEnding, toggleTask } from "../vault/tasks";
+import { lineEnding } from "../vault/tasks";
 import { showConflictCompare } from "./conflict-compare";
 import type { LinkOption } from "./editor-insert";
 import type { EditorHandle } from "./editor-view";
 import { closeSheet } from "./git-panel-parts";
+import { type LiveNote, NoteWriter } from "./note-writer";
 import { confirmAction } from "./prompts";
 import { readingAnchor, type ScrollAnchor, showReadingLine } from "./reading-spots";
 import type { ShellElements } from "./shell";
@@ -28,6 +29,8 @@ export interface EditingHost {
   prefs: PrefStore;
   /** A past version was written over this note. */
   noteRestored: (path: string) => Promise<void>;
+  syncBusy: () => boolean;
+  noteSaved: () => void;
 }
 
 interface Session {
@@ -71,11 +74,19 @@ export class NoteEditing {
   private savingLabel: ReturnType<typeof setTimeout> | undefined;
   private session: Session | null = null;
   private opening = false;
-  private toggling = false;
-  private readonly undoTasks: { path: string; line: number; wrote: string }[] = [];
+  readonly writer: NoteWriter;
   readonly stats: StatusStats;
 
   constructor(private readonly host: EditingHost) {
+    this.writer = new NoteWriter({
+      vault: host.vault,
+      notePath: host.notePath,
+      live: (path) => this.live(path),
+      syncBusy: host.syncBusy,
+      reshow: host.reshow,
+      toast: host.toast,
+      scroller: () => host.els.scroller,
+    });
     this.stats = new StatusStats(host.els.statusStats, host.vault, () => host.els.scroller.querySelector(".doc"));
   }
 
@@ -254,49 +265,33 @@ export class NoteEditing {
   }
 
   async toggleTask(box: HTMLElement): Promise<void> {
-    await this.flipTask(this.host.notePath(), Number(box.dataset.taskLine), true);
+    await this.writer.toggleTask(this.host.notePath(), Number(box.dataset.taskLine), true);
   }
 
-  /** Undoes the last task clicked in the reading view. */
-  async undoTask(): Promise<void> {
-    const last = this.undoTasks.pop();
-    if (!last || last.path !== this.host.notePath()) return;
-    /* Any other change since then means the line number may now point at a different task. */
-    if (this.host.vault.texts.get(last.path) === last.wrote) await this.flipTask(last.path, last.line, false);
-    else this.undoTasks.length = 0;
+  /** Undoes the last task clicked or property changed in the reading view. */
+  undoTask(): Promise<void> {
+    return this.writer.undo();
   }
 
-  private async flipTask(path: string, line: number, remember: boolean): Promise<void> {
-    if (this.toggling || !path) return;
-    this.toggling = true;
-    const { vault, toast, reshow, els } = this.host;
-    try {
-      const before = await vault.read(path);
-      const after = toggleTask(before, line);
-      if (after === null) {
-        toast("That task has moved. Showing the latest version.");
-        await vault.applyChanges([path]);
-        await reshow();
-        return;
-      }
-      const outcome = await vault.save(path, after, before);
-      if (outcome.kind !== "saved") {
-        toast("This note just changed elsewhere, so the task was left alone.");
-        await vault.applyChanges([path]);
-        await reshow();
-        return;
-      }
-      if (remember) this.undoTasks.push({ path, line, wrote: after });
-      const box = els.scroller.querySelector<HTMLElement>(`.task-box[data-task-line="${line}"]`);
-      if (!box) return;
-      const done = box.getAttribute("aria-checked") !== "true";
-      box.setAttribute("aria-checked", String(done));
-      box.closest("li")?.classList.toggle("is-done", done);
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "The task could not be saved.");
-    } finally {
-      this.toggling = false;
-    }
+  private live(path: string): LiveNote | null {
+    const session = this.session;
+    if (session?.path !== path) return null;
+    return {
+      text: () => session.draft.text,
+      blocked: () => session.draft.isBlocked,
+      apply: (text) => session.editor.change(text),
+      flush: () => session.draft.flush(),
+    };
+  }
+
+  /** The note as the reader would save it, which is the editor's text while it is open. */
+  noteText(path: string): Promise<string> {
+    return this.session?.path === path ? Promise.resolve(this.session.draft.text) : this.host.vault.read(path);
+  }
+
+  async openAtLine(line: number): Promise<void> {
+    await this.open();
+    this.session?.editor.revealLine(line);
   }
 
   private assetUrl(target: string): string | null {
@@ -425,6 +420,7 @@ export class NoteEditing {
   }
 
   private showState(state: DraftState): void {
+    if (state.kind === "saved") this.host.noteSaved();
     const { editState } = this.host.els;
     editState.dataset.state = state.kind;
     clearTimeout(this.savingLabel);

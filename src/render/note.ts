@@ -11,7 +11,6 @@ const md = createMarkdown();
 export interface RenderedNote {
   fragment: DocumentFragment;
   headings: RenderEnv["headings"];
-  frontmatter: Record<string, string | string[]>;
   /** Markdown-to-DOM time, excluding one-time grammar loading. */
   ms: number;
   grammarMs: number;
@@ -30,7 +29,7 @@ export async function renderNote(
   options: { interactive?: boolean } = {},
 ): Promise<RenderedNote> {
   const t0 = performance.now();
-  const { data, body, offset } = parseFrontmatter(source);
+  const { body, offset } = parseFrontmatter(source);
   const text = stripComments(body);
   /* Marks the task boxes this render made, so a box written as HTML in the note cannot act as one. */
   const taskNonce = crypto.randomUUID();
@@ -59,7 +58,7 @@ export async function renderNote(
   }
   const ms = performance.now() - t0 - grammarMs;
   await reserveImageSpace(fragment);
-  return { fragment, headings: env.headings, frontmatter: data, ms, grammarMs };
+  return { fragment, headings: env.headings, ms, grammarMs };
 }
 
 /** One table cell or similar scrap of Markdown, sanitised like a whole note. */

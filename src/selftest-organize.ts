@@ -110,11 +110,36 @@ function checkWelcome({ check }: SelfTestContext): void {
   host.remove();
 }
 
+/** A real property change through the panel, in the packaged app, read back from the file. */
+async function checkProperties({ app, reader, vault, check, until, wait }: SelfTestContext): Promise<void> {
+  const note = "Refs.md";
+  const before = await vault.read(note);
+  await app.open(note);
+  reader.inspector.setPane("info");
+  await until(() => document.querySelector(".prop-add") !== null);
+  document.querySelector<HTMLElement>(".prop-add")?.click();
+  await wait(100);
+  const [name, value] = document.querySelectorAll<HTMLInputElement>(".prop-new-field");
+  name.value = "Due date";
+  value.value = "soon: maybe";
+  value.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await until(() => document.querySelector('.prop-cell[data-key="Due date"]') !== null);
+  check(
+    "adding a property writes the block at the top",
+    (await vault.reread(note)) === `---\nDue date: "soon: maybe"\n---\n${before}`,
+  );
+  document.querySelector<HTMLElement>('.prop-cell[data-key="Due date"] .prop-remove')?.click();
+  await until(() => document.querySelector('.prop-cell[data-key="Due date"]') === null);
+  check("removing it leaves the note as it was", (await vault.reread(note)) === before);
+  reader.inspector.setPane("links");
+}
+
 export async function runOrganize(ctx: SelfTestContext): Promise<void> {
   await checkTable(ctx);
   await checkClipboard(ctx);
   await checkMove(ctx);
   checkPin(ctx);
+  await checkProperties(ctx);
   await checkDialog(ctx);
   checkWelcome(ctx);
 }

@@ -34,6 +34,8 @@ import { bindTooltips } from "./tooltips";
 
 export type { Metrics, OpenOptions, ReaderDeps };
 
+const ESCAPE_IS_TAKEN = ".lightbox, .sheet-overlay, .popover, .prompt-overlay, .prop-new, [data-editing-property]";
+
 /** One open vault's window: its panels, its tabs and how the user moves between notes. */
 export class Reader {
   readonly vault: VaultStore;
@@ -107,11 +109,8 @@ export class Reader {
         showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
-        railWidth: () => prefs.value.railWidth,
-        holdRailWidth: (width) => Object.assign(prefs.value, { railWidth: width }),
-        saveRailWidth: () => prefs.update(() => undefined),
-        sectionFolded: (section, folded) => prefs.update((next) => Object.assign(next, { [`${section}Folded`]: folded })),
-        railToggled: (open) => prefs.update((next) => Object.assign(next, { rail: open })),
+        prefs,
+        editing: () => this.editing,
       },
       p.railPane,
       { trail: p.trailFolded, graph: p.graphFolded },
@@ -130,6 +129,8 @@ export class Reader {
       renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
       rename: (path, name) => this.files.renameTo(path, name),
       prefs,
+      syncBusy: () => this.sync.busy,
+      noteSaved: () => void this.inspector?.refreshProperties(),
       noteRestored: async (path) => {
         await vault.applyChanges([path]);
         if (path === this.current && !this.editing.isOpen) await this.show({ keepScroll: true, quiet: true, keyboard: true });
@@ -445,7 +446,7 @@ export class Reader {
   /** Escape closes the most recently opened layer first. */
   private handleEscape(inField: boolean): void {
     const { shell } = this.els;
-    if (this.palette.isOpen || document.querySelector(".lightbox, .sheet-overlay, .popover, .prompt-overlay")) return;
+    if (this.palette.isOpen || document.querySelector(ESCAPE_IS_TAKEN)) return;
     if (this.sync.panel.isOpen) this.sync.panel.close();
     else if (this.find.isOpen) this.find.close();
     else if (!this.workspace.isEmpty && this.onGraph && !inField) this.leaveGraph();

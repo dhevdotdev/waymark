@@ -1,5 +1,5 @@
 import { type CommunityResult, detectCommunities } from "./communities";
-import { parseFrontmatter } from "./frontmatter";
+import { loadYaml, parseFrontmatter } from "./frontmatter";
 import { excludedBy } from "./ignore-filters";
 import { VaultIndex } from "./index";
 import { LinkGraph } from "./links";
@@ -51,6 +51,7 @@ export class VaultStore {
 
   /** Reads every note not yet in memory and builds the link and search indexes. */
   async loadAll(): Promise<void> {
+    await loadYaml();
     await this.readInto(this.index.notes.filter((p) => !this.texts.has(p)));
     this.registerAliases(this.index.notes);
     this.relinkAll();

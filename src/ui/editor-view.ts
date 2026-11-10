@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import {
@@ -9,6 +9,7 @@ import {
   type Extension,
   StateEffect,
   StateField,
+  type TransactionSpec,
 } from "@codemirror/state";
 import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
@@ -50,6 +51,10 @@ export interface EditorHandle {
   focus(): void;
   find(): void;
   replace(text: string): void;
+  /** Changes the text as one undo step, as if typed. False when the editor is frozen. */
+  change(text: string): boolean;
+  /** Moves the cursor onto a line, revealing it if it was folded away. */
+  revealLine(line: number): void;
   placeCursorAt(x: number, y: number): void;
   /** Stops typing while text is being moved somewhere safe. */
   setFrozen(frozen: boolean): void;
@@ -68,6 +73,26 @@ function lineInset(view: EditorView, at: number): number {
   const element = node instanceof HTMLElement ? node : node.parentElement;
   const line = element?.closest(".cm-line");
   return line ? Number.parseFloat(getComputedStyle(line).paddingTop) || 0 : 0;
+}
+
+/** Applies only the part of the text that differs, so the cursor and everything around the change stay put. */
+function swapText(view: EditorView, text: string, annotations: TransactionSpec["annotations"]): void {
+  const next = text.replace(/\r\n/g, "\n");
+  const current = view.state.doc.toString();
+  let start = 0;
+  while (start < current.length && start < next.length && current[start] === next[start]) start++;
+  let tail = 0;
+  while (
+    tail < current.length - start &&
+    tail < next.length - start &&
+    current[current.length - 1 - tail] === next[next.length - 1 - tail]
+  ) {
+    tail++;
+  }
+  view.dispatch({
+    changes: { from: start, to: current.length - tail, insert: next.slice(start, next.length - tail) },
+    annotations,
+  });
 }
 
 function wrap(view: EditorView, marker: string): boolean {
@@ -353,23 +378,16 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
   return {
     focus: () => view.focus(),
     find: () => openSearchPanel(view),
-    replace(text) {
-      const next = text.replace(/\r\n/g, "\n");
-      const current = view.state.doc.toString();
-      let start = 0;
-      while (start < current.length && start < next.length && current[start] === next[start]) start++;
-      let tail = 0;
-      while (
-        tail < current.length - start &&
-        tail < next.length - start &&
-        current[current.length - 1 - tail] === next[next.length - 1 - tail]
-      ) {
-        tail++;
-      }
-      view.dispatch({
-        changes: { from: start, to: current.length - tail, insert: next.slice(start, next.length - tail) },
-        annotations: External.of(true),
-      });
+    replace: (text) => swapText(view, text, External.of(true)),
+    change(text) {
+      if (view.state.readOnly) return false;
+      swapText(view, text, isolateHistory.of("full"));
+      return true;
+    },
+    revealLine(line) {
+      const at = view.state.doc.line(Math.min(view.state.doc.lines, line + 1)).from;
+      view.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+      view.focus();
     },
     placeCursorAt(x, y) {
       view.dispatch({ selection: { anchor: blocks.outsideBlocks(view.state, view.posAtCoords({ x, y }, false)) } });

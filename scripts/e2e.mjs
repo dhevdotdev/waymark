@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 const SHARDS = [
   [["tables"]],
   [["reader"], ["reader", "reduced"], ["edge"], ["dialogs"]],
-  [["editing"], ["organize"]],
+  [["editing"], ["organize"], ["properties"]],
   [["note-files"], ["recovery"], ["backup"], ["library"]],
 ];
 

@@ -1,4 +1,6 @@
+import type { PrefStore } from "../prefs";
 import type { RenderedNote } from "../render/note";
+import { loadYaml } from "../vault/frontmatter";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { FloatingOutline } from "./floating-outline";
@@ -6,8 +8,11 @@ import { icons } from "./icons";
 import { LocalGraph } from "./local-graph";
 import { railFloats } from "./media";
 import { MorphArrows } from "./morph-arrows";
+import type { NoteEditing } from "./note-editing";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
+import { toast } from "./overlays";
 import { bindPanelResize } from "./panel-resize";
+import type { PropertyEditor } from "./property-editor";
 import type { ShellElements } from "./shell";
 
 const MIN_WIDTH = 220;
@@ -18,11 +23,8 @@ export type RailSection = "trail" | "graph";
 
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
-  railToggled: (open: boolean) => void;
-  railWidth: () => number;
-  holdRailWidth: (width: number) => void;
-  saveRailWidth: () => void;
-  sectionFolded: (section: RailSection, folded: boolean) => void;
+  prefs: PrefStore;
+  editing: () => NoteEditing;
 }
 
 /** The right panel: links, note details and the local graph. It also owns the heading outline on the reading pane. */
@@ -33,6 +35,8 @@ export class Inspector {
   private rendered: RenderedNote | null = null;
   private current = "";
   private readonly expandArrows = new MorphArrows("apart");
+  private readonly propertySlot = document.createElement("div");
+  private propertyEditor: Promise<PropertyEditor> | null = null;
   private readonly vacant: Record<RailSection, boolean> = { trail: true, graph: true };
 
   constructor(
@@ -53,9 +57,11 @@ export class Inspector {
       min: MIN_WIDTH,
       max: MAX_WIDTH,
       direction: -1,
-      read: () => host.railWidth(),
-      hold: (width) => host.holdRailWidth(width),
-      save: () => host.saveRailWidth(),
+      read: () => host.prefs.value.railWidth,
+      hold: (width) => {
+        host.prefs.value.railWidth = width;
+      },
+      save: () => host.prefs.update(() => undefined),
     });
     this.setPane(pane);
     this.drawSection("trail");
@@ -68,7 +74,8 @@ export class Inspector {
     this.expandArrows.to("apart");
     this.floating.render(rendered.headings.filter((h) => h.level === 2 || h.level === 3));
     this.renderLinks();
-    this.renderInfo(rendered);
+    this.renderInfo();
+    void this.refreshProperties();
     this.renderLocalGraph();
     this.spy();
   }
@@ -101,7 +108,10 @@ export class Inspector {
   setFolded(section: RailSection, folded: boolean): void {
     this.folded[section] = folded;
     this.drawSection(section);
-    this.host.sectionFolded(section, folded);
+    this.host.prefs.update((p) => {
+      if (section === "trail") p.trailFolded = folded;
+      else p.graphFolded = folded;
+    });
   }
 
   /** A section with nothing to show is not drawn at all, and its room goes to the links. */
@@ -132,7 +142,9 @@ export class Inspector {
       return;
     }
     const closed = shell.classList.toggle("rail-closed");
-    this.host.railToggled(!closed);
+    this.host.prefs.update((p) => {
+      p.rail = !closed;
+    });
   }
 
   /** Called when the Git status changes, so the Info pane stays honest about uncommitted edits. */
@@ -205,8 +217,27 @@ export class Inspector {
     shell.querySelector('[data-rail="links"]')!.textContent = total ? `Links ${total}` : "Links";
   }
 
+  /** The note's properties, read again from its current text. The editing code loads when first needed. */
+  async refreshProperties(): Promise<void> {
+    const path = this.current;
+    if (!path) return;
+    this.propertyEditor ??= Promise.all([import("./property-editor"), loadYaml()]).then(([{ PropertyEditor }]) => {
+      const { editing } = this.host;
+      const editor = new PropertyEditor({
+        write: (at, edit) => editing().writer.change(at, edit),
+        text: (at) => editing().noteText(at),
+        openRaw: (_, line) => void editing().openAtLine(line),
+        toast,
+      });
+      this.propertySlot.append(editor.root);
+      return editor;
+    });
+    const [editor, text] = await Promise.all([this.propertyEditor, this.host.editing().noteText(path)]);
+    if (path === this.current) editor.show(path, text);
+  }
+
   /** Folder, length and every frontmatter property, shown as written and without meaning attached to any key. */
-  private renderInfo(rendered: RenderedNote): void {
+  private renderInfo(): void {
     const { info: box } = this.els;
     box.replaceChildren();
     const addRow = (target: HTMLElement, key: string, value: string | string[]) => {
@@ -229,13 +260,7 @@ export class Inspector {
     addRow(facts, "Words", this.vault.wordCount(this.current).toLocaleString());
     box.append(facts);
 
-    const properties = Object.entries(rendered.frontmatter).filter(([, value]) => value.length > 0);
-    if (properties.length) {
-      const own = document.createElement("dl");
-      own.className = "props";
-      for (const [key, value] of properties) addRow(own, key, value);
-      box.append(this.title("Properties"), own);
-    }
+    box.append(this.title("Properties"), this.propertySlot);
 
     const history = document.createElement("div");
     history.className = "rail-history";

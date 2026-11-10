@@ -1,5 +1,5 @@
 import { type RenderContext, renderNote } from "../render/note";
-import { parseFrontmatter } from "../vault/frontmatter";
+import { noteBody } from "../vault/frontmatter";
 import type { VaultStore } from "../vault/store";
 
 const OPEN_DELAY_MS = 650;
@@ -48,8 +48,8 @@ export class LinkPreview {
     if (!path || path === this.host.currentNote()) return;
     const text = this.host.vault.texts.get(path);
     if (!text) return;
-    const excerpt = parseFrontmatter(text)
-      .body.split(/\n(?=## )/)[0]
+    const excerpt = noteBody(text)
+      .split(/\n(?=## )/)[0]
       .slice(0, EXCERPT_CHARS);
     const rendered = await renderNote(excerpt, path, this.host.renderContext());
     if (!link.matches(":hover")) return;

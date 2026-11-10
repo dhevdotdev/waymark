@@ -58,6 +58,16 @@ Every state has a visible way in and a visible way out.
 - Tabs are as wide as their titles. When they do not all fit, only the widest give up room, so a short title is never clipped to make space for a long one.
 - On narrower windows the inspector and sidebar float. A click outside or Escape dismisses them.
 
+## Properties
+
+The Info pane is the one home for a note's properties. Click a value and it becomes editable where it sits, so the row keeps its shape. Enter saves, Escape puts it back, and leaving the field saves. Lists edit item by item. No key means anything: `status` is treated like any other name.
+
+A change rewrites only that property's lines and every other byte of the file stays as it was, which `src/vault/properties.ts` checks by reading its own result back before it writes. A value keeps its quoting, and its number or boolean kind. New text that a YAML reader would take for a number or a boolean is quoted. Removing the only property removes the empty block as well.
+
+Nested values, block text, anchors, duplicate names and YAML that does not parse are shown as written and never rewritten, with a way into the raw text.
+
+A change goes through the editor when the note is open there, as one undo step under its save and conflict protection, and straight to the file otherwise, with ⌘Z undoing it. A change that fails is reported and the old value comes back.
+
 ## Trails
 
 Each tab remembers where following links has taken it. A second link from the same note starts a side branch. A link to a note already on the trail moves there and adds nothing. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.

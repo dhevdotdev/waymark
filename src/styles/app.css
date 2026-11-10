@@ -1358,10 +1358,185 @@ kbd {
   color: var(--chrome-ink-3);
   font-variant-numeric: tabular-nums;
 }
+.prop-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.prop-editor .props {
+  align-self: stretch;
+}
+.prop-key {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.prop-cell {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  min-inline-size: 0;
+}
+.prop-value,
+.prop-fixed {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.prop-fixed {
+  color: var(--chrome-ink-3);
+  white-space: pre-wrap;
+}
+.prop-cell.is-fixed {
+  flex-direction: column;
+}
+.prop-value,
+.prop-chip {
+  border-radius: 3px;
+  outline-offset: 1px;
+  cursor: text;
+  transition: background-color var(--t-hover) ease;
+}
+.prop-value {
+  min-block-size: 1.4em;
+}
+.prop-value:empty::before {
+  content: "Empty";
+  color: var(--chrome-ink-3);
+}
+.prop-value:focus-visible,
+.prop-chip:focus-visible,
+[data-editing-property] {
+  outline: 2px solid var(--accent);
+}
+[data-editing-property] {
+  background: var(--paper);
+  user-select: text;
+  -webkit-user-select: text;
+}
 .prop-chip {
   padding: 0 6px;
   border-radius: var(--r-chip);
   background: var(--fill);
+  overflow-wrap: anywhere;
+  min-inline-size: 1.5em;
+}
+.prop-chips {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.prop-chip-add,
+.prop-remove {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: default;
+  padding: 0;
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: var(--r-control);
+  color: var(--chrome-ink-3);
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    opacity var(--t-hover) ease,
+    scale var(--t-hover) var(--ease-out);
+}
+.prop-chip-add:active,
+.prop-remove:active {
+  scale: 0.9;
+}
+.prop-chip-add:focus-visible,
+.prop-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  opacity: 1;
+}
+.prop-chip-add svg,
+.prop-remove svg {
+  inline-size: 11px;
+  block-size: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.prop-remove {
+  opacity: 0;
+}
+.prop-cell:focus-within .prop-remove {
+  opacity: 1;
+}
+.prop-add,
+.prop-raw {
+  align-self: flex-start;
+  color: var(--chrome-ink-3);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+.prop-add {
+  margin-inline-start: 8px;
+  padding-inline: 0;
+}
+.prop-new {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 76px) minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 0 8px;
+}
+.prop-new-field {
+  appearance: none;
+  min-inline-size: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.prop-new-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.prop-hint:empty {
+  display: none;
+}
+.prop-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--danger-ink);
+}
+.is-failed {
+  animation: prop-failed 500ms ease-out;
+}
+@keyframes prop-failed {
+  from {
+    background-color: color-mix(in oklab, var(--danger) 26%, transparent);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .prop-value:not([data-editing-property]):hover,
+  .prop-chip:not([data-editing-property]):hover {
+    background: var(--row-hover);
+  }
+  .prop-cell:hover .prop-remove {
+    opacity: 1;
+  }
+  .prop-chip-add:hover,
+  .prop-remove:hover {
+    background: var(--fill);
+    color: var(--ink);
+  }
 }
 /* Each section keeps its open height while folding, so the graph is clipped and never redrawn smaller. */
 .rail-section {
