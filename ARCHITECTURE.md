@@ -54,7 +54,7 @@ Pure TypeScript with no DOM, tested directly.
 
 `NoteEditing` (`src/ui/note-editing.ts`) owns every change to a note: clicking a task and editing one note at a time. A `Draft` (`src/vault/draft.ts`) holds the text and the version known to be on disk, saves one write at a time, and stops when the file changed elsewhere. `VaultStore.save` writes through `write_note` and updates the indexes once the disk has the text.
 
-`live-preview.ts` only decorates. It hides and styles syntax but never changes the document, so the file on disk stays exactly what was typed. CodeMirror is imported on first edit and stays out of the startup bundle.
+`editor-caret.ts` draws the note's caret from the line's type size, and leaves selection to the browser. `live-preview.ts` only decorates. It hides and styles syntax but never changes the document, so the file on disk stays exactly what was typed. CodeMirror is imported on first edit and stays out of the startup bundle.
 
 `GitPanel.commitAndSync` saves the draft, fetches, fast-forwards, commits and pushes in that order, so nothing is committed on top of a stale branch.
 

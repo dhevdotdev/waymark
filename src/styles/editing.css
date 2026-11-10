@@ -23,9 +23,36 @@
 }
 .doc-editing .cm-line {
   padding: 0;
+  caret-color: transparent;
 }
-.doc-editing .cm-cursor {
-  border-left: 2px solid var(--accent);
+.doc-editing .cm-scroller.is-composing .cm-line {
+  caret-color: var(--accent);
+}
+.doc-editing .cm-scroller.is-composing .cm-caret-layer {
+  display: none;
+}
+.doc-editing .cm-caret {
+  background: var(--accent);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .doc-editing .cm-caret-layer {
+    animation: caret-blink 1s steps(1) infinite;
+  }
+  .doc-editing .cm-caret-layer.is-restarted {
+    animation-name: caret-blink-restarted;
+  }
+}
+/* Two identical animations, because switching between them is what restarts the blink with the caret showing. */
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes caret-blink-restarted {
+  50% {
+    opacity: 0;
+  }
 }
 .doc-editing .cm-h1,
 .doc-editing .cm-h2 {

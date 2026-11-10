@@ -13,6 +13,7 @@ import {
 } from "@codemirror/state";
 import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, ViewPlugin } from "@codemirror/view";
 import { previewBlocks } from "./editor-blocks";
+import { drawnCaret } from "./editor-caret";
 import { findPanel } from "./editor-find";
 import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { lineKeys } from "./editor-keys";
@@ -351,6 +352,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         bubbleAfterPointer,
         bubbleButtons,
         placeholder("Start writing, or type / for blocks"),
+        drawnCaret(),
         caretRoom,
         clickHandlers(options),
         keymap.of([
