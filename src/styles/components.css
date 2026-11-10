@@ -63,7 +63,9 @@
   white-space: nowrap;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: var(--shadow-raise);
+  box-shadow:
+    0 0 0 1px var(--rule-strong),
+    var(--btn-drop);
   transition:
     background-color var(--t-hover) ease,
     box-shadow var(--t-hover) ease,
@@ -88,7 +90,9 @@
 .btn-primary {
   background: var(--accent);
   color: var(--on-accent);
-  box-shadow: 0 1px 2px color-mix(in oklab, var(--accent) 30%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent) 82%, var(--ink)),
+    var(--btn-drop);
 }
 @media (hover: hover) and (pointer: fine) {
   .btn-primary:not(:disabled):hover {
@@ -1536,16 +1540,34 @@
   padding: 12px 10px;
 }
 .empty-state.is-page {
-  max-width: 30rem;
-  margin: 22vh auto 0;
-  text-align: center;
-  font-size: 0.875rem;
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin: 18vh auto 0;
+  padding-inline: var(--gutter);
+  font-size: 0.9375rem;
+  color: var(--ink-2);
 }
 .empty-state.is-page strong {
   font-family: var(--font-read);
-  font-size: 1.375rem;
+  font-size: 2rem;
   font-weight: 600;
-  margin-bottom: 8px;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  margin-bottom: var(--s3);
+}
+.empty-state.is-page p {
+  margin-block-end: var(--s5);
+}
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.sidebar-inner:empty::before {
+  content: "No notes yet";
+  display: block;
+  padding: var(--s2) var(--s3);
+  color: var(--ink-3);
+  font-size: 0.8125rem;
 }
 .empty-state kbd {
   padding: 1px 5px;
@@ -1557,58 +1579,34 @@
 /* ---------- Welcome ---------- */
 
 .welcome {
-  height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-  background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--accent) 7%, var(--chrome)), var(--chrome) 60%);
-}
-.welcome-card {
-  width: min(460px, 100%);
-  padding: 40px 36px 28px;
-  border-radius: var(--r-sheet);
+  min-block-size: 100vh;
+  padding: 18vh var(--gutter) var(--s8);
   background: var(--paper);
-  box-shadow: var(--shadow-float);
-  text-align: center;
-  animation: sheet-in var(--t-modal) var(--ease-out);
 }
-.welcome-mark {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 14px;
-  border-radius: var(--r-sheet);
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.welcome-mark svg {
-  width: 28px;
-  height: 28px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+.welcome-page {
+  max-inline-size: 34rem;
+  margin-inline: auto;
 }
 .welcome h1 {
   margin: 0;
   font-family: var(--font-read);
-  font-size: 2rem;
+  font-size: 2.75rem;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 .welcome-lede {
-  margin: 8px auto 24px;
-  max-width: 30ch;
+  margin: var(--s3) 0 var(--s6);
   color: var(--ink-2);
-  font-size: 0.875rem;
+  font-family: var(--font-read);
+  font-size: 1.125rem;
   line-height: 1.5;
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 .welcome-actions {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
 }
 .welcome-actions[hidden],
 .clone-form[hidden] {
@@ -1617,7 +1615,6 @@
 .clone-form {
   display: grid;
   gap: 12px;
-  text-align: left;
 }
 .clone-form label {
   display: grid;
@@ -1679,43 +1676,69 @@
   display: none;
 }
 .welcome-recent {
-  margin-top: 22px;
-  text-align: left;
+  margin-block-start: var(--s7);
 }
 .welcome-recent:empty {
   display: none;
 }
 .welcome-recent-label {
-  font-size: 0.6875rem;
+  padding-block-end: var(--s2);
+  border-block-end: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--ink-3);
-  padding: 0 8px 4px;
 }
 .welcome-recent-row {
-  overflow-wrap: anywhere;
-  min-inline-size: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 7px 8px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: var(--s4);
+  inline-size: 100%;
+  padding: var(--s3) 0;
   border: 0;
+  border-block-end: 1px solid var(--rule);
   background: none;
-  text-align: left;
-  border-radius: var(--r-control);
+  text-align: start;
   cursor: default;
-  font-weight: 550;
+  font-family: var(--font-read);
+  font-size: 1rem;
+}
+.welcome-recent-row::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 2px calc(-1 * var(--s2));
+  border-radius: var(--r-control);
+  transition: background-color var(--t-hover) ease;
+}
+.welcome-recent-row > span:first-child {
+  overflow-wrap: anywhere;
+}
+.welcome-recent-row:active::before {
+  background: var(--selected);
+}
+.welcome-recent-row:focus-visible {
+  outline: 2px solid transparent;
+}
+.welcome-recent-row:focus-visible::before {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .welcome-recent-row:hover {
+  .welcome-recent-row:hover::before {
     background: var(--row-hover);
   }
 }
 .welcome-recent-dir {
-  overflow-wrap: anywhere;
-  min-inline-size: 0;
-  font-size: 0.6875rem;
-  font-weight: 450;
+  overflow: clip;
   color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .key-volume {
@@ -1737,6 +1760,9 @@
   background: var(--danger);
   border-color: transparent;
   color: var(--on-accent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--danger) 82%, var(--ink)),
+    var(--btn-drop);
 }
 .btn-danger:focus-visible {
   outline-color: var(--danger);
@@ -1787,13 +1813,6 @@
 }
 .sync-backup.is-waiting {
   color: var(--pending-ink);
-}
-
-.empty-actions {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-block-start: 14px;
 }
 
 .shell.is-base .edit-state,

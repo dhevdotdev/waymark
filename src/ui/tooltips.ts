@@ -6,6 +6,7 @@ export function bindTooltips(root: HTMLElement): void {
   let tip: HTMLElement | null = null;
   let timer = 0;
   let warmUntil = 0;
+  let pressed: HTMLElement | null = null;
 
   const hide = () => {
     clearTimeout(timer);
@@ -14,6 +15,7 @@ export function bindTooltips(root: HTMLElement): void {
   };
 
   const show = (target: HTMLElement) => {
+    if (document.querySelector(".context-menu:not(.is-leaving)")) return;
     tip = document.createElement("div");
     tip.className = `tooltip${performance.now() < warmUntil ? " is-instant" : ""}`;
     tip.textContent = target.dataset.tip ?? "";
@@ -26,12 +28,13 @@ export function bindTooltips(root: HTMLElement): void {
     const r = target.getBoundingClientRect();
     const width = tip.offsetWidth;
     tip.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, r.left + r.width / 2 - width / 2))}px`;
-    tip.style.top = `${r.bottom + 40 > window.innerHeight ? r.top - tip.offsetHeight - 6 : r.bottom + 6}px`;
+    const above = target.dataset.tipSide === "above" || r.bottom + 40 > window.innerHeight;
+    tip.style.top = `${above ? r.top - tip.offsetHeight - 6 : r.bottom + 6}px`;
   };
 
   root.addEventListener("pointerover", (e) => {
     const target = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]");
-    if (!target || target.closest(".tab.is-active")) return;
+    if (!target || target === pressed || target.closest(".tab.is-active")) return;
     const label = target.querySelector<HTMLElement>(":scope > :is(.nav-text, .rail-link-name, .tree-name, .start-title)");
     if (label && label.scrollWidth <= label.clientWidth) return;
     if (target.classList.contains("tab")) {
@@ -46,10 +49,14 @@ export function bindTooltips(root: HTMLElement): void {
   root.addEventListener("pointerout", (e) => {
     const from = (e.target as HTMLElement).closest("[data-tip]");
     if (from && !from.contains(e.relatedTarget as Node)) {
+      if (from === pressed) pressed = null;
       if (tip) warmUntil = performance.now() + WARM_MS;
       hide();
     }
   });
 
-  root.addEventListener("pointerdown", hide);
+  root.addEventListener("pointerdown", (e) => {
+    pressed = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]");
+    hide();
+  });
 }

@@ -121,6 +121,41 @@ export function deleteColumn(lines: string[], column: number): string[] {
   });
 }
 
+/** Moves a row, carrying its line unchanged. The delimiter stays second, so row 0 is whichever row is first. */
+export function moveRow(lines: string[], from: number, to: number): string[] {
+  const rows = [lines[0], ...lines.slice(2)];
+  if (from === to || !rows[from] || !rows[to]) return lines;
+  const [row] = rows.splice(from, 1);
+  rows.splice(to, 0, row);
+  return [rows[0], lines[1], ...rows.slice(1)];
+}
+
+/** Moves a column on every line. Cells keep their bytes, padding included, when the row has pipes at both ends. */
+export function moveColumn(lines: string[], from: number, to: number): string[] {
+  const columns = cellsOf(lines[0]).length;
+  if (from === to || from < 0 || to < 0 || from >= columns || to >= columns) return lines;
+  return lines.map((original) => {
+    const line = withCells(original, Math.max(from, to) + 1);
+    const all = segments(line);
+    const first = all[0];
+    const last = all[all.length - 1];
+    const pieces = all.map((s) => line.slice(s.from, s.to));
+    const piped = line.trimStart().startsWith("|") && line.slice(last.to).trimStart().startsWith("|");
+    const moved = [...pieces];
+    const [cell] = moved.splice(from, 1);
+    moved.splice(to, 0, cell);
+    const cells = piped
+      ? moved
+      : moved.map((text, i) => {
+          const around = pieces[i];
+          const lead = around.slice(0, around.length - around.trimStart().length);
+          const tail = around.slice(around.trimEnd().length);
+          return `${lead}${text.trim()}${tail}`;
+        });
+    return line.slice(0, first.from) + cells.join("|") + line.slice(last.to);
+  });
+}
+
 export function setAlignment(lines: string[], column: number, align: ParsedTable["align"][number]): string[] {
   const line = withCells(lines[1], column + 1);
   const { from, to } = segments(line)[column];

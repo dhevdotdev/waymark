@@ -818,6 +818,9 @@ kbd {
 .shell:is(.is-blank, :has(.empty-state.is-page)) .pane-head {
   visibility: hidden;
 }
+.shell:has(.empty-state.is-page) .trail {
+  display: none;
+}
 
 /* The tab's trail: where following links has taken it. */
 .trail {

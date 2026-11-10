@@ -8,8 +8,7 @@ import { type GitError, git, native } from "../platform";
 export function showWelcome(root: HTMLElement, recent: string[], onOpen: (path: string) => void, error?: string): void {
   root.innerHTML = `
     <div class="welcome" data-tauri-drag-region>
-      <div class="welcome-card">
-        <div class="welcome-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M9 5.5h10.5L25 11v15.5H9z"/><path d="M19.5 5.5V11H25"/><path d="M13 16h8M13 20h6"/></svg></div>
+      <main class="welcome-page">
         <h1>Waymark</h1>
         <p class="welcome-lede">A quiet place to read your notes. Open a Markdown vault kept in Git, or clone one.</p>
         <div class="welcome-actions">
@@ -23,8 +22,8 @@ export function showWelcome(root: HTMLElement, recent: string[], onOpen: (path: 
           <div class="clone-buttons"><button type="button" class="btn" data-w="cancel">Cancel</button><button type="submit" class="btn btn-primary">Clone</button></div>
         </form>
         <p class="welcome-error" role="alert"></p>
-        <div class="welcome-recent"></div>
-      </div>
+        <section class="welcome-recent"></section>
+      </main>
     </div>`;
   const q = <T extends HTMLElement>(s: string) => root.querySelector(s) as T;
   const errorEl = q<HTMLElement>(".welcome-error");

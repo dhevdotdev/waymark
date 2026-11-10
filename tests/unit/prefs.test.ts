@@ -36,7 +36,7 @@ describe("PrefStore.load", () => {
     localStorage.setItem(KEY, "{broken");
     const store = new PrefStore();
     await store.load();
-    expect(store.value.family).toBe("catppuccin");
+    expect(store.value.family).toBe("ember");
   });
 });
 

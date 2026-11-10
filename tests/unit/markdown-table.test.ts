@@ -4,6 +4,8 @@ import {
   deleteRow,
   insertColumn,
   insertRow,
+  moveColumn,
+  moveRow,
   parseTable,
   setAlignment,
   setCell,
@@ -130,5 +132,37 @@ describe("setAlignment", () => {
 
   it("leaves every cell's text alone", () => {
     expect(parseTable(setAlignment(table, 0, "right")).rows).toEqual(parseTable(table).rows);
+  });
+});
+
+describe("moving", () => {
+  const table = ["| a  |   b |", "|:---|----:|", "| 1  |   2 |", "| 3  |   4 |"];
+
+  it("moves a row and leaves the delimiter in place", () => {
+    expect(moveRow(table, 2, 1)).toEqual([table[0], table[1], table[3], table[2]]);
+    expect(moveRow(table, 0, 1)).toEqual([table[2], table[1], table[0], table[3]]);
+  });
+
+  it("ignores a move to the same place or out of range", () => {
+    expect(moveRow(table, 1, 1)).toBe(table);
+    expect(moveRow(table, 1, 9)).toBe(table);
+    expect(moveColumn(table, 0, 0)).toBe(table);
+    expect(moveColumn(table, 0, 5)).toBe(table);
+  });
+
+  it("moves a column with its padding and its alignment marker", () => {
+    expect(moveColumn(table, 0, 1)).toEqual(["|   b | a  |", "|----:|:---|", "|   2 | 1  |", "|   4 | 3  |"]);
+  });
+
+  it("keeps escaped pipes inside their cell", () => {
+    expect(moveColumn(["| x \\| y | z |", "|---|---|"], 0, 1)[0]).toBe("| z | x \\| y |");
+  });
+
+  it("keeps a table without outer pipes valid", () => {
+    expect(moveColumn(["a | b", "--- | ---", "1 | 2"], 0, 1)).toEqual(["b | a", "--- | ---", "2 | 1"]);
+  });
+
+  it("gives a short row the cells it needs to move", () => {
+    expect(moveColumn(["| a | b |", "|---|---|", "| 1 |"], 0, 1)[2]).toBe("|  | 1 |");
   });
 });

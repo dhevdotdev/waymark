@@ -15,25 +15,25 @@ function load(): Promise<Mermaid> {
  * stands for, so switching theme or appearance repaints diagrams through CSS
  * with no re-render.
  */
-const ROLES: Record<string, string> = {
-  "#010101": "var(--code-bg)",
-  "#020202": "var(--ink)",
-  "#030303": "var(--ink-3)",
-  "#040404": "var(--paper)",
-  "#050505": "var(--rule-strong)",
-  "#060606": "var(--accent)",
-  "#070707": "color-mix(in oklab, var(--p-surface0) 40%, var(--code-bg))",
-};
-const role = (css: string) => Object.keys(ROLES).find((k) => ROLES[k] === css)!;
+const ROLES = {
+  paper: ["#010101", "var(--code-bg)"],
+  ink: ["#020202", "var(--ink)"],
+  line: ["#030303", "var(--ink-3)"],
+  node: ["#040404", "color-mix(in oklab, var(--p-surface0) 55%, var(--code-bg))"],
+  accent: ["#060606", "var(--accent)"],
+  cluster: ["#070707", "color-mix(in oklab, var(--p-surface0) 25%, var(--code-bg))"],
+} as const;
 
 function themeVariables(): MermaidConfig["themeVariables"] {
-  const paper = role("var(--code-bg)");
-  const ink = role("var(--ink)");
-  const line = role("var(--ink-3)");
-  const node = role("color-mix(in oklab, var(--p-surface0) 55%, var(--code-bg))");
-  const border = role("var(--ink-3)");
-  const accent = role("var(--accent)");
-  const cluster = role("color-mix(in oklab, var(--p-surface0) 25%, var(--code-bg))");
+  const [paper, ink, line, node, accent, cluster] = [
+    ROLES.paper,
+    ROLES.ink,
+    ROLES.line,
+    ROLES.node,
+    ROLES.accent,
+    ROLES.cluster,
+  ].map(([hex]) => hex);
+  const border = line;
   return {
     darkMode: false,
     background: paper,
@@ -88,7 +88,7 @@ function themeVariables(): MermaidConfig["themeVariables"] {
 /** Replaces placeholder colours (hex, or the rgb() form Mermaid sometimes emits) with theme variables. */
 function bindColours(svg: string): string {
   let out = svg;
-  for (const [hex, css] of Object.entries(ROLES)) {
+  for (const [hex, css] of Object.values(ROLES)) {
     const n = parseInt(hex.slice(1, 3), 16);
     out = out
       .replaceAll(new RegExp(hex, "gi"), css)
@@ -178,16 +178,32 @@ export async function renderDiagrams(root: ParentNode): Promise<void> {
     f.classList.add("is-pending");
     f.style.minBlockSize = `${heights[fingerprint(sourceOf(f))] ?? estimateDiagramHeight(sourceOf(f))}px`;
   }
-  /* Mermaid measures label text while laying out; measuring before the UI face loads clips labels. */
-  const [mermaid] = await Promise.all([load(), document.fonts.load('13px "Inter Variable"'), document.fonts.ready]);
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: "base",
-    themeVariables: themeVariables(),
-    flowchart: { curve: "basis", padding: 12, nodeSpacing: 36, rankSpacing: 44, htmlLabels: true },
-    sequence: { mirrorActors: false, actorMargin: 48 },
-  });
+  const failed = (figure: HTMLElement, err: unknown) => {
+    figure.classList.remove("is-pending");
+    figure.classList.add("is-error");
+    figure.style.minBlockSize = "";
+    if (figure.querySelector(".diagram-error")) return;
+    const note = document.createElement("div");
+    note.className = "diagram-error";
+    note.textContent = `Diagram could not be drawn: ${String((err as Error)?.message ?? err).split("\n")[0]}`;
+    figure.prepend(note);
+  };
+  let mermaid: Mermaid;
+  try {
+    /* Mermaid measures label text while laying out; measuring before the UI face loads clips labels. */
+    [mermaid] = await Promise.all([load(), document.fonts.load('13px "Inter Variable"'), document.fonts.ready]);
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "base",
+      themeVariables: themeVariables(),
+      flowchart: { curve: "basis", padding: 12, nodeSpacing: 36, rankSpacing: 44, htmlLabels: true },
+      sequence: { mirrorActors: false, actorMargin: 48 },
+    });
+  } catch (err) {
+    for (const figure of figures) failed(figure, err);
+    return;
+  }
   for (const figure of figures) {
     const source = sourceOf(figure);
     try {
@@ -198,15 +214,7 @@ export async function renderDiagrams(root: ParentNode): Promise<void> {
       figure.style.minBlockSize = "";
       if (figure.isConnected) rememberHeight(source, figure.getBoundingClientRect().height);
     } catch (err) {
-      figure.classList.remove("is-pending");
-      figure.classList.add("is-error");
-      if (!figure.querySelector(".diagram-error")) {
-        const note = document.createElement("div");
-        note.className = "diagram-error";
-        note.textContent = `Diagram could not be drawn: ${(err as Error).message.split("\n")[0]}`;
-        figure.prepend(note);
-      }
+      failed(figure, err);
     }
-    figure.style.minBlockSize = "";
   }
 }

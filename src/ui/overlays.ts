@@ -44,12 +44,12 @@ export function lightbox(content: Element): void {
 }
 
 /** Calls `close` on Escape or a press outside `inside`. Returns a function that stops listening. */
-export function dismissOnOutside(inside: Node[], close: () => void): () => void {
+export function dismissOnOutside(inside: Node[], close: (e: Event) => void): () => void {
   const onEvent = (e: Event) => {
     if (e instanceof KeyboardEvent && e.key !== "Escape") return;
     if (e instanceof PointerEvent && inside.some((node) => node.contains(e.target as Node))) return;
     stop();
-    close();
+    close(e);
   };
   const stop = () => {
     window.removeEventListener("pointerdown", onEvent, true);

@@ -845,7 +845,7 @@ button.callout-title:focus-visible {
 /* Narrow windows: give the text back its margins. */
 @container reader (max-width: 640px) {
   .doc {
-    --gutter: 1.25rem;
+    --gutter: 1.5rem;
     padding-top: var(--s6);
   }
   .doc-title {

@@ -1,9 +1,11 @@
+import { fadeOut } from "./overlays";
+
 function overlayFor(content: HTMLElement): { overlay: HTMLElement; close: () => void } {
   const overlay = document.createElement("div");
   overlay.className = "overlay prompt-overlay";
   overlay.append(content);
   document.body.append(overlay);
-  return { overlay, close: () => overlay.remove() };
+  return { overlay, close: () => fadeOut(overlay) };
 }
 
 /** Asks for a short piece of text. `validate` returns why a value cannot be used. Resolves null if cancelled. */
@@ -81,6 +83,8 @@ export function confirmAction(options: { title: string; body: string; action: st
     const box = document.createElement("div");
     box.className = "prompt";
     box.setAttribute("role", "alertdialog");
+    box.setAttribute("aria-modal", "true");
+    box.tabIndex = -1;
     const title = document.createElement("h2");
     title.className = "prompt-title";
     title.textContent = options.title;
@@ -97,6 +101,8 @@ export function confirmAction(options: { title: string; body: string; action: st
     confirm.textContent = options.action;
     actions.append(cancel, confirm);
     box.append(title, body, actions);
+    box.setAttribute("aria-label", options.title);
+    box.setAttribute("aria-description", options.body);
     const { overlay, close } = overlayFor(box);
     const finish = (value: boolean) => {
       close();
@@ -104,10 +110,24 @@ export function confirmAction(options: { title: string; body: string; action: st
       if (returnFocus instanceof HTMLElement) returnFocus.focus({ preventScroll: true });
       resolve(value);
     };
+    const buttons = [cancel, confirm];
     const onKey = (e: KeyboardEvent) => {
+      const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
       if (e.key === "Escape") {
         e.stopPropagation();
         finish(false);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const step = e.shiftKey ? -1 : 1;
+        const from = at < 0 && e.shiftKey ? 0 : at;
+        buttons[(from + step + buttons.length) % buttons.length].focus();
+      } else if (e.key === "Enter" && at < 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        /* Return never takes a destructive action unless that button was reached on purpose. */
+        if (options.danger) cancel.focus();
+        else finish(true);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -116,6 +136,6 @@ export function confirmAction(options: { title: string; body: string; action: st
     overlay.addEventListener("pointerdown", (e) => {
       if (e.target === overlay) finish(false);
     });
-    confirm.focus();
+    box.focus({ preventScroll: true });
   });
 }

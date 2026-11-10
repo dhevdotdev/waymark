@@ -213,12 +213,13 @@ try {
   await pause(150);
   const withTable = await disk("Writing.md");
   check(
-    "the typing replaces the placeholder",
-    withTable.includes("| Name | Column 2 | Column 3 |\n| --- | --- | --- |"),
+    "the typing goes into an empty header",
+    withTable.includes("| Name |  |  |\n| --- | --- | --- |"),
     withTable.slice(0, 120),
   );
   check("the slash is gone", !withTable.includes("/table"));
   check("the table has a blank line before it, so it counts as a table", /here\.\n\n\| Name/.test(withTable));
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await pause(200);
 
@@ -512,7 +513,9 @@ try {
     const first = document.querySelector(".files-actions .icon-btn svg").getBoundingClientRect();
     const end = document.querySelector(".files-actions-end svg").getBoundingClientRect();
     const forward = document.querySelector('.titlebar [data-act="forward"] svg').getBoundingClientRect();
-    const rowIcon = document.querySelector(".nav-item .tree-icon").getBoundingClientRect();
+    const rowIcon = [...document.querySelectorAll(".nav-item .tree-icon")]
+      .map((icon) => icon.getBoundingClientRect())
+      .sort((a, b) => a.left - b.left)[0];
     return { left: first.left - rowIcon.left, right: centre(end) - centre(forward), size: first.width - rowIcon.width };
   });
   check(

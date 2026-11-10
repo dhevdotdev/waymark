@@ -36,10 +36,13 @@ export class NoteView {
   }
 
   showEmptyVault(): void {
-    this.showMessage("No Markdown notes here", "Waymark reads .md files. Start one here, or open a different folder.");
+    this.showMessage(
+      "No Markdown notes here",
+      `Waymark reads .md files. Start one here${isDesktop ? ", or open a different folder" : ""}.`,
+    );
     const actions = document.createElement("div");
     actions.className = "empty-actions";
-    actions.innerHTML = `<button class="btn btn-primary btn-small" data-act="new-note">New note</button>${isDesktop ? `<button class="btn btn-small" data-act="open-vault">Open another folder</button>` : ""}`;
+    actions.innerHTML = `<button class="btn btn-primary" data-act="new-note">New note</button>${isDesktop ? `<button class="btn" data-act="open-vault">Open another folder</button>` : ""}`;
     this.els.scroller.querySelector(".empty-state.is-page")?.append(actions);
   }
 

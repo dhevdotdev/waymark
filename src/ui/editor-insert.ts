@@ -10,6 +10,7 @@ import { syntaxTree } from "@codemirror/language";
 import { EditorSelection, type EditorState, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { native } from "../platform";
+import { showContextMenu } from "./context-menu";
 import { frontmatterEnd } from "./live-preview";
 import { htmlToMarkdown, isCodeEditorCopy } from "./paste-html";
 import { focusTableAt } from "./table-editor";
@@ -28,7 +29,7 @@ export interface InsertOptions {
 }
 
 const IN_CODE = new Set(["InlineCode", "FencedCode", "CodeBlock", "CodeText", "Table"]);
-const TABLE = ["| Column 1 | Column 2 | Column 3 |", "| --- | --- | --- |", "|  |  |  |", "|  |  |  |"];
+const TABLE = ["|  |  |  |", "| --- | --- | --- |", "|  |  |  |", "|  |  |  |"];
 
 function inCode(state: EditorState, pos: number): boolean {
   for (
@@ -348,5 +349,21 @@ export function editorInsert(options: InsertOptions): Extension {
     }),
     heldPlaces,
     fileHandlers(options),
+    EditorView.domEventHandlers({
+      contextmenu(e, view) {
+        const line = (e.target as HTMLElement).closest(".cm-line");
+        const pos = line ? view.posAtCoords({ x: e.clientX, y: e.clientY }, false) : null;
+        if (pos === null) return false;
+        const { from, to, text } = view.state.doc.lineAt(pos);
+        if (text.trim()) return false;
+        e.preventDefault();
+        showContextMenu(
+          e.clientX,
+          e.clientY,
+          WHOLE_LINE.map(([label, , apply]) => ({ label, run: () => apply(view, from, to, options) })),
+        );
+        return true;
+      },
+    }),
   ];
 }

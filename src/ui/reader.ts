@@ -435,6 +435,7 @@ export class Reader {
       this.handleEscape(inField);
       return;
     }
+    if (e.key === "F2" && e.target instanceof HTMLElement && e.target.closest(".cm-table-widget")) return;
     if (this.commands.handleKey(e, inField)) {
       e.preventDefault();
       e.stopPropagation();
