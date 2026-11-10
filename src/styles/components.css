@@ -123,8 +123,8 @@
   padding: 2px 4px;
   margin: -2px -4px;
   font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 500;
+  color: var(--ink-3);
   border-radius: var(--r-chip);
 }
 @media (hover: hover) and (pointer: fine) {
@@ -667,7 +667,7 @@
 }
 .sheet {
   width: min(980px, 100%);
-  max-height: 100%;
+  height: min(680px, 100%);
   display: flex;
   flex-direction: column;
   background: var(--paper);
@@ -1012,6 +1012,10 @@
   overflow: hidden;
   animation: sheet-in var(--t-modal) var(--ease-out);
 }
+.sync-sheet.is-short {
+  height: auto;
+  padding-block-end: 14px;
+}
 .sync-sheet:focus,
 .sync-sheet:focus-visible {
   outline: none;
@@ -1297,6 +1301,10 @@
 .change-act {
   opacity: 0.6;
 }
+/* Sticking stops at the padding edge, so the list must not have any below the commit box. */
+.sync-body:has(.commit-box) {
+  padding-block-end: 0;
+}
 .commit-box {
   position: sticky;
   inset-block-end: 0;
@@ -1304,7 +1312,7 @@
   border-block-start: 1px solid var(--rule);
   display: grid;
   gap: 8px;
-  padding: 6px;
+  padding: 6px 6px 16px;
 }
 .commit-actions {
   display: flex;
@@ -1812,9 +1820,6 @@
 .sync-overlay ~ .sheet-overlay,
 .sync-overlay ~ .sheet-overlay .sheet {
   animation: none;
-}
-.sync-overlay ~ .sheet-overlay .sheet {
-  height: min(680px, 100%);
 }
 .sync-overlay ~ .sheet-overlay.is-leaving {
   display: none;

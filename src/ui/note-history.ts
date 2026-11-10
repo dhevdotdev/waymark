@@ -1,5 +1,5 @@
 import { type Commit, type FileChange, type GitStatus, git, isDesktop } from "../platform";
-import { relative } from "./git-panel-parts";
+import { dayOf, relative } from "./git-panel-parts";
 
 const HISTORY_LIMIT = 100;
 const HISTORY_SHOWN = 30;
@@ -96,14 +96,7 @@ export class NoteHistory {
     };
     fact("Updated", relative(commits[0].date));
     if (!capped) {
-      fact(
-        "Created",
-        new Date(commits[commits.length - 1].date).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        }),
-      );
+      fact("Created", dayOf(commits[commits.length - 1].date));
     }
     return list;
   }

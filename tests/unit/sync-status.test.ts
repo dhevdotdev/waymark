@@ -26,7 +26,14 @@ describe("describeSync", () => {
     ["both ways", { ...clean, ahead: 1, behind: 1 }, "Diverged", "warn"],
     ["edited", { ...clean, files: [change] }, "1 changed", "changed"],
     ["mid-merge", { ...clean, operation: "merge" }, "merge in progress", "warn"],
-    ["no upstream", { ...clean, upstream: null }, "No remote", "off"],
+    ["no remote at all", { ...clean, upstream: null, remoteUrl: null }, "No remote", "off"],
+    [
+      "a remote the branch does not track",
+      { ...clean, upstream: null, remoteUrl: "git@example.invalid:n.git" },
+      "Not tracking",
+      "off",
+    ],
+    ["detached", { ...clean, branch: null, upstream: null }, "Detached HEAD", "off"],
     ["not a repository", { ...clean, isRepo: false }, "Local", "off"],
   ])("%s", (_name, status, text, tone) => {
     expect(describeSync(status, idle, desktop)).toMatchObject({ text, tone });

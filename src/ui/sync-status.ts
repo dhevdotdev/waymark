@@ -40,7 +40,10 @@ export function describeSync(
   if (ahead) return { tone: "outgoing", text: `${ahead.toLocaleString()} to push`, tip: "Committed here, not yet pushed" };
   if (files.length)
     return { tone: "changed", text: `${files.length.toLocaleString()} changed`, tip: "Saved here, not committed yet" };
-  if (!upstream) return { tone: "off", text: "No remote", tip: "This branch does not track a remote branch" };
+  if (!status.branch) return { tone: "off", text: "Detached HEAD", tip: "Not on a branch, so there is nothing to sync" };
+  if (!upstream && status.remoteUrl)
+    return { tone: "off", text: "Not tracking", tip: "This branch does not track a remote branch" };
+  if (!upstream) return { tone: "off", text: "No remote", tip: "This vault has no remote, so commits stay on this Mac" };
   if (!context.everSynced) return { tone: "off", text: "Not checked", tip: "Press Sync to compare with the remote" };
   return { tone: "ok", text: "Synced", tip: "Up to date with the remote" };
 }

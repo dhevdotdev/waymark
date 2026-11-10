@@ -1166,18 +1166,6 @@ kbd {
 .rail-pane .rail-title:not(:first-child) {
   padding-top: 14px;
 }
-.rail-title .link-btn {
-  color: var(--chrome-ink-3);
-  font-weight: 500;
-  font-size: 0.6875rem;
-  letter-spacing: 0;
-  text-transform: none;
-}
-@media (hover: hover) and (pointer: fine) {
-  .rail-title .link-btn:hover {
-    color: var(--ink);
-  }
-}
 .rail-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1426,8 +1414,6 @@ kbd {
 .prop-raw {
   align-self: flex-start;
   color: var(--chrome-ink-3);
-  font-size: 0.6875rem;
-  font-weight: 500;
 }
 .prop-add {
   margin-inline-start: 8px;

@@ -45,6 +45,7 @@ export class GitPanel {
   private tab: "changes" | "history" = "changes";
   private historyPath: string | null = null;
   private commits: Commit[] = [];
+  private history: "loading" | "loaded" | "failed" = "loading";
   private busy = false;
   private message: string | null = null;
   private readonly work = new WorkIndicator();
@@ -246,6 +247,7 @@ export class GitPanel {
       this.historyPath = opts.historyPath || null;
       this.commits = [];
     }
+    if (this.tab === "history") void this.loadHistory();
     if (!this.root) {
       const overlay = el("div", "overlay sync-overlay");
       const root = el("section", "sync-sheet");
@@ -266,7 +268,6 @@ export class GitPanel {
     }
     this.render();
     void this.refresh();
-    if (this.tab === "history") void this.loadHistory();
   }
 
   close(): void {
@@ -285,6 +286,7 @@ export class GitPanel {
     const st = this.status;
     const typing = root.querySelector<HTMLTextAreaElement>(".commit-box textarea:focus");
     root.replaceChildren();
+    root.classList.toggle("is-short", st?.isRepo === false);
 
     const head = el("header", "sync-head");
     const close = el("button", "icon-btn");
@@ -309,7 +311,9 @@ export class GitPanel {
 
     const summary = el("div", "sync-summary");
     const quiet = !st.ahead && !st.behind && !st.files.length && this.state.kind !== "error";
-    if (quiet) {
+    const unconnected = this.unconnectedLine(st);
+    if (unconnected) summary.append(el("div", "sync-uptodate is-unchecked", unconnected));
+    else if (quiet) {
       const last = this.host.lastSync();
       summary.append(
         el(
@@ -334,7 +338,8 @@ export class GitPanel {
     const backup = this.backupLine();
     if (backup) summary.append(backup);
 
-    summary.append(this.syncActions(st));
+    const actions = this.syncActions(st);
+    if (actions) summary.append(actions);
     root.append(summary);
 
     if (this.state.kind === "error") root.append(this.explain(this.state.error));
@@ -372,7 +377,22 @@ export class GitPanel {
     }
   }
 
-  private syncActions(st: GitStatus): HTMLElement {
+  /** Why the usual comparison with a remote does not apply here, or null when it does. */
+  private unconnectedLine(st: GitStatus): string | null {
+    if (st.upstream) return null;
+    if (!st.branch) return "Not on a branch, so there is nothing to sync. Check one out in a terminal.";
+    if (!st.remoteUrl) return "This vault has no remote, so commits stay on this Mac.";
+    return "This branch does not track a remote branch yet. Set one up in a terminal.";
+  }
+
+  /** The state itself needs a terminal, so its button sits with the main actions and a notice need not repeat it. */
+  private needsTerminal(st: GitStatus | null): boolean {
+    if (!st) return false;
+    return (st.ahead > 0 && st.behind > 0) || Boolean(st.operation) || (!st.upstream && (Boolean(st.remoteUrl) || !st.branch));
+  }
+
+  private syncActions(st: GitStatus): HTMLElement | null {
+    if (!st.upstream && st.branch && !st.remoteUrl) return null;
     const actions = el("div", "sync-actions");
     const btn = (label: string, primary: boolean, enabled: boolean, onClick: () => void, hint?: string) => {
       const b = el("button", primary ? "btn btn-primary" : "btn", label);
@@ -382,19 +402,22 @@ export class GitPanel {
       actions.append(b);
       return b;
     };
-    const blocked = (st.ahead > 0 && st.behind > 0) || Boolean(st.operation);
+    const blocked = this.needsTerminal(st);
     if (blocked)
       btn("Open in Terminal", true, true, () => void native.openTerminal(), "Resolve it there, where Git can ask you what to do");
+    if (!st.upstream) return actions;
+    /* Commit & Sync is the main action whenever there is something to commit, so one button leads at a time. */
+    const leads = !blocked && !st.files.length;
     btn(
       blocked ? "Check again" : "Sync",
-      st.behind > 0 && !blocked,
+      leads && st.behind > 0,
       true,
       () => void this.sync(),
       blocked ? "Fetch and look again" : "Fetch, then apply incoming commits when that is a fast-forward",
     );
     btn(
       `Push${st.ahead ? ` ${st.ahead}` : ""}`,
-      false,
+      leads && st.ahead > 0 && st.behind === 0,
       st.ahead > 0 && st.behind === 0,
       () => void this.push(),
       st.behind ? "Sync first" : undefined,
@@ -421,10 +444,17 @@ export class GitPanel {
     if (error.message && error.kind !== "notARepo") {
       const details = el("details", "notice-details");
       details.append(el("summary", "", "Git output"), el("pre", "", error.message));
+      details.open = error.kind === "other";
       box.append(details);
     }
     const row = el("div", "notice-actions");
-    if (info.terminal || error.kind === "other") {
+    if (info.retry) {
+      const b = el("button", "btn btn-small", info.retry);
+      b.disabled = this.busy;
+      b.onclick = () => void this.sync();
+      row.append(b);
+    }
+    if ((info.terminal || error.kind === "other") && !this.needsTerminal(this.status)) {
       const b = el("button", "btn btn-small", "Open in Terminal");
       b.onclick = () => void native.openTerminal();
       row.append(b);
@@ -599,13 +629,29 @@ export class GitPanel {
   }
 
   private async loadHistory(): Promise<void> {
+    this.history = "loading";
     try {
       this.commits = await git.log(this.historyPath, 80, 0);
+      this.history = "loaded";
     } catch (err) {
       this.commits = [];
+      this.history = "failed";
       this.host.toast((err as Error).message);
     }
     if (this.root && this.tab === "history") this.render();
+  }
+
+  private historyPlaceholder(): HTMLElement {
+    if (this.history === "loading") return el("div", "empty-state is-late", "Loading history…");
+    const empty = el("div", "empty-state");
+    if (this.history === "failed") empty.append(el("strong", "", "History could not be read"));
+    else {
+      empty.append(
+        el("strong", "", "No commits yet"),
+        el("p", "", this.historyPath ? "This note has not been committed." : "Commits appear here once you make one."),
+      );
+    }
+    return empty;
   }
 
   private renderHistory(body: HTMLElement): void {
@@ -616,14 +662,14 @@ export class GitPanel {
       all.onclick = () => {
         this.historyPath = null;
         this.commits = [];
-        this.render();
         void this.loadHistory();
+        this.render();
       };
       scope.append(all);
       body.append(scope);
     }
     if (!this.commits.length) {
-      body.append(el("div", "empty-state is-late", "Loading history…"));
+      body.append(this.historyPlaceholder());
       return;
     }
     const list = el("ol", "commit-list");

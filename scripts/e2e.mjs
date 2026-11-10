@@ -7,7 +7,7 @@ const SHARDS = [
   [["tables"], ["blocks"]],
   [["reader"], ["reader", "reduced"], ["edge"], ["dialogs"]],
   [["editing"], ["organize"], ["properties"]],
-  [["note-files"], ["recovery"], ["backup"], ["library"]],
+  [["note-files"], ["recovery"], ["backup"], ["library"], ["sync"]],
 ];
 
 const wanted = process.argv[2];

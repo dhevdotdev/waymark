@@ -1,9 +1,10 @@
 /** The sync panel's fixed text and small building blocks. */
 
-export const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean }> = {
+export const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean; retry?: string }> = {
   offline: {
     title: "Offline",
     body: "The remote could not be reached. Your notes are all here and readable; sync again when you are back online.",
+    retry: "Try again",
   },
   auth: {
     title: "The remote refused access",
@@ -22,6 +23,7 @@ export const EXPLAIN: Record<string, { title: string; body: string; terminal?: b
   rejected: {
     title: "Push was rejected",
     body: "The remote has commits you do not have yet. Sync first; Waymark never force-pushes.",
+    retry: "Sync now",
   },
   inProgress: {
     title: "An operation is unfinished",
@@ -40,12 +42,13 @@ export const EXPLAIN: Record<string, { title: string; body: string; terminal?: b
   timeout: {
     title: "Git took too long",
     body: "Waymark stopped waiting. For a commit, a Git hook or signing prompt may still be running, and it was left alone so nothing is half-written. Otherwise check your connection and try again.",
+    retry: "Try again",
   },
   notARepo: {
     title: "Not a Git repository",
     body: "This vault is a plain folder. Waymark reads it normally, but sync and history need Git.",
   },
-  other: { title: "Git reported a problem", body: "" },
+  other: { title: "Git reported a problem", body: "Git stopped with an error. Its output says what went wrong." },
 };
 
 export function relative(at: number | string | null): string {
@@ -59,7 +62,23 @@ export function relative(at: number | string | null): string {
   if (h < 24) return `${h} h ago`;
   const d = Math.round(h / 24);
   if (d < 30) return `${d} d ago`;
-  return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return dayOf(t);
+}
+
+/** A date on its own, written one way everywhere. */
+export function dayOf(at: number | string): string {
+  return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** The same date with its time, for the one place a commit is looked at closely. */
+export function momentOf(at: number | string): string {
+  return new Date(at).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -92,13 +111,9 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   const titles = el("div", "sheet-titles");
   titles.append(el("h2", "sheet-title", title), el("div", "sheet-sub", subtitle));
   const close = el("button", "icon-btn");
-  const overSync = document.querySelector(".sync-overlay") !== null;
-  close.setAttribute("aria-label", overSync ? "Back" : "Close");
-  close.innerHTML = overSync
-    ? `<svg viewBox="0 0 16 16"><path d="M10 4L6 8l4 4"/></svg>`
-    : `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
-  if (overSync) head.append(close, titles);
-  else head.append(titles, close);
+  close.setAttribute("aria-label", "Close");
+  close.innerHTML = `<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>`;
+  head.append(titles, close);
   const body = el("div", "sheet-body");
   body.append(content);
   sheet.append(head, body);

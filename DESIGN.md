@@ -68,6 +68,10 @@ Inline code inside a callout takes a stronger tint of that callout's own colour.
 
 A heading's marks hang in the margin and read left to right, so the arrow keys move through them the way they look. Up, Down and Home land on the heading's text, never inside the marks. Up and Down stop on every line, the short gaps between blocks included. Backspace at the start of a heading's text makes it plain text in one step, and one Undo brings the heading back.
 
+## Sync panel
+
+One button leads at a time: Commit & Sync when there is something to commit, otherwise Sync for incoming commits or Push for outgoing ones. A state that can only be resolved in a terminal leads with Open in Terminal, once. Every problem says what happened and offers its next step where there is one. A vault with no remote, a branch with no upstream and a detached HEAD each say which they are, and never claim to be up to date. Quiet text actions such as Stage all use muted ink, not the accent. A commit or diff opens in one sheet of the same size and close button from anywhere, and dates read the same way throughout.
+
 ## Coming back to a note
 
 A note is where it was left: after Back and Forward, after another tab, after the graph, after closing a stop on the trail, after Read and Edit, and after a relaunch. A position is never recorded while a different note or the graph is on screen. After a property change adds or removes lines, the reading view is drawn again in place, so its line numbers stay true.

@@ -1,7 +1,7 @@
 import { type Commit, type FileChange, type GitStatus, git } from "../platform";
 import { diffWithPrefs } from "./diff";
 import type { GitHost } from "./git-panel";
-import { el, openSheet } from "./git-panel-parts";
+import { dayOf, el, momentOf, openSheet } from "./git-panel-parts";
 
 /** The sheets that show one change: a file against the last commit, or a commit and what can be done with it. */
 export class GitDetail {
@@ -23,7 +23,7 @@ export class GitDetail {
 
   /** A button that puts this commit's text back in the note, as an uncommitted change. */
   private restoreButton(c: Commit, from: string, target: string): HTMLElement {
-    const when = new Date(c.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    const when = dayOf(c.date);
     const button = el("button", "btn btn-small", "Restore this version");
     button.dataset.tip = "Puts this text back as an uncommitted change";
     button.onclick = async () => {
@@ -62,7 +62,7 @@ export class GitDetail {
           const md = await git.fileAt(c.sha, path);
           const doc = el("article", "doc is-revision");
           await this.host.renderNoteAt(md, path, doc);
-          openSheet(this.host.title(path), `As of ${new Date(c.date).toLocaleString()} · ${c.short} · read-only`, doc);
+          openSheet(this.host.title(path), `As of ${momentOf(c.date)} · ${c.short} · read-only`, doc);
         };
         const cmp = el("button", "btn btn-small", "Compare with current");
         cmp.onclick = async () => {
@@ -75,7 +75,7 @@ export class GitDetail {
         content.append(bar);
       }
       content.append(this.diffView(text, "This commit changed no file contents."));
-      openSheet(c.subject || c.short, `${c.author} · ${new Date(c.date).toLocaleString()} · ${c.short}`, content);
+      openSheet(c.subject || c.short, `${c.author} · ${momentOf(c.date)} · ${c.short}`, content);
     } catch (err) {
       this.host.toast((err as Error).message);
     }
