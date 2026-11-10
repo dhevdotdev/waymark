@@ -63,7 +63,12 @@ export class Reader {
     const { host, vault, prefs } = deps;
     const p = prefs.value;
     this.vault = vault;
-    this.els = mountShell(host, { sidebarOpen: p.sidebar, railOpen: p.rail, sidebarWidth: p.sidebarWidth });
+    this.els = mountShell(host, {
+      sidebarOpen: p.sidebar,
+      railOpen: p.rail,
+      sidebarWidth: p.sidebarWidth,
+      railWidth: p.railWidth,
+    });
     const { els } = this;
 
     this.noteView = new NoteView(els, vault, deps.name, toast);
@@ -102,6 +107,9 @@ export class Reader {
         showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
         openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
+        railWidth: () => prefs.value.railWidth,
+        holdRailWidth: (width) => Object.assign(prefs.value, { railWidth: width }),
+        saveRailWidth: () => prefs.update(() => undefined),
         sectionFolded: (section, folded) => prefs.update((next) => Object.assign(next, { [`${section}Folded`]: folded })),
         railToggled: (open) => prefs.update((next) => Object.assign(next, { rail: open })),
       },

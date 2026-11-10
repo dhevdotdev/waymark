@@ -7,6 +7,7 @@ export interface ShellElements {
   sidebar: HTMLElement;
   searchPane: HTMLElement;
   sidebarResize: HTMLElement;
+  railResize: HTMLElement;
   reader: HTMLElement;
   scroller: HTMLElement;
   paneHead: HTMLElement;
@@ -32,6 +33,7 @@ export interface ShellOptions {
   sidebarOpen: boolean;
   railOpen: boolean;
   sidebarWidth: number;
+  railWidth: number;
 }
 
 function template(options: ShellOptions): string {
@@ -44,7 +46,7 @@ function template(options: ShellOptions): string {
     .filter(Boolean)
     .join(" ");
   return `
-    <div class="${classes}" style="--sidebar-w:${options.sidebarWidth}px">
+    <div class="${classes}" style="--sidebar-w:${options.sidebarWidth}px;--rail-w:${options.railWidth}px">
       <header class="titlebar" data-tauri-drag-region>
         ${isDesktop ? "" : `<div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>`}
         <div class="titlebar-lead" data-tauri-drag-region>
@@ -83,6 +85,7 @@ function template(options: ShellOptions): string {
         <div class="scroller" tabindex="-1"><article class="doc"></article></div>
       </main>
       <aside class="rail" aria-label="Inspector">
+        <div class="rail-resize" aria-hidden="true"></div>
         <div class="rail-inner">
           <div class="seg seg-full rail-tabs" role="tablist">
             <button class="seg-btn" role="tab" data-rail="links">Links</button>
@@ -97,7 +100,7 @@ function template(options: ShellOptions): string {
             <div class="rail-section-body rail-trail"></div>
           </section>
           <section class="rail-section" data-section="graph" aria-label="Local graph">
-            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="graph"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Graph</span></button><button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.fit}</button></div>
+            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="graph"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Graph</span></button><button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.expand}</button></div>
             <div class="rail-section-body rail-graph"></div>
           </section>
         </div>
@@ -127,6 +130,7 @@ export function mountShell(host: HTMLElement, options: ShellOptions): ShellEleme
     sidebar: q(".sidebar-inner"),
     searchPane: q(".sidebar-search"),
     sidebarResize: q(".sidebar-resize"),
+    railResize: q(".rail-resize"),
     reader: q(".reader"),
     scroller: q(".scroller"),
     paneHead: q(".pane-head"),

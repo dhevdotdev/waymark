@@ -39,6 +39,7 @@ export interface Prefs {
   trailFolded: boolean;
   graphFolded: boolean;
   sidebarWidth: number;
+  railWidth: number;
   /** How notes are ordered within a folder. Kept with the app's preferences, never in the vault. */
   fileSort: "name" | "modified";
   diffWrap: boolean;
@@ -63,6 +64,7 @@ const DEFAULTS: Prefs = {
   trailFolded: false,
   graphFolded: false,
   sidebarWidth: 268,
+  railWidth: 256,
   fileSort: "name",
   diffWrap: true,
   keySound: "tactile",

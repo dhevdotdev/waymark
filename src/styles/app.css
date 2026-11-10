@@ -500,16 +500,51 @@ kbd {
   translate: -12px 0;
   pointer-events: none;
 }
-.sidebar-resize {
+.sidebar-resize,
+.rail-resize {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: -2px;
-  width: 8px;
+  z-index: 2;
+  inset-block: 0;
+  inline-size: 8px;
   cursor: col-resize;
   touch-action: none;
 }
+.sidebar-resize {
+  inset-inline-end: -2px;
+}
+.rail-resize {
+  inset-inline-start: 0;
+}
+.sidebar-resize::after,
+.rail-resize::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inline-size: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--t-hover) ease;
+}
+.sidebar-resize::after {
+  inset-inline-end: 2px;
+}
+.rail-resize::after {
+  inset-inline-start: 0;
+}
+.sidebar-resize:active::after,
+.rail-resize:active::after {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-resize:hover::after,
+  .rail-resize:hover::after {
+    opacity: 1;
+  }
+}
 .shell.sidebar-closed .sidebar-resize {
+  display: none;
+}
+.shell.rail-closed .rail-resize {
   display: none;
 }
 .shell.is-resizing {
@@ -1132,6 +1167,7 @@ kbd {
 }
 
 .rail {
+  position: relative;
   grid-column: 3;
   grid-row: 2;
   min-width: 0;
@@ -1346,6 +1382,9 @@ kbd {
 .rail-section.is-folded {
   block-size: var(--head-h);
 }
+.rail-section.is-vacant {
+  display: none;
+}
 .rail-section-head {
   display: flex;
   align-items: center;
@@ -1389,11 +1428,8 @@ kbd {
 .rail-section.is-folded .rail-section-chevron {
   rotate: -90deg;
 }
-.rail-section-toggle:disabled .rail-section-chevron {
-  visibility: hidden;
-}
 @media (hover: hover) and (pointer: fine) {
-  .rail-section-toggle:not(:disabled):hover {
+  .rail-section-toggle:hover {
     color: var(--ink);
   }
 }
@@ -1405,7 +1441,12 @@ kbd {
 }
 @media (prefers-reduced-motion: no-preference) {
   .rail-section {
-    transition: block-size var(--t-menu) var(--ease-out);
+    transition:
+      block-size var(--t-menu) var(--ease-out),
+      opacity var(--t-menu) var(--ease-out);
+    @starting-style {
+      opacity: 0;
+    }
   }
   .rail-section-chevron {
     transition: rotate var(--t-menu) var(--ease-out);
@@ -1573,7 +1614,7 @@ kbd {
     top: var(--chrome-h);
     bottom: var(--status-h);
     right: 8px;
-    width: var(--rail-w);
+    width: min(var(--rail-w), calc(100vw - 16px));
     background: var(--chrome);
     border-radius: var(--r-float);
     box-shadow: var(--shadow-float);
@@ -1584,6 +1625,12 @@ kbd {
   }
   .shell.rail-peek .rail {
     translate: 0 0;
+  }
+  .rail-inner {
+    width: 100%;
+  }
+  .rail-resize {
+    display: none;
   }
 }
 

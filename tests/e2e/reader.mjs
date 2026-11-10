@@ -401,6 +401,27 @@ await page.keyboard.press("Escape");
 await pause(120);
 check("Escape in Search returns to the tree", await page.locator(".tree").isVisible());
 
+// The right panel's edge drags to resize it
+const railWidth = () => page.locator(".rail").evaluate((r) => r.getBoundingClientRect().width);
+const dragRailEdge = async (by) => {
+  const edge = await page.locator(".rail-resize").boundingBox();
+  await page.mouse.move(edge.x + 3, edge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 3 + by, edge.y + 200, { steps: 4 });
+  await page.mouse.up();
+  await pause(200);
+};
+const railAtStart = await railWidth();
+await dragRailEdge(-60);
+check("dragging the panel's edge widens it", (await railWidth()) === railAtStart + 60, `${await railWidth()}`);
+check("the width is remembered", (await page.evaluate(() => window.waymark.prefs.value.railWidth)) === railAtStart + 60);
+await dragRailEdge(-900);
+check("it stops at its widest", (await railWidth()) === 440, `${await railWidth()}`);
+await dragRailEdge(900);
+check("it stops at its narrowest", (await railWidth()) === 220, `${await railWidth()}`);
+await dragRailEdge(-(railAtStart - 220));
+check("it comes back to where it was", (await railWidth()) === railAtStart, `${await railWidth()}`);
+
 // Each tab keeps its own trail of followed links
 await page.evaluate(async () => {
   const f = window.waymark;
@@ -489,10 +510,8 @@ await page.click(".tab:nth-child(2)");
 await pause(450);
 check("another tab has its own trail", !(await readout.isVisible()));
 check(
-  "a tab with one stop keeps the trail folded and gives its room away",
-  (await page.locator('[data-section="trail"]').evaluate((e) => e.classList.contains("is-folded"))) &&
-    (await page.locator('[data-fold-section="trail"]').isDisabled()) &&
-    !(await trailPane.isVisible()),
+  "a tab with no trail shows no trail section at all",
+  await page.locator('[data-section="trail"]').evaluate((e) => getComputedStyle(e).display === "none"),
 );
 await page.click(".tab:nth-child(1)");
 await pause(450);

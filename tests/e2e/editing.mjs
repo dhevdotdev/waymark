@@ -801,10 +801,12 @@ try {
       const blocks = [...document.querySelectorAll(".doc p, .doc h2, .cm-line")].filter((b) =>
         /(?:Paragraph number|Section) \d+/.test(b.textContent),
       );
-      const first = blocks.find((b) => b.getBoundingClientRect().top >= box.top);
+      const textTop = (b) =>
+        b.getBoundingClientRect().top + (b.classList.contains("cm-line") ? Number.parseFloat(getComputedStyle(b).paddingTop) : 0);
+      const first = blocks.find((b) => textTop(b) >= box.top);
       return {
         text: first.textContent.match(/(?:Paragraph number|Section) \d+/)[0],
-        y: Math.round(first.getBoundingClientRect().top),
+        y: Math.round(textTop(first)),
       };
     });
   await page.evaluate(() => {

@@ -6,7 +6,11 @@ import { icons } from "./icons";
 import { LocalGraph } from "./local-graph";
 import { railFloats } from "./media";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
+import { bindPanelResize } from "./panel-resize";
 import type { ShellElements } from "./shell";
+
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 440;
 
 export type RailPane = "links" | "info";
 export type RailSection = "trail" | "graph";
@@ -14,6 +18,9 @@ export type RailSection = "trail" | "graph";
 export interface InspectorHost extends NoteHistoryHost {
   openFromGraph: (path: string, newTab: boolean) => void;
   railToggled: (open: boolean) => void;
+  railWidth: () => number;
+  holdRailWidth: (width: number) => void;
+  saveRailWidth: () => void;
   sectionFolded: (section: RailSection, folded: boolean) => void;
 }
 
@@ -35,6 +42,16 @@ export class Inspector {
   ) {
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
+    bindPanelResize(els.railResize, {
+      shell: els.shell,
+      variable: "--rail-w",
+      min: MIN_WIDTH,
+      max: MAX_WIDTH,
+      direction: -1,
+      read: () => host.railWidth(),
+      hold: (width) => host.holdRailWidth(width),
+      save: () => host.saveRailWidth(),
+    });
     this.setPane(pane);
     this.drawSection("trail");
     this.drawSection("graph");
@@ -81,7 +98,7 @@ export class Inspector {
     this.host.sectionFolded(section, folded);
   }
 
-  /** A section with nothing to show stays folded, and its room goes to the others. */
+  /** A section with nothing to show is not drawn at all, and its room goes to the links. */
   setEmpty(section: RailSection, empty: boolean): void {
     if (this.vacant[section] === empty) return;
     this.vacant[section] = empty;
@@ -92,9 +109,8 @@ export class Inspector {
     const el = this.els.shell.querySelector<HTMLElement>(`[data-section="${section}"]`)!;
     const open = this.isOpen(section);
     el.classList.toggle("is-folded", !open);
-    const toggle = el.querySelector<HTMLButtonElement>("[data-fold-section]")!;
-    toggle.disabled = this.vacant[section];
-    toggle.setAttribute("aria-expanded", String(open));
+    el.classList.toggle("is-vacant", this.vacant[section]);
+    el.querySelector("[data-fold-section]")!.setAttribute("aria-expanded", String(open));
   }
 
   get isShowing(): boolean {

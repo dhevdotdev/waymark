@@ -3,6 +3,7 @@ import type { VaultIndex } from "../vault/index";
 import { FileTree } from "./file-tree";
 import { paint } from "./find";
 import { isNarrow } from "./media";
+import { bindPanelResize } from "./panel-resize";
 import { SearchPane, type SearchPaneHost } from "./search-pane";
 import type { ShellElements } from "./shell";
 
@@ -34,7 +35,18 @@ export class Sidebar {
       close: () => this.showFiles(),
       clearHighlights: () => paint("search", []),
     });
-    this.bindResize(els.sidebarResize);
+    bindPanelResize(els.sidebarResize, {
+      shell: els.shell,
+      variable: "--sidebar-w",
+      min: MIN_WIDTH,
+      max: MAX_WIDTH,
+      direction: 1,
+      read: () => prefs.value.sidebarWidth,
+      hold: (width) => {
+        prefs.value.sidebarWidth = width;
+      },
+      save: () => prefs.update(() => undefined),
+    });
     this.syncMode();
   }
 
@@ -112,28 +124,5 @@ export class Sidebar {
       button.setAttribute("aria-pressed", String(on));
     }
     for (const pane of shell.querySelectorAll<HTMLElement>("[data-side-pane]")) pane.hidden = pane.dataset.sidePane !== this.mode;
-  }
-
-  private bindResize(handle: HTMLElement): void {
-    handle.addEventListener("pointerdown", (down) => {
-      down.preventDefault();
-      const { shell } = this.els;
-      const start = this.prefs.value.sidebarWidth;
-      handle.setPointerCapture(down.pointerId);
-      shell.classList.add("no-anim", "is-resizing");
-      const move = (e: PointerEvent) => {
-        const width = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, start + e.clientX - down.clientX)));
-        shell.style.setProperty("--sidebar-w", `${width}px`);
-        this.prefs.value.sidebarWidth = width;
-      };
-      const up = () => {
-        handle.removeEventListener("pointermove", move);
-        shell.classList.remove("no-anim", "is-resizing");
-        this.prefs.update(() => undefined);
-      };
-      handle.addEventListener("pointermove", move);
-      handle.addEventListener("pointerup", up, { once: true });
-      handle.addEventListener("pointercancel", up, { once: true });
-    });
   }
 }
