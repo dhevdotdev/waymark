@@ -189,8 +189,10 @@ kbd {
   padding: 0 8px;
   height: 100%;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
 }
-.tab {
+:is(.tab, .tab-ghost) {
   position: relative;
   display: flex;
   align-items: center;
@@ -230,7 +232,7 @@ kbd {
 .tab.is-active + .tab::before {
   opacity: 0;
 }
-.tab.is-active {
+:is(.tab, .tab-ghost).is-active {
   background: var(--selected);
   color: var(--ink);
 }
@@ -255,7 +257,7 @@ kbd {
   font-weight: 500;
   letter-spacing: -0.003em;
 }
-.tab.is-clipped .tab-title {
+:is(.tab, .tab-ghost).is-clipped .tab-title {
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
 }
 .tab:active {
@@ -291,8 +293,13 @@ kbd {
   mask-image: none;
   text-overflow: ellipsis;
 }
-.tab.is-entering {
-  opacity: 0;
+.tab-ghost {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  margin-block: auto;
+  max-width: none;
+  pointer-events: none;
 }
 @media (hover: hover) and (pointer: fine) {
   .tab:not(.is-active):hover {
@@ -1909,13 +1916,19 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:is(.nav-item, .tab).is-landed {
-  animation: landed 620ms var(--ease-out);
+:is(.nav-item, .tab, .prop-cell, .prop-value, .prop-chip).is-landed {
+  animation: landed var(--t-toast) var(--ease-out);
+}
+:root[data-input="keyboard"] .is-landed {
+  animation-timing-function: step-end;
 }
 @keyframes landed {
   from {
     background-color: color-mix(in oklab, var(--accent) 26%, transparent);
   }
+}
+.tab.is-landed {
+  z-index: 1;
 }
 .tab.is-dragging {
   opacity: 0.5;
