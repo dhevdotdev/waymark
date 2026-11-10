@@ -272,6 +272,7 @@
   max-block-size: min(460px, 72vh);
 }
 .palette-field {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -361,6 +362,7 @@
   text-wrap: balance;
 }
 .palette-foot {
+  flex: none;
   display: flex;
   gap: 16px;
   padding: 8px 16px;

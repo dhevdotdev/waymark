@@ -126,6 +126,8 @@ try {
   await page.locator(".palette-field input").fill(">");
   await pause(80);
   const many = await paletteBox();
+  const fieldHeight = await page.locator(".palette-field").evaluate((f) => f.getBoundingClientRect().height);
+  check("a long list does not squash the field", fieldHeight === 52, String(fieldHeight));
   check("many results stop at the maximum and scroll", many.height === 460 && many.overflows, JSON.stringify(many));
   check("the field stays put at the maximum", many.fieldTop === recent.fieldTop);
   await page.keyboard.press("Escape");

@@ -255,8 +255,10 @@ const paletteSizeFor = async (query) => {
 const paletteSizes = [];
 for (const query of ["", "show", "tide", "a", "zzzzqqq"]) paletteSizes.push(await paletteSizeFor(query));
 check(
-  "the palette keeps one height while typing",
-  new Set(paletteSizes.map((s) => s.height)).size === 1,
+  "the palette sizes to its results up to its maximum",
+  paletteSizes.every((s) => s.height <= 460) &&
+    Math.max(...paletteSizes.map((s) => s.height)) === 460 &&
+    paletteSizes[4].height < 200,
   JSON.stringify(paletteSizes),
 );
 const typedRows = paletteSizes.slice(1, 4);
