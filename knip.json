@@ -8,5 +8,5 @@
     "@fontsource-variable/source-serif-4"
   ],
   "ignore": [],
-  "ignoreBinaries": ["ffmpeg"]
+  "ignoreBinaries": ["ffmpeg", "ioreg"]
 }

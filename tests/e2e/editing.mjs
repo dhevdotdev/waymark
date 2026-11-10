@@ -391,7 +391,7 @@ try {
   check(
     "every block sits in the same place in Read and Edit",
     drift.length === 0,
-    JSON.stringify(MARKS.map((m, i) => editTops[i] - readTops[i])),
+    JSON.stringify(MARKS.map((_m, i) => editTops[i] - readTops[i])),
   );
   await page.keyboard.press("Meta+e");
   await pause(250);
