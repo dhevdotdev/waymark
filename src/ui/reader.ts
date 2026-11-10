@@ -357,7 +357,7 @@ export class Reader {
     }
     this.workspace.addBeside(view);
     this.workspace.activeIndex += 1;
-    void this.show();
+    void this.show({ openingGraph: true });
   }
 
   toggleGraph(): void {
@@ -488,7 +488,7 @@ export class Reader {
     metrics.navStart = performance.now();
     const entry = this.tab.trail.current;
     if (entry.view.kind === "graph") {
-      this.showGraph(entry.view);
+      this.showGraph(entry.view, opts.openingGraph === true);
       return;
     }
     this.closeGraphView();
@@ -574,10 +574,9 @@ export class Reader {
     this.persist();
   }
 
-  private showGraph(view: GraphTabView): void {
+  private showGraph(view: GraphTabView, opened: boolean): void {
     if (this.find.isOpen) this.find.close();
     this.current = view.note;
-    const opened = !this.graph;
     if (!this.graph) {
       this.graph = new GraphView(this.els.reader, this.vault, {
         open: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),

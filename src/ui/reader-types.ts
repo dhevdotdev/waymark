@@ -38,6 +38,8 @@ export interface ShowOptions {
   find?: string;
   followed?: boolean;
   keepScroll?: boolean;
+  /** A graph tab that has just been opened, so a pointer open may fade it in. */
+  openingGraph?: boolean;
   quiet?: boolean;
   restoring?: boolean;
   onPainted?: () => void;
