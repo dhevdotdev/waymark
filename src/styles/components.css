@@ -739,7 +739,20 @@
 .lightbox {
   cursor: zoom-out;
 }
+.lightbox-close {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  background: var(--float-bg);
+  box-shadow: var(--shadow-float);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lightbox-close:hover {
+    background: color-mix(in oklab, var(--float-bg), var(--ink) 10%);
+  }
+}
 .lightbox-sheet {
+  cursor: auto;
   max-width: min(1400px, 100%);
   max-height: 100%;
   overflow: auto;
