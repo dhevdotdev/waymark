@@ -225,6 +225,11 @@
 .cm-table-widget.has-handles :is(th, td) + :is(th, td) {
   box-shadow: inset 1px 0 0 var(--rule);
 }
+.cm-table-widget.has-handles th + th {
+  box-shadow:
+    inset 1px 0 0 var(--rule),
+    inset 0 -1px var(--rule-strong);
+}
 .cm-table-widget th:empty::before {
   content: "Heading";
   color: var(--ink-3);
@@ -233,6 +238,10 @@
 @media (hover: hover) and (pointer: fine) {
   .cm-table-widget :is(th, td):hover {
     background: var(--fill);
+  }
+  /* A header can sit over the rows while it is stuck, so its hover stays opaque. */
+  .cm-table-widget th:hover {
+    background: color-mix(in oklab, var(--p-surface0) 48%, var(--paper));
   }
 }
 .cm-table-widget :is(th, td).is-acted-on {
@@ -244,9 +253,6 @@
 @keyframes table-mark {
   from {
     background-color: color-mix(in oklab, var(--accent) 26%, var(--paper));
-  }
-  to {
-    background-color: var(--paper);
   }
 }
 .cm-table-ghost {
@@ -1082,6 +1088,9 @@ button.task-box:focus-visible {
   background: color-mix(in oklab, var(--c) var(--tint), var(--paper));
   font-size: var(--text-small);
   line-height: 1.6;
+}
+.doc-editing .cm-callout .cm-inline-code {
+  background: color-mix(in oklab, var(--c) 16%, transparent);
 }
 .doc-editing .cm-callout-first {
   padding-block-start: 11px;

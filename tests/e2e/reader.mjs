@@ -509,6 +509,10 @@ const followLink = async () => {
 };
 await followLink();
 check("following a link grows the trail", (await page.locator(".trail-row").count()) === 2);
+check(
+  "a trail of two stops has nothing to resize, so it offers no handle",
+  !(await page.locator('[data-section="trail"] .rail-section-resize').isVisible()),
+);
 check("the readout says where the tab is", (await readout.textContent()).includes("2 of 2"), await readout.textContent());
 check("a second stop leaves the readout's slot where it was", (await slotPlace()) === slotWithOneStop);
 check("nothing sits between the path row and the note", (await page.locator(".reader > .trail").count()) === 0);
@@ -561,6 +565,66 @@ await pause(320);
 check("the graph stays put while the trail changes height", (await graphTop()) === graphWasAt);
 await page.locator('[data-fold-section="trail"]').click();
 await pause(320);
+const sectionBox = (name) => page.locator(`[data-section="${name}"]`).evaluate((e) => e.getBoundingClientRect().toJSON());
+const dragSection = async (name, by) => {
+  const box = await sectionBox(name);
+  await page.mouse.move(box.x + 60, box.y + 2);
+  await pause(60);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 60, box.y + 2 + by, { steps: 8 });
+  await pause(60);
+  await page.mouse.up();
+  await pause(250);
+};
+const graphBefore = await sectionBox("graph");
+const titleBeforeDrag = await titleTop();
+await dragSection("graph", -80);
+const graphTaller = await sectionBox("graph");
+check(
+  "dragging the graph's top edge makes it taller",
+  graphTaller.height === graphBefore.height + 80,
+  `${graphBefore.height} to ${graphTaller.height}`,
+);
+check("its bottom edge stays where it was", graphTaller.bottom === graphBefore.bottom);
+check(
+  "the graph fills its new height",
+  (await page.locator(".local-graph canvas").evaluate((c) => c.getBoundingClientRect().height)) > 150,
+);
+check("the note does not move", (await titleTop()) === titleBeforeDrag);
+check("the height is remembered", (await page.evaluate(() => window.waymark.prefs.value.graphHeight)) === graphTaller.height);
+await dragSection("graph", 900);
+check("it stops at its smallest", (await sectionBox("graph")).height === 130, String((await sectionBox("graph")).height));
+await dragSection("graph", -2000);
+const graphMost = await sectionBox("graph");
+const linksLeft = await page.locator(".rail-body").evaluate((b) => b.getBoundingClientRect().height);
+check(
+  "it stops while the links still have room",
+  graphMost.height <= 420 && linksLeft >= 80,
+  `${graphMost.height}, links ${linksLeft}`,
+);
+await dragSection("graph", graphMost.height - graphBefore.height);
+check(
+  "and comes back",
+  (await sectionBox("graph")).height === graphBefore.height,
+  `${(await sectionBox("graph")).height} for ${graphBefore.height}`,
+);
+check(
+  "a trail of three stops can be dragged down to two rows",
+  await page.locator('[data-section="trail"] .rail-section-resize').isVisible(),
+);
+await dragSection("trail", 60);
+const trailSmall = await sectionBox("trail");
+check(
+  "the trail shrinks to its smallest and scrolls",
+  trailSmall.height === 95 && (await trailPane.evaluate((t) => t.scrollHeight > t.clientHeight)),
+  `${trailSmall.height}, ${await trailPane.evaluate((t) => `${t.scrollHeight} in ${t.clientHeight}`)}`,
+);
+await dragSection("trail", -200);
+check(
+  "it grows back only as far as its stops",
+  (await sectionBox("trail")).height === 31 + 3 * 28 + 8,
+  String((await sectionBox("trail")).height),
+);
 check("the readout counts the side branch", (await readout.locator(".trail-forks").textContent()) === "1");
 await page.keyboard.down("Meta");
 await page.locator(".tree-folder.is-open .nav-item").first().click();

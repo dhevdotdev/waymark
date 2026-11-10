@@ -547,6 +547,9 @@ kbd {
 .shell.rail-closed .rail-resize {
   display: none;
 }
+.shell.is-resizing-rows {
+  cursor: row-resize;
+}
 .shell.is-resizing {
   cursor: col-resize;
   user-select: none;
@@ -1547,6 +1550,7 @@ kbd {
 /* Each section keeps its open height while folding, so the graph is clipped and never redrawn smaller. */
 .rail-section {
   --head-h: 30px;
+  position: relative;
   flex: none;
   block-size: var(--section-h);
   margin-inline: -8px;
@@ -1555,10 +1559,43 @@ kbd {
   overflow: clip;
 }
 [data-section="trail"] {
-  --section-h: min(clamp(120px, 29vh, 270px), calc(var(--head-h) + 1px + var(--trail-rows, 2) * 28px + 8px));
+  --section-h: clamp(120px, 29vh, 270px);
 }
 [data-section="graph"] {
   --section-h: clamp(130px, 22vh, 200px);
+}
+.rail-section-resize {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  inset-block-start: 0;
+  block-size: 6px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.rail-section-resize[hidden] {
+  display: none;
+}
+.rail-section-resize::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  block-size: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--t-hover) ease;
+}
+.rail-section-resize:active::after {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .rail-section-resize:hover::after {
+    opacity: 1;
+  }
+}
+.shell.is-resizing .rail-section {
+  transition: none;
 }
 .rail-section.is-folded {
   block-size: var(--head-h);

@@ -30,6 +30,7 @@ import { Sidebar } from "./sidebar";
 import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
+import { watchTableFit } from "./table-fit";
 import { bindTooltips } from "./tooltips";
 
 export type { Metrics, OpenOptions, ReaderDeps };
@@ -72,6 +73,7 @@ export class Reader {
     const { els } = this;
 
     this.noteView = new NoteView(els, vault, deps.name, toast);
+    watchTableFit(els.scroller);
     this.trail = new TrailActions(els, {
       tab: () => this.tab,
       label: (view) => this.viewLabel(view),

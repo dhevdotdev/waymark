@@ -437,6 +437,10 @@
   scrollbar-width: thin;
   border-radius: var(--r-block);
 }
+/* A table that fits its column clips without scrolling, so its header can stay in view down the page. */
+.table-wrap.fits {
+  overflow: clip;
+}
 .table-wrap:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -457,8 +461,17 @@
   text-align: left;
   vertical-align: bottom;
   padding: var(--s2) var(--s4);
-  border-bottom: 1px solid var(--rule-strong);
+  box-shadow: inset 0 -1px var(--rule-strong);
   white-space: nowrap;
+}
+/* A header with nothing in it is a table used for layout, and gets no band. */
+.doc :where(thead:has(th:not(:empty))) th {
+  background: color-mix(in oklab, var(--p-surface0) 30%, var(--surface, var(--paper)));
+}
+.table-wrap.fits thead:has(th:not(:empty)) th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
 }
 .doc td {
   padding: 0.6rem var(--s4);
@@ -496,14 +509,19 @@
 /* Callouts */
 .callout {
   --c: var(--c-note);
+  --surface: color-mix(in oklab, var(--c) var(--tint), var(--paper));
   margin: var(--s2) 0 var(--s5);
   border-radius: var(--r-block);
-  background: color-mix(in oklab, var(--c) var(--tint), var(--paper));
+  background: var(--surface);
   font-size: var(--text-small);
   line-height: 1.6;
 }
 :root[data-scheme="dark"] .callout {
-  background: color-mix(in oklab, var(--c) calc(var(--tint) * 1.6), var(--paper));
+  --surface: color-mix(in oklab, var(--c) calc(var(--tint) * 1.6), var(--paper));
+}
+/* Inline code takes the callout's own colour, a step stronger than the callout. */
+.callout :not(pre) > code {
+  background: color-mix(in oklab, var(--c) 16%, transparent);
 }
 .callout[data-callout="abstract"] {
   --c: var(--c-abstract);

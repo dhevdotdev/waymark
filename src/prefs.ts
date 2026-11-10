@@ -40,6 +40,9 @@ export interface Prefs {
   graphFolded: boolean;
   sidebarWidth: number;
   railWidth: number;
+  /** Heights dragged for the panel's sections. Zero leaves a section to size itself. */
+  trailHeight: number;
+  graphHeight: number;
   /** How notes are ordered within a folder. Kept with the app's preferences, never in the vault. */
   fileSort: "name" | "modified";
   diffWrap: boolean;
@@ -65,6 +68,8 @@ const DEFAULTS: Prefs = {
   graphFolded: false,
   sidebarWidth: 268,
   railWidth: 256,
+  trailHeight: 0,
+  graphHeight: 0,
   fileSort: "name",
   diffWrap: true,
   keySound: "tactile",

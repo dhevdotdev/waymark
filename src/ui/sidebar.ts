@@ -3,7 +3,7 @@ import type { VaultIndex } from "../vault/index";
 import { FileTree } from "./file-tree";
 import { paint } from "./find";
 import { isNarrow } from "./media";
-import { bindPanelResize } from "./panel-resize";
+import { bindEdgeDrag } from "./panel-resize";
 import { SearchPane, type SearchPaneHost } from "./search-pane";
 import type { ShellElements } from "./shell";
 
@@ -35,14 +35,14 @@ export class Sidebar {
       close: () => this.showFiles(),
       clearHighlights: () => paint("search", []),
     });
-    bindPanelResize(els.sidebarResize, {
+    bindEdgeDrag(els.sidebarResize, {
       shell: els.shell,
-      variable: "--sidebar-w",
-      min: MIN_WIDTH,
-      max: MAX_WIDTH,
+      axis: "x",
       direction: 1,
+      range: () => [MIN_WIDTH, MAX_WIDTH],
       read: () => prefs.value.sidebarWidth,
-      hold: (width) => {
+      apply: (width) => {
+        els.shell.style.setProperty("--sidebar-w", `${width}px`);
         prefs.value.sidebarWidth = width;
       },
       save: () => prefs.update(() => undefined),

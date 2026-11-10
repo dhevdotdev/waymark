@@ -65,8 +65,9 @@ export class TrailActions {
     const many = trail.size > 1;
     this.panel.root.hidden = !many;
     this.tabButton.textContent = many ? `Trail · ${trail.size}` : "Trail";
-    this.els.trailPane.parentElement?.style.setProperty("--trail-rows", String(entries.length));
-    this.host.inspector().setEmpty("trail", !many);
+    const { sections } = this.host.inspector();
+    sections.setTrailRows(entries.length);
+    sections.setEmpty("trail", !many);
     this.readout.hidden = !this.available;
     if (this.readout.hidden) return;
     const position = entries.findIndex((entry) => entry.id === current) + 1;
@@ -102,11 +103,11 @@ export class TrailActions {
       toast("This tab has no trail yet. Follow a link to start one.");
       return;
     }
-    const open = inspector.isShowing && inspector.isOpen("trail");
+    const open = inspector.isShowing && inspector.sections.isOpen("trail");
     if (this.returnTo && open) {
       const { railWasHidden, wasFolded } = this.returnTo;
       this.returnTo = null;
-      if (wasFolded) inspector.setFolded("trail", true);
+      if (wasFolded) inspector.sections.setFolded("trail", true);
       if (railWasHidden) inspector.toggle();
       this.els.scroller.focus({ preventScroll: true });
       return;
@@ -116,8 +117,8 @@ export class TrailActions {
       this.panel.pulse();
       return;
     }
-    this.returnTo = { railWasHidden: !inspector.isShowing, wasFolded: !inspector.isOpen("trail") };
-    if (this.returnTo.wasFolded) inspector.setFolded("trail", false);
+    this.returnTo = { railWasHidden: !inspector.isShowing, wasFolded: !inspector.sections.isOpen("trail") };
+    if (this.returnTo.wasFolded) inspector.sections.setFolded("trail", false);
     if (this.returnTo.railWasHidden) inspector.toggle();
     this.panel.focusCurrent();
   }

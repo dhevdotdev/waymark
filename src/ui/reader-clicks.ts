@@ -1,8 +1,9 @@
 import { isDesktop, native } from "../platform";
-import type { RailPane, RailSection } from "./inspector";
+import type { RailPane } from "./inspector";
 import { reducedMotion } from "./media";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
 import { lightbox } from "./overlays";
+import type { RailSection } from "./panel-sections";
 import type { Reader } from "./reader";
 
 type Route = [selector: string, handle: (el: HTMLElement, e: MouseEvent) => void];
@@ -54,7 +55,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
         r.inspector.setPane(pane);
       },
     ],
-    ["[data-fold-section]", (el) => r.inspector.toggleSection(el.dataset.foldSection as RailSection)],
+    ["[data-fold-section]", (el) => r.inspector.sections.toggle(el.dataset.foldSection as RailSection)],
     [".search-hit", (el, e) => r.sidebar.searchPane.openHit(Number(el.dataset.hit), e.metaKey)],
     [".doc button.task-box[data-task-line]", (el) => void r.editing.toggleTask(el)],
     [".code-copy", (el) => void copyCode(el as HTMLButtonElement, () => r.deps.sound.play("copy"))],

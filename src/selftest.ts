@@ -313,19 +313,25 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   check("a followed link shows the trail readout", readout !== null && !readout.hidden, readout?.textContent);
   const titleTop = () => document.querySelector(".doc-title")?.getBoundingClientRect().top;
   const before = titleTop();
-  check("the trail shows with the links and the graph", reader.inspector.isOpen("trail") && reader.inspector.isOpen("graph"));
-  reader.inspector.setFolded("trail", true);
+  check(
+    "the trail shows with the links and the graph",
+    reader.inspector.sections.isOpen("trail") && reader.inspector.sections.isOpen("graph"),
+  );
+  reader.inspector.sections.setFolded("trail", true);
   readout?.click();
   await wait(350);
-  check("the readout opens the trail", reader.inspector.isOpen("trail") && document.querySelectorAll(".trail-row").length === 3);
+  check(
+    "the readout opens the trail",
+    reader.inspector.sections.isOpen("trail") && document.querySelectorAll(".trail-row").length === 3,
+  );
   check("opening the trail leaves the note where it was", titleTop() === before, titleTop());
   document.querySelector<HTMLElement>(".trail-row:not(.is-current)")?.click();
   await wait(400);
-  check("clicking a stop moves the tab and leaves the trail open", reader.inspector.isOpen("trail"));
+  check("clicking a stop moves the tab and leaves the trail open", reader.inspector.sections.isOpen("trail"));
   readout?.click();
   await wait(100);
-  check("the readout puts the trail back", !reader.inspector.isOpen("trail"));
-  reader.inspector.setFolded("trail", false);
+  check("the readout puts the trail back", !reader.inspector.sections.isOpen("trail"));
+  reader.inspector.sections.setFolded("trail", false);
   reader.openGraph("vault");
   await wait(1500);
   check("graph opens", !!document.querySelector(".graph-view canvas"));
