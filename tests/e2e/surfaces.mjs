@@ -174,7 +174,7 @@ try {
   check("the lightbox fades in from the pointer", IN_MOTION(numbers(lightboxOpacity)));
   const left = await page.evaluate(() => {
     const box = document.querySelector(".lightbox");
-    box.click();
+    box.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     return box.classList.contains("is-leaving");
   });
   check("the lightbox leaves through its exit", left);
