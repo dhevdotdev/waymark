@@ -18,7 +18,8 @@ function scrollsOn(el: Element, axis: Axis): boolean {
   return overflow === "auto" || overflow === "scroll";
 }
 
-function nearest(from: Element | null, axis: Axis): Element | null {
+/** The closest element from `from` outward that can scroll along this axis. */
+export function nearest(from: Element | null, axis: Axis): Element | null {
   for (let el = from; el && el !== document.body; el = el.parentElement) if (scrollsOn(el, axis)) return el;
   return null;
 }

@@ -95,6 +95,68 @@ check(
 await page.keyboard.press("Escape");
 await pause(150);
 
+/* Swipe and mouse buttons */
+const WIDE = Array.from({ length: 14 }, (_, i) => `| Column number ${i + 1} `).join("");
+await writeFile(`${app.vault}/Swipe one.md`, "# Swipe one\n\n[[Swipe two]]\n");
+await writeFile(`${app.vault}/Swipe two.md`, `# Swipe two\n\nPlain words here.\n\n${WIDE}|\n${"| --- ".repeat(14)}|\n${WIDE}|\n`);
+await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Swipe one.md", "Swipe two.md"]));
+await pause(200);
+await open("Swipe one.md");
+await page.locator(".doc a.wikilink").first().click();
+await pause(400);
+const title = () => page.textContent(".tab.is-active .tab-title");
+check("a link was followed before swiping", (await title()) === "Swipe two", await title());
+const notePoint = async (selector) => {
+  const box = await page.locator(selector).first().boundingBox();
+  return [box.x + box.width / 2, box.y + box.height / 2];
+};
+const swipe = async (dx, dy = 0, steps = 8) => {
+  for (let i = 0; i < steps; i++) {
+    await page.mouse.wheel(dx / steps, dy / steps);
+    await pause(16);
+  }
+  await pause(320);
+};
+await page.mouse.move(...(await notePoint(".doc p")));
+await swipe(-40);
+check("a small sideways nudge does nothing", (await title()) === "Swipe two", await title());
+await swipe(60, 400);
+check("mostly vertical scrolling is not a swipe", (await title()) === "Swipe two", await title());
+await page.mouse.move(...(await notePoint(".table-wrap")));
+await swipe(300);
+await swipe(-600);
+check("swiping over a wide table scrolls the table only", (await title()) === "Swipe two", await title());
+await page.mouse.move(...(await notePoint(".doc p")));
+await swipe(-260, 0, 16);
+check("swiping right goes back, one step", (await title()) === "Swipe one", await title());
+await page.mouse.move(...(await notePoint(".doc p")));
+await swipe(260, 0, 16);
+check("swiping left goes forward", (await title()) === "Swipe two", await title());
+const mouseButton = (button) =>
+  page.evaluate(
+    (b) =>
+      document.querySelector(".doc").dispatchEvent(new MouseEvent("mouseup", { button: b, bubbles: true, cancelable: true })),
+    button,
+  );
+await mouseButton(3);
+await pause(350);
+check("mouse button 3 goes back", (await title()) === "Swipe one", await title());
+await mouseButton(4);
+await pause(350);
+check("mouse button 4 goes forward", (await title()) === "Swipe two", await title());
+await page.keyboard.press("Meta+g");
+await pause(500);
+const graphBefore = await page.evaluate(() => window.waymark.reader.workspace.active.trail.size);
+await page.mouse.move(600, 400);
+await swipe(-260, 0, 16);
+check(
+  "swiping on the graph does not navigate",
+  (await page.evaluate(() => window.waymark.reader.workspace.active.trail.size)) === graphBefore &&
+    (await page.locator(".graph-view").isVisible()),
+);
+await page.keyboard.press("Meta+g");
+await pause(400);
+
 check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 await browser.close();
 await app.close();

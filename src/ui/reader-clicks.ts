@@ -5,10 +5,13 @@ import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
 import { lightbox } from "./overlays";
 import type { RailSection } from "./panel-sections";
 import type { Reader } from "./reader";
+import { bindSwipeNavigation } from "./swipe-navigation";
 
 type Route = [selector: string, handle: (el: HTMLElement, e: MouseEvent) => void];
 
 const PEEKS = ["sidebar-peek", "rail-peek"];
+const MOUSE_BACK = 3;
+const MOUSE_FORWARD = 4;
 
 function closeTabOf(r: Reader, el: HTMLElement): void {
   r.closeTab(Number(el.closest<HTMLElement>(".tab")!.dataset.tab));
@@ -114,4 +117,10 @@ export function bindReaderClicks(shell: HTMLElement, reader: Reader): void {
   shell.addEventListener("auxclick", (e) => {
     if (e.button === 1) onClick(e);
   });
+  shell.addEventListener("mouseup", (e) => {
+    if (e.button !== MOUSE_BACK && e.button !== MOUSE_FORWARD) return;
+    e.preventDefault();
+    reader.commands.run(e.button === MOUSE_BACK ? "back" : "forward", "click");
+  });
+  bindSwipeNavigation(reader.els.scroller, (step) => reader.commands.run(step < 0 ? "back" : "forward", "click"));
 }
