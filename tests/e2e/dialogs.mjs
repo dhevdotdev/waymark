@@ -68,17 +68,20 @@ try {
   await page.keyboard.press("Tab");
   check("Tab stays inside the dialog", (await page.evaluate(() => document.activeElement.textContent)) === "Cancel");
   await page.keyboard.press("Escape");
-  await pause(30);
-  check("cancelling fades the dialog out", (await page.locator(".prompt-overlay.is-leaving").count()) === 1);
-  await pause(180);
-  check("Escape cancels", (await page.locator(".prompt").count()) === 0 && (await exists("Doomed.md")) === 1);
+  check("Escape cancels at once", (await page.locator(".prompt").count()) === 0 && (await exists("Doomed.md")) === 1);
+
+  await openDialog();
+  await cancel.click();
+  check("cancelling with the pointer fades the dialog out", (await page.locator(".prompt-overlay.is-leaving").count()) === 1);
+  await pause(200);
+  check("the fade removes it", (await page.locator(".prompt").count()) === 0 && (await exists("Doomed.md")) === 1);
 
   await openDialog();
   await danger.hover();
   await pause(60);
   await page.mouse.down();
   await pause(60);
-  const pressed = await danger.evaluate((el) => getComputedStyle(el).transform);
+  const pressed = await danger.evaluate((el) => getComputedStyle(el).scale);
   await page.mouse.up();
   check("the destructive button responds to a press", pressed !== "none", pressed);
   await pause(350);

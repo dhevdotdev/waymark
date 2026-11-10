@@ -189,7 +189,11 @@ The rules come from Emil Kowalski's animation standards, good-css.com, Impeccabl
 
 - Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
 - Following a link with the pointer fades the new page in over 180ms, with no movement.
-- Popovers scale from their trigger, while sheets and the lightbox stay centred. Toasts rise and stay interruptible because they are transitions, not keyframes.
+- Popovers and menus grow from the point nearest what opened them, measured after they are pushed back into the window. Sheets and the lightbox stay centred. Entries and exits are transitions, so a reversal starts from where the surface is. A key press shows or removes any of them at once.
+- A sheet opened from a sheet changes the open sheet's content, so two never overlap.
+- A toast from a key press appears and leaves with no motion. A replaced toast leaves through its exit and takes no clicks while the new one is ready at once. The 400ms entry stays, because the curve has done 92% of its travel by 160ms.
+- Every small control presses to the same .97 over 160ms, for the pointer only, because Space and Return also set `:active`. Dense rows and the table only tint.
+- Moving the pointer counts as coming back to it, so hover fades return after typing.
 - Collapsed callouts and sidebar groups open by animating grid rows, so the content keeps its height and nothing jumps.
 - While writing, each key sounds like a recorded mechanical switch, with a press and its own release, placed left to right by where the key sits. Quick typing lands softer than a deliberate press, and a held key repeats silently. Linear, Tactile or Clicky are chosen in settings, and picking one plays a few keys so it can be judged at once.
 - Sound is a small synthesised palette: copy, a new background tab, sync finished, incoming changes, commit, push, and a problem. Each cue has a 900ms cooldown, so repeated actions never pile up. Nothing plays for clicks, scrolling, typing or background fetches. One toggle mutes everything.
