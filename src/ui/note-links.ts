@@ -5,7 +5,7 @@ import { type MenuItem, showContextMenu } from "./context-menu";
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
 
 /** The vault's own link form: the note's name, or its path when another note shares the name. */
-export function wikilinkTo(index: VaultIndex, path: string, heading: string | null): string {
+function wikilinkTo(index: VaultIndex, path: string, heading: string | null): string {
   const name = nameOf(path);
   const shared = index.notes.filter((note) => nameOf(note).toLowerCase() === name.toLowerCase()).length > 1;
   const target = shared ? path.replace(/\.md$/i, "") : name;
