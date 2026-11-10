@@ -1,5 +1,6 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import type { PrefStore } from "../prefs";
+import { commitBox } from "./commit-box";
 import { GitDetail } from "./git-detail";
 import { gitNotice } from "./git-notices";
 import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
@@ -404,9 +405,20 @@ export class GitPanel {
       return b;
     };
     const blocked = this.needsTerminal(st);
-    if (blocked)
-      btn("Open in Terminal", true, true, () => void native.openTerminal(), "Resolve it there, where Git can ask you what to do");
-    if (!st.upstream) return actions;
+    const terminal = () => {
+      if (blocked)
+        btn(
+          "Open in Terminal",
+          true,
+          true,
+          () => void native.openTerminal(),
+          "Resolve it there, where Git can ask you what to do",
+        );
+    };
+    if (!st.upstream) {
+      terminal();
+      return actions;
+    }
     /* Commit & Sync is the main action whenever there is something to commit, so one button leads at a time. */
     const leads = !blocked && !st.files.length;
     btn(
@@ -423,6 +435,7 @@ export class GitPanel {
       () => void this.push(),
       st.behind ? "Sync first" : undefined,
     );
+    terminal();
     return actions;
   }
 
@@ -518,49 +531,17 @@ export class GitPanel {
     group("Staged", staged, true);
     group("Changes", unstaged, false);
 
-    const box = el("form", "commit-box");
-    const msg = el("textarea");
-    msg.placeholder = "Describe what changed";
-    msg.rows = 3;
-    msg.dataset.control = "message";
-    msg.value = this.message ?? this.defaultMessage(st);
-    msg.addEventListener("input", () => {
-      this.message = msg.value;
-    });
-    const row = el("div", "commit-actions");
-    const hasRemote = Boolean(st.upstream);
-    const publish = el("button", "btn btn-primary", hasRemote ? "Commit & Sync" : "Commit");
-    publish.type = "submit";
-    publish.dataset.control = "publish";
-    publish.disabled = this.busy;
-    row.append(publish);
-    if (hasRemote) {
-      const localOnly = el("button", "btn", "Commit only");
-      localOnly.type = "button";
-      localOnly.dataset.control = "commit-only";
-      localOnly.disabled = this.busy;
-      localOnly.onclick = () => void send(false);
-      row.append(localOnly);
-    }
-    box.append(msg, row);
-    const send = async (share: boolean) => {
-      if (!msg.value.trim()) {
-        msg.focus();
-        return;
-      }
-      await this.commitAndSync(msg.value, share);
-    };
-    box.onsubmit = (e) => {
-      e.preventDefault();
-      void send(true);
-    };
-    msg.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && e.metaKey) {
-        e.preventDefault();
-        void send(true);
-      }
-    });
-    body.append(box);
+    body.append(
+      commitBox({
+        message: this.message ?? this.defaultMessage(st),
+        hasRemote: Boolean(st.upstream),
+        busy: this.busy,
+        onInput: (message) => {
+          this.message = message;
+        },
+        commit: (message, share) => void this.commitAndSync(message, share),
+      }),
+    );
   }
 
   private defaultMessage(st: GitStatus): string {
