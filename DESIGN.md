@@ -151,6 +151,10 @@ Hovering a web or mail link shows its real address under the link, in Read and E
 
 Nothing replaces Waymark's page. A web address that tries to load inside it opens in the default browser, and anything else is refused. A file or link dropped outside the editor does nothing. Right-clicking a web or mail link, in Read or Edit, offers Open link and Copy link address.
 
+## Window
+
+The window comes back where it was and the size it was, placed before it is shown. The place lives in Application Support, never in the vault. If that screen has gone the window is centred and made to fit. Full screen is restored, and leaving it returns to the size from before.
+
 ## Reopening tabs
 
 ⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.

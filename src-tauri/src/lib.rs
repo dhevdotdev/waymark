@@ -6,6 +6,7 @@ mod navigation;
 mod selftest;
 mod trash;
 mod vault;
+mod window_state;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -546,7 +547,18 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             app.set_menu(build_menu(app.handle())?)?;
+            if let Some(window) = app.get_webview_window("main") {
+                window_state::restore(&window);
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
+            ) {
+                window_state::note_change(window);
+            }
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
