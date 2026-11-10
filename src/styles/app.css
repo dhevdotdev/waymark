@@ -622,30 +622,6 @@ kbd {
 .nav-item.is-current .tree-icon {
   color: var(--accent);
 }
-.tree-head.is-section {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: 2;
-  --row-ink: var(--chrome-ink-3);
-  background: var(--chrome);
-  border-radius: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.tree-head.is-section .tree-name {
-  flex: 0 1 auto;
-}
-.tree-head.is-section .tree-count {
-  margin-inline-start: auto;
-  letter-spacing: 0;
-}
-@media (hover: hover) and (pointer: fine) {
-  .tree-head.is-section:hover {
-    --row-ink: var(--ink);
-  }
-}
 .tree-head.has-actions {
   --row-ink: var(--ink);
 }
@@ -663,7 +639,7 @@ kbd {
   overflow: clip;
   min-block-size: 0;
 }
-.tree-body:not(.is-top) > .tree-inner::before {
+.tree-body > .tree-inner::before {
   content: "";
   position: absolute;
   inset-block: 2px;
@@ -845,9 +821,20 @@ kbd {
 
 /* The tab's trail: where following links has taken it. */
 .trail {
-  grid-row: 1;
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 38px;
+  z-index: 3;
   padding: 5px var(--s4) 5px;
+  background: var(--paper);
   border-block-end: 1px solid var(--rule);
+}
+.shell.is-graph .trail {
+  position: static;
+  grid-row: 1;
+}
+.reader:has(> .trail:not([hidden])) .scroller {
+  scroll-padding-top: 52px;
 }
 .trail[hidden] {
   display: none;
@@ -857,7 +844,7 @@ kbd {
   --fade-end: 0px;
   flex: 1;
   min-inline-size: 0;
-  max-block-size: 112px;
+  max-block-size: 64px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -1246,18 +1233,13 @@ kbd {
     color: var(--ink-2);
   }
 }
-.rail-link-name {
+.rail-link-name,
+.rail-link-context {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.rail-link-name,
-.rail-link-context {
   min-inline-size: 0;
-  overflow: clip;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: hidden;
 }
 .rail-link-context {
   grid-column: 2;

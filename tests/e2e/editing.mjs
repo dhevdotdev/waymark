@@ -338,6 +338,60 @@ try {
     (await page.locator(".cm-content").textContent()).includes("from a sync"),
   );
 
+  await writeFile(
+    file("Parity.md"),
+    "Opening paragraph that is long enough to take up a full line of this column and wrap on to a second one.\n\n## First heading\n\n- [ ] one\n- [ ] two\n- [ ] three\n\n> A quote that sits here.\n\n## Second heading\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n### Third heading\n\nBody under it.\n\n```js\nconst a = 1;\n```\n\n> [!tip] Label\n> Text of the tip.\n\nClosing line.\n",
+  );
+  await page.evaluate(() => window.waymark.reader.onVaultChanged(["Parity.md"]));
+  await pause(200);
+  await openNote("Parity");
+  await pause(300);
+  const MARKS = [
+    "Opening paragraph",
+    "First heading",
+    "one",
+    "three",
+    "A quote",
+    "Second heading",
+    "Third heading",
+    "Body under",
+    "const a",
+    "Text of the tip",
+    "Closing line",
+  ];
+  const blockTops = (selector) =>
+    page.evaluate(
+      ([sel, marks]) => {
+        const scroller = document.querySelector(".scroller");
+        const blocks = [...document.querySelectorAll(sel)];
+        return marks.map((mark) => {
+          const block =
+            blocks.findLast(
+              (b) => b.textContent.includes(mark) && b.children.length <= 8 && b.getBoundingClientRect().height < 200,
+            ) ?? blocks.find((b) => b.textContent.includes(mark));
+          if (!block) return null;
+          const inset = Number.parseFloat(getComputedStyle(block).paddingTop) || 0;
+          return Math.round(
+            block.getBoundingClientRect().top + scroller.scrollTop + (block.classList.contains("cm-line") ? inset : 0),
+          );
+        });
+      },
+      [selector, MARKS],
+    );
+  const readTops = await blockTops(".doc :is(p, h2, h3, li, .code, blockquote)");
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(400);
+  const editTops = await blockTops(".cm-content > .cm-line");
+  const drift = MARKS.map((mark, i) => [mark, editTops[i] - readTops[i]]).filter(([, gap]) => Math.abs(gap) > 12);
+  check(
+    "every block sits in the same place in Read and Edit",
+    drift.length === 0,
+    JSON.stringify(MARKS.map((m, i) => editTops[i] - readTops[i])),
+  );
+  await page.keyboard.press("Meta+e");
+  await pause(250);
+
   await openNote("Crlf");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
@@ -797,7 +851,7 @@ try {
   await pause(300);
   const line2 = (text) => page.locator(".cm-line", { hasText: text });
   const editColours = await page.$$eval(".cm-code-token", (spans) =>
-    [...new Set(spans.map((s) => getComputedStyle(s).color))].sort(),
+    [...new Set(spans.filter((s) => s.textContent.trim()).map((s) => getComputedStyle(s).color))].sort(),
   );
   check("code has colours in Edit", editColours.length >= 3, editColours.join(" "));
   check(

@@ -260,6 +260,7 @@ function commandItem(command: Command): PaletteItem {
     hint: command.hint,
     keywords: command.keywords,
     group: "Commands",
+    danger: command.id === "delete-note",
     run: () => command.run("palette"),
   };
 }

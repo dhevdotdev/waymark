@@ -7,6 +7,7 @@ export interface PaletteItem {
   hint?: string;
   group: string;
   keywords?: string;
+  danger?: boolean;
   run: (opts: { newTab: boolean }) => void;
 }
 
@@ -127,7 +128,7 @@ export class Palette {
         this.list.append(h);
       }
       const row = document.createElement("div");
-      row.className = "palette-row";
+      row.className = item.danger ? "palette-row is-danger" : "palette-row";
       row.setAttribute("role", "option");
       row.dataset.index = String(i);
       row.id = `palette-opt-${i}`;

@@ -32,6 +32,8 @@ export function showConflictCompare(options: ConflictCompare): void {
   );
   const key = el("p", "compare-key");
   key.append(el("span", "is-del", "Only in the other version"), el("span", "is-add", "Only in yours"));
-  content.append(bar, key, diffWithPrefs(prefs, unifiedDiff(path, disk, mine), "The two versions are identical."));
-  openSheet(title, "Your version and the one now on disk", content);
+  const diff = diffWithPrefs(prefs, unifiedDiff(path, disk, mine), "The two versions are identical.");
+  diff.classList.add("is-one-file");
+  content.append(bar, key, diff);
+  openSheet(title, "Keep both saves your version as a new note beside this one.", content);
 }

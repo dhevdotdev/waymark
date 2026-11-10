@@ -14,7 +14,8 @@
   --text-body: 1.0625rem; /* 17px reading body */
   --text-small: 0.9375rem; /* 15px callouts, tables, captions */
   --text-code: 0.8125rem; /* 13px code */
-  --text-h3: 1.0625rem;
+  --hang: 16px;
+  --text-h3: 1.1875rem;
   --text-h2: 1.375rem;
   --text-title: 2.125rem;
   --ui-text: 0.8125rem; /* 13px app controls */

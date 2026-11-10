@@ -96,10 +96,10 @@ export class Bookmarks {
     const closed = this.host.prefs.value.vaults[this.host.root]?.bookmarksClosed === true;
     this.element.classList.toggle("is-open", !closed);
     const head = document.createElement("button");
-    head.className = "tree-head is-section";
+    head.className = "tree-head";
     head.dataset.bookmarksHead = "";
     head.setAttribute("aria-expanded", String(!closed));
-    head.innerHTML = `<span class="tree-name">Bookmarks</span>${CHEVRON}<span class="tree-count"></span>`;
+    head.innerHTML = `${CHEVRON}${treeIcon(icons.bookmark)}<span class="tree-name">Bookmarks</span><span class="tree-count"></span>`;
     head.querySelector(".tree-count")!.textContent = list.length.toLocaleString();
     const inner = document.createElement("div");
     inner.className = "tree-inner";
@@ -107,7 +107,7 @@ export class Bookmarks {
       inner.append(this.row(bookmark, i));
     });
     const body = document.createElement("div");
-    body.className = "tree-body is-top";
+    body.className = "tree-body";
     body.append(inner);
     this.element.replaceChildren(head, body);
   }
@@ -117,6 +117,7 @@ export class Bookmarks {
     const missing = this.isMissing(bookmark);
     const row = document.createElement("button");
     row.className = `nav-item is-bookmark${missing ? " is-missing" : ""}`;
+    row.style.setProperty("--d", "1");
     row.dataset.bookmark = String(index);
     row.dataset.tip = missing ? `${label} is no longer in the vault` : label;
     row.classList.toggle("is-current", !bookmark.heading && bookmark.path === this.host.current());

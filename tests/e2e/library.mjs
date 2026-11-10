@@ -21,7 +21,12 @@ function installFakeGit() {
     files: [{ path: "AGENTS.md", origPath: null, staged: ".", unstaged: "M", conflicted: false }],
     operation: null,
   };
-  window.__fakeGit = { status: async () => status, fetch: async () => status, log: async () => [] };
+  window.__fakeGit = {
+    status: async () => status,
+    fetch: async () => status,
+    log: async () => [],
+    diff: async () => "diff --git a/AGENTS.md b/AGENTS.md\n--- a/AGENTS.md\n+++ b/AGENTS.md\n@@ -1 +1 @@\n-a\n+b\n",
+  };
 }
 
 const app = await serveFixture();
@@ -177,6 +182,23 @@ try {
   await page.click('[data-act="sync-panel"]');
   await pause(450);
   check("the sync panel still shows a changed excluded file", (await page.textContent(".sync-sheet")).includes("AGENTS"), "");
+  const sheetBox = await page.locator(".sync-sheet").boundingBox();
+  const sheetPixels = async () => {
+    await page.mouse.move(4, 4);
+    await pause(250);
+    return page.screenshot({ clip: sheetBox });
+  };
+  const beforeDiff = await sheetPixels();
+  await page.locator(".change-name").first().click();
+  await page.waitForSelector(".sheet .diff-line");
+  await pause(350);
+  check(
+    "the sync sheet is never hidden behind a diff",
+    (await page.locator(".sync-sheet").evaluate((e) => getComputedStyle(e).visibility)) === "visible",
+  );
+  await page.keyboard.press("Escape");
+  await pause(450);
+  check("coming back from a diff shows the whole sync sheet", beforeDiff.equals(await sheetPixels()));
   await page.keyboard.press("Escape");
   await pause(350);
   check(

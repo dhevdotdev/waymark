@@ -11,6 +11,11 @@ import {
 import { resolveColor } from "./colors";
 import { groupColor } from "./graph-paint";
 
+/* A small neighbourhood has room to name its notes, so it can be read without hovering. */
+const NAMED_UP_TO = 8;
+const NAME_CHARS = 18;
+const NAME_FONT = "10.5px Inter, sans-serif";
+
 export interface Neighbour {
   id: string;
   label: string;
@@ -271,6 +276,14 @@ export class LocalGraph {
       ctx.arc(this.sx(d), this.sy(d), on ? 5 : 3.5, 0, Math.PI * 2);
       ctx.fillStyle = on ? c.ink : (this.hues.get(d.group!) ?? c.dot);
       ctx.fill();
+      if (this.nodes.length > NAMED_UP_TO) continue;
+      const name = d.label ?? "";
+      ctx.fillStyle = c.ink;
+      ctx.font = NAME_FONT;
+      ctx.textAlign = "center";
+      const shown = name.length > NAME_CHARS ? `${name.slice(0, NAME_CHARS - 1)}…` : name;
+      const half = ctx.measureText(shown).width / 2 + 2;
+      ctx.fillText(shown, Math.min(Math.max(this.sx(d), half), this.size.w - half), this.sy(d) + 16);
     }
   }
 

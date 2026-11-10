@@ -46,7 +46,7 @@ const DEFAULTS: Prefs = {
   lastVault: null,
   recentVaults: [],
   vaults: {},
-  family: "catppuccin",
+  family: "ember",
   appearance: "system",
   sound: true,
   syncOnLaunch: true,

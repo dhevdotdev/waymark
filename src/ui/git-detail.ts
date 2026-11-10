@@ -15,6 +15,12 @@ export class GitDetail {
     return diffWithPrefs(this.host.prefs, text, emptyMessage);
   }
 
+  /** The sheet's title already names the file. */
+  private oneFile(view: HTMLElement): HTMLElement {
+    view.classList.add("is-one-file");
+    return view;
+  }
+
   /** A button that puts this commit's text back in the note, as an uncommitted change. */
   private restoreButton(c: Commit, from: string, target: string): HTMLElement {
     const when = new Date(c.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -36,7 +42,7 @@ export class GitDetail {
       openSheet(
         `${f.path}`,
         staged ? "Staged changes" : f.unstaged === "?" ? "New file" : "Unstaged changes",
-        this.diffView(text),
+        this.oneFile(this.diffView(text)),
       );
     } catch (err) {
       this.host.toast((err as Error).message);

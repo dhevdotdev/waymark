@@ -2,12 +2,14 @@ import { type Commit, type FileChange, type GitStatus, git, isDesktop } from "..
 import { relative } from "./git-panel-parts";
 
 const HISTORY_LIMIT = 100;
+const HISTORY_SHOWN = 4;
 
 export interface NoteHistoryHost {
   status: () => GitStatus | null;
   showWorktreeDiff: (change: FileChange) => void;
   showCommit: (commit: Commit, path: string) => void;
   currentNote: () => string;
+  showAllHistory: (path: string) => void;
 }
 
 const emptyLine = (text: string): HTMLElement => {
@@ -69,10 +71,17 @@ export class NoteHistory {
     if (changed) {
       nodes.push(this.row("Uncommitted changes", "Edited since the last commit", () => this.host.showWorktreeDiff(changed)));
     }
-    for (const commit of commits) {
+    for (const commit of commits.slice(0, HISTORY_SHOWN)) {
       nodes.push(this.row(commit.subject || "(no message)", relative(commit.date), () => this.host.showCommit(commit, path)));
     }
     if (!commits.length && !changed) nodes.push(emptyLine("Not committed yet."));
+    if (commits.length > HISTORY_SHOWN) {
+      const all = document.createElement("button");
+      all.className = "link-btn rail-history-all";
+      all.textContent = `All ${commits.length}${capped ? "+" : ""} versions`;
+      all.addEventListener("click", () => this.host.showAllHistory(path));
+      nodes.push(all);
+    }
     box.replaceChildren(...nodes);
   }
 

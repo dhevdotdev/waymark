@@ -80,18 +80,14 @@ export class FileTree {
 
   private folderRow(folder: TreeFolder, depth: number, index: VaultIndex): HTMLElement {
     const open = this.opened.has(folder.path);
-    const section = depth === 0;
-    const indent = String(Math.max(0, depth - 1));
+    const indent = String(depth);
 
     const head = document.createElement("button");
     head.className = "tree-head";
-    head.classList.toggle("is-section", section);
     head.dataset.folder = folder.path;
     head.style.setProperty("--d", indent);
     head.setAttribute("aria-expanded", String(open));
-    head.innerHTML = section
-      ? `<span class="tree-name"></span>${CHEVRON}<span class="tree-count"></span>`
-      : `${CHEVRON}${treeIcon(icons.folder)}<span class="tree-name"></span><span class="tree-count"></span>`;
+    head.innerHTML = `${CHEVRON}${treeIcon(icons.folder)}<span class="tree-name"></span><span class="tree-count"></span>`;
     head.querySelector(".tree-name")!.textContent = folder.name;
     head.querySelector(".tree-count")!.textContent = folder.count.toLocaleString();
     head.dataset.tip = folder.name;
@@ -101,7 +97,6 @@ export class FileTree {
     inner.append(...this.children(folder, depth + 1, index));
     const body = document.createElement("div");
     body.className = "tree-body";
-    body.classList.toggle("is-top", section);
     body.style.setProperty("--d", indent);
     body.append(inner);
 
@@ -118,7 +113,7 @@ export class FileTree {
     row.className = "nav-item";
     row.dataset.path = path;
     row.dataset.tip = title;
-    row.style.setProperty("--d", String(Math.max(0, depth - 1)));
+    row.style.setProperty("--d", String(depth));
     row.innerHTML = treeIcon(isBaseFile(path) ? icons.table : icons.note);
     const label = document.createElement("span");
     label.className = "nav-text";

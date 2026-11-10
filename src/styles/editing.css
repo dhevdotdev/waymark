@@ -41,7 +41,9 @@
 .doc-editing .cm-h2 {
   font-size: var(--text-h2);
 }
-.doc-editing .cm-h3,
+.doc-editing .cm-h3 {
+  font-weight: 600;
+}
 .doc-editing .cm-h4,
 .doc-editing .cm-h5,
 .doc-editing .cm-h6 {
@@ -77,8 +79,8 @@
   font-variant-ligatures: none;
 }
 .doc-editing .cm-code-line {
-  margin-inline: -18px;
-  padding-inline: 18px;
+  margin-inline: calc(-1 * var(--hang));
+  padding-inline: var(--hang);
   font-family: var(--font-mono);
   font-size: var(--text-code);
   line-height: var(--leading-code);
@@ -119,7 +121,7 @@
   color: color-mix(in oklab, var(--shiki-light) 50%, var(--ink));
 }
 :root[data-scheme="dark"] .doc-editing .cm-code-token {
-  color: var(--shiki-dark);
+  color: color-mix(in oklab, var(--shiki-dark) 72%, var(--ink));
 }
 .doc-editing .cm-preview-block {
   padding-block: var(--s2);
@@ -173,7 +175,7 @@
   word-break: normal;
 }
 .cm-table-widget .table-wrap {
-  margin: 0 -8px;
+  margin: 0 calc(-1 * var(--hang));
 }
 .cm-table-widget :is(th, td) {
   outline: none;
@@ -922,7 +924,8 @@ button.task-box:focus-visible {
   font-size: 0.6875rem;
 }
 .doc-editing .cm-callout {
-  padding-inline: 16px;
+  margin-inline: calc(-1 * var(--hang));
+  padding-inline: var(--hang);
   background: color-mix(in oklab, var(--c) var(--tint), var(--paper));
   font-size: var(--text-small);
   line-height: 1.6;
@@ -963,6 +966,7 @@ button.task-box:focus-visible {
     inset-inline-start: 50%;
     translate: -50% 0;
     max-inline-size: calc(100% + 124px);
+    inline-size: min(calc(100% + 124px), var(--iw, 100%));
   }
 }
 

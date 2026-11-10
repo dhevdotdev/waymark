@@ -265,7 +265,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: min(460px, 72vh);
+  max-height: min(460px, 72vh);
 }
 .palette-field {
   display: flex;
@@ -1744,8 +1744,18 @@
 .sync-overlay ~ .sheet-overlay {
   background: transparent;
 }
-body:has(.sheet-overlay) .sync-sheet {
-  visibility: hidden;
+.sync-overlay ~ .sheet-overlay,
+.sync-overlay ~ .sheet-overlay .sheet {
+  animation: none;
+}
+.sync-overlay ~ .sheet-overlay .sheet {
+  height: min(680px, 100%);
+}
+.sync-overlay ~ .sheet-overlay.is-leaving {
+  display: none;
+}
+.is-one-file .diff-file-name {
+  display: none;
 }
 
 .compare-key {
@@ -1820,4 +1830,8 @@ body:has(.sheet-overlay) .sync-sheet {
   color: var(--ink-3);
   text-decoration: line-through;
   text-decoration-style: dashed;
+}
+
+.palette-row.is-danger .palette-label {
+  color: var(--danger-ink);
 }
