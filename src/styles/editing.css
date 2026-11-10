@@ -247,7 +247,10 @@
   background: color-mix(in oklab, var(--accent) 13%, var(--paper));
 }
 .cm-table-widget :is(th, td).is-marked:not(:focus) {
-  animation: table-mark 520ms var(--ease-out);
+  animation: table-mark var(--t-toast) var(--ease-out);
+}
+:root[data-input="keyboard"] .cm-table-widget :is(th, td).is-marked:not(:focus) {
+  animation-timing-function: step-end;
 }
 @keyframes table-mark {
   from {
