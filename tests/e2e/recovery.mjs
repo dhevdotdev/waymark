@@ -6,6 +6,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
+import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const results = [];
@@ -58,11 +59,13 @@ const DESKTOP_MODULES = /\/src\/ui\/(sync-controller|note-history|note-files|rea
 
 async function routeGit(page) {
   await page.route(/\/src\/platform\.ts/, async (route) => {
-    const response = await route.fetch();
+    const response = await fetchRoute(route);
+    if (!response) return;
     await route.fulfill({ response, body: `${await response.text()}\n;Object.assign(git, window.__fakeGit ?? {});\n` });
   });
   await page.route(DESKTOP_MODULES, async (route) => {
-    const response = await route.fetch();
+    const response = await fetchRoute(route);
+    if (!response) return;
     const body = (await response.text()).replace(
       /import\s*\{([^}]*)\}\s*from\s*"(\/src\/platform\.ts[^"]*)"/,
       (whole, names, from) =>
@@ -392,8 +395,11 @@ try {
   await page.evaluate(() => window.waymark.prefs.flush());
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(700);
-  const relaunched = await topBlock();
+  const settledOn = async (line) => {
+    for (let i = 0; i < 40 && (await topBlock()).line !== line; i++) await pause(150);
+    return topBlock();
+  };
+  const relaunched = await settledOn(stopped.line);
   check("the place survives a relaunch", relaunched.line === stopped.line, `${stopped.line} vs ${relaunched.line}`);
 
   await page.click('[data-act="new-tab"]');
@@ -401,8 +407,7 @@ try {
   await page.keyboard.type("Long read");
   await pause(150);
   await page.keyboard.press("Enter");
-  await pause(600);
-  check("a note closed and opened in a new tab returns there", (await topBlock()).line === stopped.line);
+  check("a note closed and opened in a new tab returns there", (await settledOn(stopped.line)).line === stopped.line);
 
   await writeFile(file("Anchored.md"), `${LONG}\n## Target heading\n\nEnd of the note.\n\n${LONG}`);
   await writeFile(file("Links in.md"), "Go to [[Anchored#Target heading]].\n");

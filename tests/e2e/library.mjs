@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const results = [];
@@ -91,11 +92,13 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("request", (r) => requests.push(r.url()));
 await page.addInitScript(installFakeGit);
 await page.route(/\/src\/platform\.ts/, async (route) => {
-  const response = await route.fetch();
+  const response = await fetchRoute(route);
+  if (!response) return;
   await route.fulfill({ response, body: `${await response.text()}\n;Object.assign(git, window.__fakeGit ?? {});\n` });
 });
 await page.route(/\/src\/ui\/(sync-controller|reader|note-files)\.ts/, async (route) => {
-  const response = await route.fetch();
+  const response = await fetchRoute(route);
+  if (!response) return;
   const body = (await response.text()).replace(
     /import\s*\{([^}]*)\}\s*from\s*"(\/src\/platform\.ts[^"]*)"/,
     (whole, names, from) =>
