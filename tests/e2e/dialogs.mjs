@@ -95,6 +95,41 @@ try {
   await page.evaluate(() => {
     for (const overlay of document.querySelectorAll(".prompt-overlay")) overlay.remove();
   });
+
+  /* The palette sizes to its results up to a maximum, and its field never moves. */
+  const paletteBox = () =>
+    page.evaluate(() => {
+      const box = document.querySelector(".palette").getBoundingClientRect();
+      const field = document.querySelector(".palette-field").getBoundingClientRect();
+      const list = document.querySelector(".palette-list");
+      return { height: box.height, fieldTop: field.top, overflows: list.scrollHeight > list.clientHeight };
+    });
+  await page.keyboard.press("Meta+k");
+  await pause(80);
+  const recent = await paletteBox();
+  await page.keyboard.type("zzzzqqqq");
+  await pause(80);
+  const none = await paletteBox();
+  check("no result leaves a short palette", none.height < 200, String(none.height));
+  check("the field stays put when the results shrink", none.fieldTop === recent.fieldTop, `${recent.fieldTop} ${none.fieldTop}`);
+  check(
+    "the palette does not animate its height",
+    await page.locator(".palette").evaluate((p) => {
+      const { transitionProperty, transitionDuration } = getComputedStyle(p);
+      return transitionDuration === "0s" || !/height|all/.test(transitionProperty);
+    }),
+  );
+  await page.locator(".palette-field input").fill(`${"long ".repeat(400)}`);
+  await pause(80);
+  const wordy = await paletteBox();
+  check("a very long query stays within the maximum", wordy.height <= 460, String(wordy.height));
+  await page.locator(".palette-field input").fill(">");
+  await pause(80);
+  const many = await paletteBox();
+  check("many results stop at the maximum and scroll", many.height === 460 && many.overflows, JSON.stringify(many));
+  check("the field stays put at the maximum", many.fieldTop === recent.fieldTop);
+  await page.keyboard.press("Escape");
+  await pause(80);
 } catch (e) {
   check("the run finished", false, String(e).split("\n")[0]);
 } finally {
