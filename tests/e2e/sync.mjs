@@ -240,6 +240,83 @@ try {
     return c;
   });
   check("text actions are quiet, not accent", link !== accent, `${link} ${accent}`);
+
+  /* A status refresh keeps the keyboard user's place. */
+  {
+    await stage("many");
+    const inBody = () => page.evaluate(() => document.querySelector(".sync-body").scrollTop);
+    const focusKey = () =>
+      page.evaluate(() => {
+        const a = document.activeElement;
+        return {
+          text: a.textContent.trim().slice(0, 24),
+          label: a.getAttribute("aria-label"),
+          ring: a.matches(":focus-visible"),
+          tag: a.className,
+        };
+      });
+    const refreshNow = () => page.evaluate(() => window.waymark.reader.sync.panel.refresh());
+    await page.keyboard.press("Tab");
+    await page.locator(".change-act").nth(20).focus();
+    await page.evaluate(() => {
+      document.querySelector(".sync-body").scrollTop = 300;
+    });
+    const before = await focusKey();
+    await refreshNow();
+    await pause(60);
+    const after = await focusKey();
+    check(
+      "a refresh keeps focus on the same control",
+      after.label === before.label && after.label?.startsWith("Stage Bed 20"),
+      JSON.stringify(after),
+    );
+    check("a refresh keeps the keyboard focus ring", before.ring && after.ring, `${before.ring} ${after.ring}`);
+    check("a refresh keeps the scroll position", (await inBody()) === 300, String(await inBody()));
+    for (let i = 0; i < 6; i++) void refreshNow();
+    await pause(120);
+    check("repeated refreshes keep focus", (await focusKey()).label === before.label, JSON.stringify(await focusKey()));
+
+    await page.locator('.seg-btn[role="tab"]', { hasText: "Changes" }).focus();
+    await page.evaluate(() => {
+      window.__states.fewer = { ...window.__states.many, files: window.__states.many.files.slice(0, 3) };
+      window.__state = "fewer";
+    });
+    await refreshNow();
+    await pause(60);
+    check("a tab whose count changed keeps focus", /^Changes 3/.test((await focusKey()).text), JSON.stringify(await focusKey()));
+
+    await page.locator(".change-act").nth(2).focus();
+    await page.evaluate(() => {
+      window.__states.gone = { ...window.__states.many, files: window.__states.many.files.slice(0, 1) };
+      window.__state = "gone";
+    });
+    await refreshNow();
+    await pause(60);
+    check(
+      "when a control goes, the sheet holds focus",
+      (await focusKey()).tag.includes("sync-sheet"),
+      JSON.stringify(await focusKey()),
+    );
+
+    await stage("many");
+    await page.locator(".commit-box textarea").focus();
+    await page.locator(".commit-box textarea").fill("first line");
+    await page.evaluate(() => document.querySelector(".commit-box textarea").setSelectionRange(2, 5));
+    await refreshNow();
+    await pause(60);
+    const field = await page.evaluate(() => {
+      const box = document.querySelector(".commit-box textarea");
+      return [document.activeElement === box, box.selectionStart, box.selectionEnd, box.value];
+    });
+    check("the commit box keeps its focus, selection and text", field.join() === "true,2,5,first line", field.join());
+
+    await page.evaluate(() => {
+      document.querySelector(".sync-body").scrollTop = 300;
+    });
+    await tab("History");
+    await pause(120);
+    check("another tab starts at its top", (await inBody()) === 0, String(await inBody()));
+  }
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, String(error).split("\n")[0]);
