@@ -5,6 +5,7 @@ import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
 import type { ShellElements } from "./shell";
 import { watchTableFit } from "./table-fit";
+import { watchTableSelection } from "./table-selection";
 
 const WORDS_PER_MINUTE = 230;
 
@@ -17,6 +18,7 @@ export class NoteView {
     private readonly toast: (message: string) => void,
   ) {
     watchTableFit(els.scroller);
+    watchTableSelection(els.scroller);
   }
 
   /** Replaces the column with a rendered note and returns its article element. */

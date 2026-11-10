@@ -12,6 +12,8 @@ const wide = (word) => Array.from({ length: 14 }, (_, i) => `| ${word} number ${
 const KINDS = ["note", "tip", "warning", "danger", "info", "success", "question", "quote"];
 const NOTES = {
   "Tall.md": `# Tall\n\nBefore.\n\n| Name | Detail | Count |\n| --- | --- | ---: |\n${rows(60)}\n\n${"After.\n\n".repeat(30)}`,
+  "Picking.md":
+    "# Picking\n\nBefore the table.\n\n| Step | Party A | Party B |\n| --- | --- | --- |\n| Public value | `5^6 mod 23` | `5^15 mod 23` |\n| Received | 19 | 8 |\n\nAfter the table.\n",
   "Layout.md": "# Layout\n\n|  |  |\n| --- | --- |\n| left | right |\n| more | cells |\n",
   "Sideways.md": `# Sideways\n\n${wide("Column")}|\n${"| --- ".repeat(14)}|\n${Array.from({ length: 50 }, () => `${wide("value")}|`).join("\n")}\n`,
   "Callouts.md": `# Callouts\n\nPlain \`code\` here.\n\n${KINDS.map((k) => `> [!${k}] ${k}\n> Uses \`InlineCode\` inside.\n`).join("\n")}\n> [!warning] With a table\n> | A | B |\n> | --- | --- |\n> | 1 | 2 |\n`,
@@ -136,6 +138,59 @@ async function run(scheme) {
   await page.keyboard.press("Meta+e");
   await pause(400);
 
+  await open("Picking.md");
+  const spanned = () => page.locator(".doc .is-spanned").evaluateAll((cells) => cells.map((c) => c.textContent));
+  const pick = (from, fromAt, to, toAt) =>
+    page.evaluate(
+      ([a, aAt, b, bAt]) => {
+        const textOf = (i) => document.querySelectorAll(".doc :is(td, th)")[i].firstChild;
+        const place = (i, at) => (at < 0 ? [document.querySelectorAll(".doc :is(td, th)")[i], 0] : [textOf(i), at]);
+        getSelection().setBaseAndExtent(...place(a, aAt), ...place(b, bAt));
+      },
+      [from, fromAt, to, toAt],
+    );
+  await pick(0, 1, 3, 2);
+  await pause(60);
+  check(label("a selection across cells fills them"), (await spanned()).length === 4, JSON.stringify(await spanned()));
+  const firstFill = await page
+    .locator(".doc th")
+    .first()
+    .evaluate((c) => getComputedStyle(c).backgroundImage);
+  check(label("the fill is drawn"), firstFill.includes("gradient"), firstFill);
+  await pick(0, 1, 0, 3);
+  await pause(60);
+  check(label("inside one cell it stays a text highlight"), (await spanned()).length === 0);
+  await pick(0, 0, 1, -1);
+  await pause(60);
+  check(
+    label("a selection stopping at a cell's start leaves that cell out"),
+    (await spanned()).length === 1,
+    JSON.stringify(await spanned()),
+  );
+  await page.evaluate(() => {
+    const doc = document.querySelector(".doc");
+    const para = [...doc.querySelectorAll("p")];
+    getSelection().setBaseAndExtent(para[0].firstChild, 2, para[1].firstChild, 3);
+  });
+  await pause(60);
+  check(
+    label("running through a whole table fills every cell"),
+    (await spanned()).length === 9,
+    String((await spanned()).length),
+  );
+  check(label("copying still gives the text"), (await page.evaluate(() => getSelection().toString())).includes("Party A"));
+  const a = await page.locator(".doc th").first().boundingBox();
+  const b = await page.locator(".doc td").nth(4).boundingBox();
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await pause(60);
+  check(label("clearing the selection clears the fill"), (await spanned()).length === 0);
+  await page.mouse.move(a.x + 20, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 10, b.y + b.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await pause(60);
+  check(label("dragging across cells fills them"), (await spanned()).length >= 2, JSON.stringify(await spanned()));
+  await page.evaluate(() => getSelection().removeAllRanges());
   await open("Layout.md");
   const blank = await head();
   check(label("a table with an empty header gets no band"), blank.background === "rgba(0, 0, 0, 0)", blank.background);

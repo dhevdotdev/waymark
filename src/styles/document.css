@@ -868,6 +868,16 @@ button.callout-title:focus-visible {
   background: var(--select);
   color: var(--ink);
 }
+.doc :is(td, th).is-spanned {
+  background-image: linear-gradient(var(--select), var(--select));
+}
+.doc .is-spanned::selection,
+.doc .is-spanned ::selection {
+  background: transparent;
+}
+.doc .is-spanned code {
+  background: transparent;
+}
 .callout-title,
 .callout-title * {
   user-select: none;

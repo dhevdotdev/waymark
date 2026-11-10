@@ -64,6 +64,8 @@ A table has a thin rounded outline, in the same shape as code blocks and callout
 
 Inline code inside a callout takes a stronger tint of that callout's own colour. The plain grey only suits plain paper.
 
+A selection that runs across table cells in Read fills each whole cell as one block. Text selected inside one cell stays ordinary text highlighting.
+
 ## Moving through a note in Edit
 
 A heading's marks hang in the margin and read left to right, so the arrow keys move through them the way they look. Up, Down and Home land on the heading's text, never inside the marks. Up and Down stop on every line, the short gaps between blocks included. Backspace at the start of a heading's text makes it plain text in one step, and one Undo brings the heading back.
