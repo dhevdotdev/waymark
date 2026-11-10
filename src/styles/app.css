@@ -835,10 +835,13 @@ kbd {
   grid-template-rows: auto auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
 }
+/* Each names its column, so the graph can lie over them without pushing either into a new one. */
 .pane-head {
+  grid-column: 1;
   grid-row: 2;
 }
 .scroller {
+  grid-column: 1;
   grid-row: 3;
 }
 
@@ -850,8 +853,9 @@ kbd {
   opacity: 0;
   pointer-events: none;
 }
+/* Hidden, not removed: a removed box forgets how far it was scrolled, and the note must be where it was left. */
 .shell.is-graph :is(.pane-head, .scroller) {
-  display: none;
+  visibility: hidden;
 }
 .shell:is(.is-blank, :has(.empty-state.is-page)) .pane-head {
   visibility: hidden;

@@ -346,6 +346,14 @@ const leaving = await leaveFrames;
 await pause(500);
 check("the icon opens the full graph", await page.locator(".graph-view canvas").isVisible());
 check(
+  "the full graph fills the note area",
+  await page.evaluate(() => {
+    const reader = document.querySelector(".reader").getBoundingClientRect();
+    const graph = document.querySelector(".graph-view canvas").getBoundingClientRect();
+    return Math.abs(graph.width - reader.width) <= 1 && Math.abs(graph.bottom - reader.bottom) <= 1;
+  }),
+);
+check(
   "the arrows in the full graph turn inwards",
   (await page.locator(".graph-leave path").getAttribute("d")).startsWith(TOGETHER),
 );

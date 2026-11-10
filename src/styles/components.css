@@ -846,6 +846,7 @@
 /* ---------- Graph view ---------- */
 
 .graph-view {
+  grid-column: 1;
   grid-row: 2 / -1;
   position: relative;
   min-inline-size: 0;

@@ -607,7 +607,6 @@ export class Reader {
   private closeGraphView(): void {
     this.graph?.destroy();
     this.graph = null;
-    this.els.shell.classList.remove("is-graph");
   }
 
   private renderTree(): void {
@@ -644,7 +643,7 @@ export class Reader {
   private saveScroll(): void {
     const node = this.tab?.trail.current;
     const drawn = (node?.view.kind === "note" || node?.view.kind === "base") && node.view.path === this.current;
-    if (drawn && !this.els.shell.classList.contains("is-graph")) node.scroll = this.els.scroller.scrollTop;
+    if (drawn) node.scroll = this.els.scroller.scrollTop;
     this.spots.record();
   }
 }
