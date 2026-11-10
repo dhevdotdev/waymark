@@ -218,7 +218,7 @@ try {
   check("a task shows as a box", (await page.locator(".cm-task").count()) >= 4);
   check("the wikilink is shown as a link", (await page.locator('.cm-wikilink:has-text("Welcome")').count()) === 1);
   check("frontmatter stays out of the way at rest", (await page.locator(".cm-frontmatter").count()) === 0);
-  await page.keyboard.press("Meta+ArrowUp");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowUp" : "Control+Home");
   await pause(120);
   check("frontmatter appears as text when the cursor goes there", (await page.locator(".cm-frontmatter").count()) === 3);
   await page.locator(".cm-line", { hasText: "Third heading" }).click();

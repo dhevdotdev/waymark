@@ -436,7 +436,7 @@ try {
   await page.evaluate(() => {
     navigator.clipboard.readText = async () => "**not bold** plain";
   });
-  await page.keyboard.press("Meta+Shift+v");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+Shift+v" : "Control+Shift+v");
   await saved();
   await pause(150);
   check("⌘⇧V pastes the plain text as it is", (await disk("Paste.md")).includes("**not bold** plain"));

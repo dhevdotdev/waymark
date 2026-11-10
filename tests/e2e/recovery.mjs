@@ -111,7 +111,7 @@ const restoreClick = async () => {
 };
 const typeInEditor = async (text) => {
   await page.locator(".cm-content").click();
-  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
   await page.keyboard.type(text);
 };
 
