@@ -644,7 +644,7 @@ button.task-box:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 5px;
-  inline-size: 5.5em;
+  inline-size: 6em;
 }
 .shell.is-editing .pane-meta {
   display: none;

@@ -1114,8 +1114,12 @@ kbd {
     color: var(--ink);
   }
 }
+/* Read time and save state swap in one fixed cell, so nothing beside them moves between Read and Edit. */
 .pane-meta {
   flex: none;
+  inline-size: 6em;
+  text-align: end;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .scroller {

@@ -420,6 +420,15 @@ check("following a link grows the trail", (await page.locator(".trail-row").coun
 check("the readout says where the tab is", (await readout.textContent()).includes("2 of 2"), await readout.textContent());
 check("a second stop leaves the readout's slot where it was", (await slotPlace()) === slotWithOneStop);
 check("nothing sits between the path row and the note", (await page.locator(".reader > .trail").count()) === 0);
+const readoutPlace = () => readout.evaluate((e) => e.getBoundingClientRect().left);
+const readoutInRead = await readoutPlace();
+await page.keyboard.press("Meta+e");
+await page.waitForSelector(".cm-content");
+await pause(300);
+const readoutInEdit = await readoutPlace();
+check("Read and Edit leave the readout where it is", readoutInEdit === readoutInRead, `${readoutInRead} and ${readoutInEdit}`);
+await page.keyboard.press("Meta+e");
+await pause(400);
 const titleBeforeOpen = await titleTop();
 await readout.click();
 await pause(200);
