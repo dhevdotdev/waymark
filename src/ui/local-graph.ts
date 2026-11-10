@@ -187,6 +187,8 @@ export class LocalGraph {
       maxY = Math.max(maxY, d.y!);
     }
     const pad = 16;
+    /* Before the layout has settled a node can have no position yet, and the canvas refuses a non-finite coordinate. */
+    if (!Number.isFinite(minX + maxX + minY + maxY)) return;
     this.view.k = Math.min((w - pad * 2) / Math.max(1, maxX - minX), (h - pad * 2) / Math.max(1, maxY - minY), 2.2);
     this.view.x = w / 2 - ((minX + maxX) / 2) * this.view.k;
     this.view.y = h / 2 - ((minY + maxY) / 2) * this.view.k;
@@ -228,7 +230,7 @@ export class LocalGraph {
   private draw(): void {
     const { ctx, colors: c } = this;
     const { w, h } = this.size;
-    if (!w || !c) return;
+    if (!w || !c || !this.nodes.every((d) => Number.isFinite(d.x) && Number.isFinite(d.y))) return;
     ctx.clearRect(0, 0, w, h);
     const hot = this.hover && !this.hover.center ? this.hover : null;
 
