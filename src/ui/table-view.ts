@@ -18,6 +18,7 @@ import {
   writeBeside,
 } from "./table-dom";
 import { reveal, snapshot } from "./table-feedback";
+import { setFocusedTable } from "./table-focus";
 
 export interface TableEditorOptions {
   renderInline: (text: string) => DocumentFragment;
@@ -54,9 +55,6 @@ const consume = (e: Event) => {
 
 const tables = new WeakMap<HTMLElement, EditableTable>();
 
-/** The table the cursor is in. It holds while the palette has focus, so a palette command can act on it. */
-let tableInFocus: EditableTable | null = null;
-export const focusedTable = () => (tableInFocus?.root.isConnected ? tableInFocus : null);
 const inPalette = (node: Node | null) => node instanceof Element && node.closest(".palette") !== null;
 
 /** A rebuilt table fires pointer events under a pointer that has not moved. Only real movement may re-aim the handles. */
@@ -563,7 +561,7 @@ export class EditableTable implements ControlsHost {
   }
 
   private onFocusIn(e: Event): void {
-    tableInFocus = this;
+    setFocusedTable(this);
     const cell = (e.target as HTMLElement).closest<HTMLElement>("th, td");
     if (!cell) {
       if (!this.aim) this.aimAt(this.at ?? { row: 0, column: 0 });
@@ -582,7 +580,7 @@ export class EditableTable implements ControlsHost {
     if (cell) cell.replaceChildren(this.render(cell.dataset.source ?? ""));
     const next = e.relatedTarget as Node | null;
     if (this.root.contains(next) || menuHolds(next)) return;
-    if (!inPalette(next)) tableInFocus = null;
+    if (!inPalette(next)) setFocusedTable(null);
     releaseColumns(this.table);
     this.mode = "edit";
     this.root.classList.remove("is-grid");

@@ -10,7 +10,7 @@ import { plural } from "./plural";
 import type { Reader } from "./reader";
 import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
-import { focusedTable } from "./table-view";
+import { focusedTable } from "./table-focus";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
