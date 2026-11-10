@@ -77,7 +77,7 @@ export class Reader {
       label: (view) => this.viewLabel(view),
       open: (path) => void this.open(path, { newTab: true, focus: true }),
       saveScroll: () => this.saveScroll(),
-      show: () => void this.show({ keyboard: true }),
+      show: () => void this.show(),
       persist: () => this.persist(),
       chrome: () => this.renderTabChrome(),
       inspector: () => this.inspector,
@@ -120,7 +120,7 @@ export class Reader {
       highlighter: deps.highlighter,
       toast,
       notePath: () => this.notePath,
-      reshow: () => this.show({ keepScroll: true, keyboard: true }),
+      reshow: () => this.show({ keepScroll: true }),
       incomingCommits: () => this.sync.panel.status?.behind ?? 0,
       open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
       openUrl: (url) => void native.openExternal(url),
@@ -131,7 +131,7 @@ export class Reader {
       noteSaved: () => void this.inspector?.refreshProperties(),
       noteRestored: async (path) => {
         await vault.applyChanges([path]);
-        if (path === this.current && !this.editing.isOpen) await this.show({ keepScroll: true, quiet: true, keyboard: true });
+        if (path === this.current && !this.editing.isOpen) await this.show({ keepScroll: true, quiet: true });
         this.renderTree();
         this.sync.scheduleRefresh();
       },
@@ -287,7 +287,6 @@ export class Reader {
         entering: opts.keyboard ? undefined : tab.id,
         find: opts.find,
         followed: opts.via === "link",
-        keyboard: opts.keyboard,
       });
       return;
     }
@@ -305,7 +304,7 @@ export class Reader {
   async go(delta: -1 | 1): Promise<void> {
     this.saveScroll();
     const moved = delta < 0 ? this.tab.trail.back() : this.tab.trail.forward();
-    if (moved) await this.show({ keyboard: true });
+    if (moved) await this.show();
   }
 
   /** A new tab starts blank with the palette open. A blank tab that is already open is reused. */
@@ -319,24 +318,24 @@ export class Reader {
       this.workspace.addBeside({ kind: "blank" });
       this.workspace.activeIndex += 1;
     }
-    void this.show({ keyboard: true });
+    void this.show();
     this.palette.open();
   }
 
   switchTab(index: number): void {
     this.saveScroll();
-    if (this.workspace.activate(index)) void this.show({ keyboard: true });
+    if (this.workspace.activate(index)) void this.show();
   }
 
   cycleTab(step: number): void {
     this.saveScroll();
-    if (this.workspace.cycle(step)) void this.show({ keyboard: true });
+    if (this.workspace.cycle(step)) void this.show();
   }
 
   closeTab(index: number): void {
     this.saveScroll();
     if (this.workspace.tabs[index]?.pinned) toast("Unpin this tab to close it.");
-    else if (this.workspace.close(index)) void this.show({ keyboard: true });
+    else if (this.workspace.close(index)) void this.show();
   }
 
   /** The graph is a tab, as in Obsidian: an open one comes forward, otherwise it opens beside the current tab. */
@@ -348,12 +347,12 @@ export class Reader {
     if (existing >= 0) {
       this.workspace.tabs[existing].trail.setCurrentView(view);
       this.workspace.activeIndex = existing;
-      void this.show({ keyboard: true });
+      void this.show();
       return;
     }
     if (this.onBlank) {
       this.tab.trail.setCurrentView(view);
-      void this.show({ keyboard: true });
+      void this.show();
       return;
     }
     const tab = this.workspace.addBeside(view);
@@ -403,7 +402,7 @@ export class Reader {
     if (this.editing.isOpen) {
       await this.editing.vaultChanged();
       this.renderTree();
-    } else if (this.onBase) await this.show({ keepScroll: true, quiet: true, keyboard: true });
+    } else if (this.onBase) await this.show({ keepScroll: true, quiet: true });
     else if (this.onGraph) await this.show({ quiet: true });
     else if (this.onBlank) this.renderTree();
     else if (!this.vault.texts.has(this.current)) {
@@ -562,7 +561,7 @@ export class Reader {
 
   /** After files move or vanish, redraws without disturbing a note being edited. */
   private async redraw(): Promise<void> {
-    if (!this.editing.isOpen) return this.show({ keepScroll: true, keyboard: true });
+    if (!this.editing.isOpen) return this.show({ keepScroll: true });
     this.current = this.notePath;
     this.renderTabChrome();
     this.renderTree();

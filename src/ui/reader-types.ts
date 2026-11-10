@@ -41,6 +41,5 @@ export interface ShowOptions {
   keepScroll?: boolean;
   quiet?: boolean;
   restoring?: boolean;
-  keyboard?: boolean;
   onPainted?: () => void;
 }
