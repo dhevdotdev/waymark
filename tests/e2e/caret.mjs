@@ -44,8 +44,10 @@ const openEditing = async (name) => {
   await page.waitForSelector(".cm-content");
   await pause(300);
 };
+/** Read after the next frame's callbacks have run, since the caret layer draws in the frame after a change. */
 const caret = () =>
-  page.evaluate(() => {
+  page.evaluate(async () => {
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
     const box = document.querySelector(".cm-caret")?.getBoundingClientRect();
     return box ? { left: box.left, width: box.width, top: box.top, height: box.height } : null;
   });
