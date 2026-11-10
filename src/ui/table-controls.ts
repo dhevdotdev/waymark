@@ -43,6 +43,7 @@ function besideColumn(column: { left: number; right: number; top: number; bottom
 export class TableControls {
   readonly rowGrip: HTMLButtonElement;
   readonly columnGrip: HTMLButtonElement;
+  readonly tableGrip: HTMLButtonElement;
   readonly addRow: HTMLButtonElement;
   readonly addColumn: HTMLButtonElement;
 
@@ -51,6 +52,11 @@ export class TableControls {
     this.columnGrip = this.button("cm-table-grip is-column", icons.gripWide, "Column actions", () =>
       this.openFromHandle("column"),
     );
+    this.tableGrip = this.button("cm-table-grip is-table", icons.more, "Table actions", () => this.openTableMenu());
+    this.tableGrip.addEventListener("pointerenter", () => this.highlightTable());
+    this.tableGrip.addEventListener("pointerleave", () => {
+      if (!document.querySelector(".context-menu:not(.is-leaving)")) this.clearHighlight();
+    });
     this.addRow = this.button("cm-table-add is-row", icons.plus, "Add row", () => host.addRow(), "Add row");
     this.addColumn = this.button("cm-table-add is-column", icons.plus, "Add column", () => host.addColumn());
     this.bindDrag(this.rowGrip, "row");
@@ -60,7 +66,7 @@ export class TableControls {
   }
 
   get all(): HTMLElement[] {
-    return [this.rowGrip, this.columnGrip, this.addRow, this.addColumn];
+    return [this.rowGrip, this.columnGrip, this.tableGrip, this.addRow, this.addColumn];
   }
 
   private button(className: string, icon: string, label: string, run: () => void, text?: string): HTMLButtonElement {
@@ -118,6 +124,10 @@ export class TableControls {
       cell.classList.add("is-acted-on");
   }
 
+  private highlightTable(): void {
+    for (const cell of this.host.root.querySelectorAll("th, td")) cell.classList.add("is-acted-on");
+  }
+
   clearHighlight(): void {
     for (const cell of this.host.root.querySelectorAll(".is-acted-on")) cell.classList.remove("is-acted-on");
   }
@@ -168,6 +178,18 @@ export class TableControls {
         ? besideRow((cell.parentElement as HTMLElement).getBoundingClientRect(), this.rowGrip.getBoundingClientRect().left)
         : besideColumn(this.columnBox(at));
     showContextMenu(0, 0, this.items(kind, at, keyboard), { place, keyboard, onClose: () => this.clearHighlight() });
+  }
+
+  private openTableMenu(): void {
+    this.highlightTable();
+    const table = this.host.root.querySelector("table")!.getBoundingClientRect();
+    const left = this.tableGrip.getBoundingClientRect().left;
+    const keyboard = document.activeElement === this.tableGrip;
+    showContextMenu(0, 0, this.tableItems(false), {
+      place: besideRow(table, left),
+      keyboard,
+      onClose: () => this.clearHighlight(),
+    });
   }
 
   /** The whole set of actions for one cell, opened from the keyboard or a right-click. */

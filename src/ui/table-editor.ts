@@ -1,7 +1,8 @@
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorState, type Extension, Prec, type Range, StateEffect, StateField, Transaction } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, WidgetType } from "@codemirror/view";
-import { EditableTable, type TableEditorOptions, type TableHost, type TableRange, tableWrite, writeBeside } from "./table-view";
+import { tableWrite, writeBeside } from "./table-dom";
+import { EditableTable, type TableEditorOptions, type TableHost, type TableRange } from "./table-view";
 
 export type { TableEditorOptions } from "./table-view";
 

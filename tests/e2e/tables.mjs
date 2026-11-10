@@ -448,6 +448,138 @@ try {
   const namedOpacity = await page.evaluate(() => getComputedStyle(document.querySelector(".cm-table-add.is-row span")).opacity);
   check("hovering Add row names it", Number(namedOpacity) > 0.95, namedOpacity);
 
+  /* Selecting text in a cell */
+  await open("Plot");
+  await cell(2, 1).click({ button: "right" });
+  await pause(150);
+  const rightClicked = await page.evaluate(() => {
+    const selection = getSelection();
+    return {
+      collapsed: selection.isCollapsed,
+      inCell: selection.anchorNode?.parentElement?.dataset.row === "2" || selection.anchorNode?.dataset?.row === "2",
+      focus: selection.focusNode?.nodeName,
+    };
+  });
+  check(
+    "a right-click on blank space selects nothing across cells",
+    rightClicked.collapsed && rightClicked.inCell,
+    JSON.stringify(rightClicked),
+  );
+  check("a right-click still opens the menu", (await page.locator(".context-menu").count()) === 1);
+  await page.keyboard.press("Escape");
+  await pause(150);
+  await open("Plot");
+  await cell(2, 1).dblclick({ position: { x: 40, y: 20 } });
+  await pause(120);
+  check(
+    "a double-click selects the word",
+    (await page.evaluate(() => getSelection().toString())) === "Legumes",
+    await page.evaluate(() => getSelection().toString()),
+  );
+  await open("Plot");
+  const dragBox = await cell(2, 1).boundingBox();
+  await page.mouse.move(dragBox.x + 18, dragBox.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(dragBox.x + 70, dragBox.y + 20, { steps: 8 });
+  await page.mouse.up();
+  await pause(120);
+  const dragged = await page.evaluate(() => getSelection().toString());
+  check(
+    "dragging across text in a cell that had no focus selects it",
+    dragged.length >= 4 && "Legumes".startsWith(dragged),
+    dragged,
+  );
+
+  /* Deleting a table */
+  const deleteByMenu = async (table = 0) => {
+    await cell(1, 0, table).hover();
+    await pause(120);
+    await page.locator(".cm-table-widget").nth(table).locator(".cm-table-grip.is-table").click();
+    await pause(120);
+    await item("Delete table").click();
+    await pause(120);
+  };
+  const deleteByPalette = async (table = 0) => {
+    await cell(1, 0, table).click();
+    await pause(80);
+    await page.keyboard.press("Meta+k");
+    await pause(150);
+    await page.keyboard.type(">delete table");
+    await pause(150);
+    await page.keyboard.press("Enter");
+    await pause(150);
+  };
+  const removal = async (label, name, how, table, expected) => {
+    await open(name);
+    await how(table);
+    await settle();
+    check(
+      `deleting a table: ${label}: the file is exact`,
+      (await disk(name)) === expected,
+      JSON.stringify((await disk(name)).slice(0, 80)),
+    );
+    check(
+      `deleting a table: ${label}: it says so`,
+      (
+        await page
+          .locator(".toast")
+          .last()
+          .textContent()
+          .catch(() => "")
+      ).includes("Table deleted"),
+    );
+    await page.keyboard.press(`${MOD}+z`);
+    await settle();
+    check(
+      `deleting a table: ${label}: one undo restores the exact file`,
+      (await disk(name)) === FILES[name],
+      JSON.stringify((await disk(name)).slice(0, 80)),
+    );
+  };
+  const plotWithout = PLOT.replace(
+    "| Bed | Crop | Sown |\n| --- | --- | ---: |\n| North | Alliums | 12 |\n| East | Legumes | 9 |\n| South | Brassicas | 14 |\n\n",
+    "",
+  );
+  await removal("from the menu", "Plot", deleteByMenu, 0, plotWithout);
+  await removal("from the palette", "Plot", deleteByPalette, 0, plotWithout);
+  await removal("at the start of a note", "First", deleteByMenu, 0, "After the table.\n");
+  await removal("at the end of a note", "Last", deleteByMenu, 0, "Before the table.");
+  const firstOfTwo = "# Adjacent\n\n| C | D |\n| --- | --- |\n| 3 | 4 |\n";
+  const secondOfTwo = "# Adjacent\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n";
+  await removal("the first of two adjacent tables", "Adjacent", deleteByMenu, 0, firstOfTwo);
+  await removal("the second of two adjacent tables", "Adjacent", deleteByPalette, 1, secondOfTwo);
+  await open("Plot");
+  await page.locator(".cm-line", { hasText: "Rotate the beds" }).click();
+  await page.keyboard.press("Meta+k");
+  await pause(150);
+  await page.keyboard.type(">delete table");
+  await pause(200);
+  check(
+    "the palette offers Delete table only with the cursor in a table",
+    (await page.locator('.palette-row:has-text("Delete table")').count()) === 0,
+  );
+  await page.keyboard.press("Escape");
+  await pause(120);
+  await cell(1, 0).click();
+  await page.keyboard.press("Meta+k");
+  await pause(150);
+  await page.keyboard.type(">delete table");
+  await pause(200);
+  check(
+    "the palette offers Delete table with the cursor in a cell",
+    (await page.locator('.palette-row:has-text("Delete table")').count()) === 1,
+  );
+  await page.keyboard.press("Escape");
+  await pause(150);
+  await aim(1, 0);
+  await page.locator(".cm-table-grip.is-table").hover();
+  await pause(150);
+  check(
+    "hovering the table handle marks the whole table",
+    (await page.locator(".cm-table-widget .is-acted-on").count()) ===
+      (await page.locator(".cm-table-widget :is(th, td)").count()),
+  );
+
   /* New tables */
   await open("Blank");
   await page.keyboard.press(`${MOD}+a`);
@@ -709,7 +841,7 @@ try {
     await page.evaluate(() => getSelection().rangeCount === 0 && document.activeElement.dataset.row === "2"),
   );
   const tabbed = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     await page.keyboard.press("Tab");
     await pause(30);
     tabbed.push(
@@ -722,7 +854,7 @@ try {
   }
   check(
     "Tab reaches every control",
-    tabbed.map(([name]) => name.replace(/ \d+/, "")).join() === "Row actions,Column actions,Add row,Add column",
+    tabbed.map(([name]) => name.replace(/ \d+/, "")).join() === "Row actions,Column actions,Table actions,Add row,Add column",
     JSON.stringify(tabbed),
   );
   check(

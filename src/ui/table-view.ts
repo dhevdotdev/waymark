@@ -1,11 +1,22 @@
 import { isolateHistory, redo, undo } from "@codemirror/commands";
-import { Annotation, type EditorState, type StateCommand } from "@codemirror/state";
+import type { EditorState, StateCommand } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { insertColumn, insertRow, moveColumn, moveRow, parseTable, setCell } from "../vault/markdown-table";
 import { toast } from "./overlays";
 import { actionForKey, gridTarget, type TableAction, type TableAt, type TableContext, type TableMode } from "./table-actions";
 import { type ControlsHost, TableControls, type TargetKind } from "./table-controls";
-import { caretOffset, freezeColumns, lineChange, placeCaret, releaseColumns } from "./table-dom";
+import {
+  caretOffset,
+  followDragSelection,
+  freezeColumns,
+  keepSelectionInCell,
+  lineChange,
+  placeCaret,
+  releaseColumns,
+  tableRemoval,
+  tableWrite,
+  writeBeside,
+} from "./table-dom";
 import { reveal, snapshot } from "./table-feedback";
 
 export interface TableEditorOptions {
@@ -25,9 +36,6 @@ export interface TableHost {
   showAsText: (view: EditorView, from: number) => void;
 }
 
-/** Marks the table's own edits, so the guard on text typed beside a table leaves them alone. */
-export const tableWrite = Annotation.define<true>();
-
 const HANG = 16;
 /** A control and the clear space between it and the table. */
 const CONTROL_ROOM = 30;
@@ -44,21 +52,12 @@ const consume = (e: Event) => {
   e.stopPropagation();
 };
 
-/** Opens a paragraph beside a table at the very start or end of a note, where no line exists to put a caret on. */
-export function writeBeside(view: EditorView, before: boolean): void {
-  const { doc, lineBreak } = view.state;
-  const gap = lineBreak + lineBreak;
-  view.dispatch({
-    changes: { from: before ? 0 : doc.length, insert: gap },
-    selection: { anchor: before ? 0 : doc.length + gap.length },
-    userEvent: "input",
-    annotations: [tableWrite.of(true), isolateHistory.of("full")],
-    scrollIntoView: true,
-  });
-  view.focus();
-}
-
 const tables = new WeakMap<HTMLElement, EditableTable>();
+
+/** The table the cursor is in. It holds while the palette has focus, so a palette command can act on it. */
+let tableInFocus: EditableTable | null = null;
+export const focusedTable = () => (tableInFocus?.root.isConnected ? tableInFocus : null);
+const inPalette = (node: Node | null) => node instanceof Element && node.closest(".palette") !== null;
 
 /** A rebuilt table fires pointer events under a pointer that has not moved. Only real movement may re-aim the handles. */
 let lastPointer = "";
@@ -369,12 +368,10 @@ export class EditableTable implements ControlsHost {
   deleteTable(): void {
     const range = this.host.range(this.view, this.root);
     if (!range) return;
-    const { doc } = this.view.state;
-    const next = range.to < doc.length ? doc.lineAt(range.to + 1) : null;
-    const to = next && !next.text.trim() ? Math.min(doc.length, next.to + 1) : range.to;
+    const changes = tableRemoval(this.view.state.doc, range);
     this.view.dispatch({
-      changes: { from: range.from, to },
-      selection: { anchor: range.from },
+      changes,
+      selection: { anchor: changes.from },
       userEvent: "delete",
       annotations: [tableWrite.of(true), isolateHistory.of("full")],
     });
@@ -546,9 +543,12 @@ export class EditableTable implements ControlsHost {
       this.host.options.openWikilink(link.dataset.path.replace(/\.md$/i, ""), e.shiftKey);
       return;
     }
-    if (e.button !== 0) return;
+    /* A right-click on blank space makes WebKit select from this cell into the next, which paints across the cell. */
+    const contextClick = e.button === 2 || (e.button === 0 && e.ctrlKey);
+    if (contextClick) e.preventDefault();
+    if (e.button !== 0 && !contextClick) return;
     if (cell === document.activeElement) {
-      if (this.mode === "grid") this.toEdit(cell);
+      if (this.mode === "grid" && !contextClick) this.toEdit(cell);
       return;
     }
     e.preventDefault();
@@ -559,9 +559,11 @@ export class EditableTable implements ControlsHost {
       getSelection()?.removeAllRanges();
       getSelection()?.addRange(at);
     }
+    if (!contextClick) followDragSelection(cell);
   }
 
   private onFocusIn(e: Event): void {
+    tableInFocus = this;
     const cell = (e.target as HTMLElement).closest<HTMLElement>("th, td");
     if (!cell) {
       if (!this.aim) this.aimAt(this.at ?? { row: 0, column: 0 });
@@ -580,6 +582,7 @@ export class EditableTable implements ControlsHost {
     if (cell) cell.replaceChildren(this.render(cell.dataset.source ?? ""));
     const next = e.relatedTarget as Node | null;
     if (this.root.contains(next) || menuHolds(next)) return;
+    if (!inPalette(next)) tableInFocus = null;
     releaseColumns(this.table);
     this.mode = "edit";
     this.root.classList.remove("is-grid");
@@ -607,6 +610,7 @@ export class EditableTable implements ControlsHost {
       const cell = cellOf(e);
       if (!cell) return;
       e.preventDefault();
+      keepSelectionInCell(cell);
       this.controls.openForCell(positionOf(cell), false, e.clientX);
     });
     /* However a cell gets focus, it must show its Markdown before anything is typed, or typing would flatten the markup. */

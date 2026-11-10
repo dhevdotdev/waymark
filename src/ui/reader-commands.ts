@@ -10,6 +10,7 @@ import { plural } from "./plural";
 import type { Reader } from "./reader";
 import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
+import { focusedTable } from "./table-view";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -131,6 +132,13 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "wikilink section",
       needsNote: true,
       run: () => void copyLink(r.vault.index, r.current, currentHeading(r.els.scroller), toast),
+    },
+    {
+      id: "delete-table",
+      label: "Delete table",
+      keywords: "remove",
+      when: () => focusedTable() !== null,
+      run: () => focusedTable()?.deleteTable(),
     },
     { id: "pin-tab", label: "Pin or unpin this tab", keywords: "keep", run: () => tabs.togglePin() },
     { id: "move-tab-left", label: "Move tab left", run: () => tabs.step(-1) },

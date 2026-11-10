@@ -24,7 +24,7 @@ async function checkTable({ reader, vault, check, until, wait }: SelfTestContext
   );
   check(
     "every control clears the table in the real web view",
-    distances.length === 4 && distances.every((d) => d >= 5.5),
+    distances.length === 5 && distances.every((d) => d >= 5.5),
     distances,
   );
   root.querySelector<HTMLElement>(".cm-table-add.is-row")!.click();
@@ -45,6 +45,22 @@ async function checkTable({ reader, vault, check, until, wait }: SelfTestContext
   await reader.editing.flush();
   check("undo returns the exact file", (await vault.source.readText("Plot.md")) === original);
   check("focus stays in a cell after undo", document.activeElement?.hasAttribute("data-row") === true);
+  cell(1, 0).focus();
+  await wait(100);
+  check(
+    "the palette offers Delete table in a cell",
+    reader.commands.listed().some((c) => c.id === "delete-table"),
+  );
+  reader.commands.run("delete-table", "palette");
+  await wait(150);
+  await reader.editing.flush();
+  check("Delete table removes only the table", !(await vault.source.readText("Plot.md")).includes("| Bed |"));
+  document
+    .querySelector(".cm-content")
+    ?.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true, cancelable: true }));
+  await wait(150);
+  await reader.editing.flush();
+  check("one undo restores the exact file after Delete table", (await vault.source.readText("Plot.md")) === original);
   await reader.editing.close?.();
 }
 

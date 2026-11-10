@@ -320,6 +320,13 @@
   inset-block-start: calc(var(--table-top) - var(--table-offset));
   block-size: var(--table-control);
 }
+.cm-table-grip.is-table {
+  inset-block-start: calc(var(--table-top) - var(--table-offset));
+  inset-inline-start: calc(var(--table-left) - var(--table-offset));
+  inline-size: var(--table-control);
+  block-size: var(--table-control);
+  cursor: pointer;
+}
 .cm-table-add {
   border-radius: var(--r-chip);
 }

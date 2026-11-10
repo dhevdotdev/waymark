@@ -1,4 +1,6 @@
-import type { Text } from "@codemirror/state";
+import { isolateHistory } from "@codemirror/commands";
+import { Annotation, type Text } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 
 export function placeCaret(cell: HTMLElement, offset: number | "start" | "end"): void {
   const selection = getSelection();
@@ -59,4 +61,50 @@ export function releaseColumns(table: HTMLTableElement): void {
   table.querySelector("colgroup")?.remove();
   table.style.width = "";
   table.style.tableLayout = "";
+}
+
+/** Extends the selection as the pointer moves, for a drag that began on a cell which had to take focus first. */
+export function followDragSelection(cell: HTMLElement): void {
+  const onMove = (e: MouseEvent) => {
+    const to = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (to && cell.contains(to.startContainer)) getSelection()?.extend(to.startContainer, to.startOffset);
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", () => window.removeEventListener("mousemove", onMove), { once: true });
+}
+
+/** What to remove with a table: the blank line after it, or at the end of a note the blank line before it. */
+export function tableRemoval(doc: Text, range: { from: number; to: number }): { from: number; to: number } {
+  const next = range.to < doc.length ? doc.lineAt(range.to + 1) : null;
+  if (next && !next.text.trim() && next.to < doc.length) return { from: range.from, to: next.to + 1 };
+  if (next?.text.trim()) return { from: range.from, to: next.from };
+  const previous = range.from > 0 ? doc.lineAt(range.from - 1) : null;
+  if (previous && !previous.text.trim() && previous.from > 0) return { from: previous.from - 1, to: range.to };
+  return range;
+}
+
+/** Marks the table's own edits, so the guard on text typed beside a table leaves them alone. */
+export const tableWrite = Annotation.define<true>();
+
+/** Opens a paragraph beside a table at the very start or end of a note, where no line exists to put a caret on. */
+export function writeBeside(view: EditorView, before: boolean): void {
+  const { doc, lineBreak } = view.state;
+  const gap = lineBreak + lineBreak;
+  view.dispatch({
+    changes: { from: before ? 0 : doc.length, insert: gap },
+    selection: { anchor: before ? 0 : doc.length + gap.length },
+    userEvent: "input",
+    annotations: [tableWrite.of(true), isolateHistory.of("full")],
+    scrollIntoView: true,
+  });
+  view.focus();
+}
+
+/** WebKit's right-click selection runs past a cell's end into the next one. Only a selection inside this cell may stay. */
+export function keepSelectionInCell(cell: HTMLElement): void {
+  const selection = getSelection();
+  if (!selection?.anchorNode || !selection.focusNode) return;
+  if (cell.contains(selection.anchorNode) && cell.contains(selection.focusNode) && selection.toString().trim()) return;
+  if (cell.contains(selection.anchorNode)) selection.collapse(selection.anchorNode, selection.anchorOffset);
+  else selection.removeAllRanges();
 }
