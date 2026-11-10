@@ -9,6 +9,10 @@ export interface SelfTestContext {
   vault: Reader["vault"];
   panel: Reader["sync"]["panel"];
   check: (name: string, ok: boolean, detail?: unknown) => void;
+  /** Whether the page is drawn. A run nobody can see gets no frames, so checks that need them cannot run. */
+  drawn: boolean;
+  /** Records a check that could not run, which is neither a pass nor a failure. */
+  inconclusive: (name: string, why: string) => void;
   wait: (ms: number) => Promise<unknown>;
   until: (fn: () => boolean, ms?: number) => Promise<boolean>;
   log: (line: string) => void;

@@ -72,6 +72,9 @@ const GO: &[Option<Item>] = &[
     item("history", "Note History", "CmdOrCtrl+Shift+H"),
 ];
 
+/// AppKit's own Quit ends the app at once, before the page can save an edit still waiting to be written.
+const QUIT: &str = "quit";
+
 const FIND: Option<Item> = item("find", "Find in Note", "CmdOrCtrl+F");
 const SETTINGS: Option<Item> = item("settings", "Settings…", "CmdOrCtrl+,");
 
@@ -127,7 +130,13 @@ fn build(app: &AppHandle, items: &mut Items) -> tauri::Result<Menu<Wry>> {
         .item(&PredefinedMenuItem::hide_others(app, None)?)
         .item(&PredefinedMenuItem::show_all(app, None)?)
         .separator()
-        .item(&PredefinedMenuItem::quit(app, None)?)
+        .item(&MenuItem::with_id(
+            app,
+            QUIT,
+            "Quit Waymark",
+            true,
+            Some("CmdOrCtrl+Q"),
+        )?)
         .build()?;
     let file = submenu(app, items, "File", FILE, &[])?;
     let find = FIND.as_ref().expect("find is an item");
@@ -162,7 +171,9 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     app.manage(items);
     app.on_menu_event(|app, event| {
         let id = event.id().0.as_str();
-        if every_item().any(|item| item.id == id) {
+        if id == QUIT {
+            crate::quit_after_saving(app);
+        } else if every_item().any(|item| item.id == id) {
             let _ = app.emit("menu-command", id);
         }
     });

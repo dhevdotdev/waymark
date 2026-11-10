@@ -17,7 +17,7 @@ guardDrops();
 async function boot(): Promise<void> {
   if (!isDesktop) return app.start(devVaultSource(), params.get("note") ?? undefined);
   const { invoke } = await import("@tauri-apps/api/core");
-  const selftest = await invoke<{ vault: string; mode: string } | null>("selftest_config");
+  const selftest = await invoke<{ vault: string; mode: string; drawn: boolean } | null>("selftest_config");
   if (!selftest) return app.start();
   const log = (line: string) => void invoke("selftest_log", { line });
   window.addEventListener("error", (e) => log(`error: ${e.message}`));
@@ -29,7 +29,7 @@ async function boot(): Promise<void> {
   await app.start(undefined, undefined, selftest.vault, selftest.mode.startsWith("relaunch"));
   log(`started: ${JSON.stringify(app.metrics)}`);
   const { runSelfTest } = await import("./selftest");
-  await invoke("selftest_report", { report: await runSelfTest(app, selftest.mode, log) });
+  await invoke("selftest_report", { report: await runSelfTest(app, selftest, log) });
 }
 
 boot().catch((err: Error) => {

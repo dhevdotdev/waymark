@@ -16,9 +16,11 @@ Start with `pnpm run health`. It reports the tools, dependencies and port this c
 
 `pnpm test:native` builds the app and runs `tests/native/run.mjs`, which launches the binary four times against disposable vaults: `read`, `git`, `diverged` and `blocked`. Reports go to a temporary folder and failures are printed.
 
-macOS throttles timers and animation frames in windows that are hidden or covered. A run that times out while other windows cover it is inconclusive, so run it again with nothing in front before treating it as a failure.
+A run never takes focus and shows no window, so it can run while someone is using the Mac. The app starts with the prohibited activation policy, and WebKit's hidden-page timer throttling is turned off, so timings stay real. A page that is never drawn gets no animation frames, no CSS animations and no editor measuring, so the few checks that need them are reported as inconclusive rather than passed.
 
-To run a single mode against an existing build, use `node tests/native/run.mjs read`.
+When the Mac has had no keyboard or pointer input for five minutes (`HIDIdleTime`), or with `--drawn`, the runner asks for a drawn page instead. The window is transparent, takes no clicks and floats above the others, so nothing can cover it, and every check runs. Putting it up can activate the app, which is why it waits for idle.
+
+To run a single mode against an existing build, use `node tests/native/run.mjs read`, or `node tests/native/run.mjs read --drawn` to run every check now.
 
 ## Reading a problem report
 
