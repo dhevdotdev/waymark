@@ -415,8 +415,8 @@ async function runRefusal(ctx: SelfTestContext, mode: string, played: string[]):
   check("sync panel explains the problem", !!notice, notice);
   check(
     "panel offers the external route",
-    !!document.querySelector(".sync-sheet .notice-actions .btn"),
-    document.querySelector(".sync-sheet .notice-actions .btn")?.textContent,
+    [...document.querySelectorAll(".sync-sheet .btn")].some((b) => b.textContent === "Open in Terminal"),
+    [...document.querySelectorAll(".sync-sheet .btn")].map((b) => b.textContent),
   );
   if (mode === "blocked") {
     reader.inspector.setPane("info");

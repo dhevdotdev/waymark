@@ -1,6 +1,7 @@
 import { type Commit, type FileChange, GitError, type GitStatus, git, native } from "../platform";
 import type { PrefStore } from "../prefs";
 import { GitDetail } from "./git-detail";
+import { gitNotice } from "./git-notices";
 import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
 import { plural } from "./plural";
 import type { Cue } from "./sound";
@@ -436,64 +437,13 @@ export class GitPanel {
   }
 
   private explain(error: GitError): HTMLElement {
-    const info = EXPLAIN[error.kind] ?? EXPLAIN.other;
-    const box = el("div", `notice is-${error.kind === "offline" || error.kind === "notARepo" ? "quiet" : "warn"}`);
-    box.setAttribute("role", "status");
-    box.append(el("strong", "", info.title));
-    if (info.body) box.append(el("p", "", info.body));
-    if (error.message && error.kind !== "notARepo") {
-      const details = el("details", "notice-details");
-      details.append(el("summary", "", "Git output"), el("pre", "", error.message));
-      details.open = error.kind === "other";
-      box.append(details);
-    }
-    const row = el("div", "notice-actions");
-    if (info.retry) {
-      const b = el("button", "btn btn-small", info.retry);
-      b.disabled = this.busy;
-      b.onclick = () => void this.sync();
-      row.append(b);
-    }
-    if ((info.terminal || error.kind === "other") && !this.needsTerminal(this.status)) {
-      const b = el("button", "btn btn-small", "Open in Terminal");
-      b.onclick = () => void native.openTerminal();
-      row.append(b);
-    }
-    if (error.kind === "auth" && this.status?.remoteUrl?.startsWith("https://")) {
-      const b = el("button", "btn btn-small", "Save credentials in Keychain");
-      b.onclick = () => box.replaceWith(this.credentialForm());
-      row.append(b);
-    }
-    if (row.childElementCount) box.append(row);
-    return box;
-  }
-
-  private credentialForm(): HTMLElement {
-    const form = el("form", "notice cred-form");
-    form.innerHTML = `<strong>HTTPS credentials</strong><p>Stored by git’s credential helper in your macOS Keychain. Waymark does not keep a copy. For most hosts the password is a personal access token.</p>`;
-    const user = el("input");
-    user.placeholder = "Username";
-    user.autocomplete = "username";
-    const secret = el("input");
-    secret.type = "password";
-    secret.placeholder = "Password or token";
-    secret.autocomplete = "current-password";
-    const save = el("button", "btn btn-primary btn-small", "Save and sync");
-    save.type = "submit";
-    form.append(user, secret, save);
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      if (!user.value || !secret.value || !this.status?.remoteUrl) return;
-      try {
-        await git.storeCredential(this.status.remoteUrl, user.value, secret.value);
-        secret.value = "";
-        await this.sync();
-      } catch (err) {
-        this.host.toast((err as Error).message);
-      }
-    };
-    setTimeout(() => user.focus());
-    return form;
+    return gitNotice(error, {
+      busy: this.busy,
+      remoteUrl: this.status?.remoteUrl ?? null,
+      terminalOffered: this.needsTerminal(this.status),
+      sync: () => void this.sync(),
+      toast: this.host.toast,
+    });
   }
 
   private changeRow(f: FileChange, isStaged: boolean): HTMLElement {
