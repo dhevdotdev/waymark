@@ -49,7 +49,7 @@ Every state has a visible way in and a visible way out.
 - Tabs reorder by dragging and from the tab's menu or the palette. Pinned tabs sit together at the left, survive a relaunch and cannot be closed by accident: closing one says to unpin it first.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
-- Nothing sits between the path row and the note. The trail is a small readout in the path row and a section in the right panel, so a note starts at the same height whether or not its tab has a trail.
+- Nothing sits between the path row and the note. The trail is a section in the right panel, so a note starts at the same height whether or not its tab has a trail.
 - A destructive confirmation arms nothing when it opens. The dialog holds focus, Return moves to Cancel, and Delete needs its button reached on purpose. Other confirmations keep Return.
 - The outline is a dash per heading on the right edge, whether or not the inspector is open. Hovering opens the titles. There is one outline, so the inspector has no tab for it. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.
@@ -60,7 +60,7 @@ Every state has a visible way in and a visible way out.
 
 ## Tables and callouts
 
-A table's header row has a faint band, and stays in view at the top of the note area while its rows scroll past, in Read and in Edit. A header with nothing in it is a table used for layout, so it gets neither. A table wider than its column scrolls sideways and its header scrolls away with it, because a sideways-scrolling box cannot also pin a row to the page.
+A table has a thin rounded outline, in the same shape as code blocks and callouts, so it ends instead of thinning into the paragraph below it. Rows keep their quieter lines and there are no lines between columns, so a sentence in a cell still reads as text. A table's header row has a faint band, and stays in view at the top of the note area while its rows scroll past, in Read and in Edit. A header with nothing in it is a table used for layout, so it gets neither. A table wider than its column scrolls sideways and its header scrolls away with it, because a sideways-scrolling box cannot also pin a row to the page.
 
 Inline code inside a callout takes a stronger tint of that callout's own colour. The plain grey only suits plain paper.
 
@@ -86,13 +86,13 @@ A change goes through the editor when the note is open there, as one undo step u
 
 Each tab remembers where following links has taken it. A second link from the same note starts a side branch. A link to a note already on the trail moves there and adds nothing. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
 
-Above the note there is only the readout in the path row: "Trail 4 of 6", with a fork count when there are side branches. Its slot is always reserved, so a tab's second stop moves nothing. The readout or ⌘Y brings the Trail section into view on the current stop, opening the panel or the section if it has to, and pressing it again undoes what that opened.
+Nothing about the trail sits above the note. ⌘Y brings the Trail section into view on the current stop, opening the panel or the section if it has to, and pressing it again undoes what that opened.
 
 Links or Info, the trail and the graph are all on screen together, because they get used together. Links or Info take what height is left. The trail and the graph each have a section that folds to its header and remembers it, and a section with nothing to show is not drawn at all, so a tab with no trail has no empty heading. The panel's left edge drags to widen it, and the width is remembered. The top edge of the trail and of the graph drags to make that section taller or shorter, down to a least height and up to what leaves the links readable. A trail too short to resize offers no handle.
 
 The trail is a list, because a tree of long titles does not fit a row. One 28px row per stop, top to bottom. Side branches sit directly under the stop they left from, stepped in 14px, up to three steps, and the main line carries on level after them. The way to the current note is drawn in the accent. The current stop uses the same tint as the current file in the tree. A stop with branches has a chevron in place of its dot, and folding shows how many stops went out of sight. The section is as tall as its stops, sitting on top of the graph, up to a limit where it scrolls on its own. Its height only changes when the trail does, which is when the panel's contents are changing anyway. Only the panel's own controls or Escape close it, so clicking stop after stop keeps it open. In a window too narrow for a docked panel, it slides over the note as the panel always does, and a click on the note dismisses it.
 
-Removing a stop takes out only that stop. Its children move up to its place, nothing else is lost, and the toast offers Undo. Removing the note the tab is on steps the tab back to the stop before it, and Undo returns to it. The panel only sits beside notes, so a graph, a base or a blank tab shows no readout and Back is the way out of them.
+Removing a stop takes out only that stop. Its children move up to its place, nothing else is lost, and the toast offers Undo. Removing the note the tab is on steps the tab back to the stop before it, and Undo returns to it. The panel only sits beside notes, so on a graph, a base or a blank tab Back is the way out.
 
 ## Graph
 

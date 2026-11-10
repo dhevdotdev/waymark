@@ -72,7 +72,6 @@ const reset = async (name, text) => {
 const change = async (key, text) => {
   await value(key).click();
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type(text);
   await page.keyboard.press("Enter");
   await pause(250);
@@ -96,7 +95,6 @@ try {
     "the row keeps its shape while editing",
     (await cell("status").evaluate((c) => c.getBoundingClientRect().height)) === heightBefore,
   );
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("read");
   await page.keyboard.press("Enter");
   await pause(250);
@@ -121,7 +119,6 @@ try {
   await value("status").focus();
   await page.keyboard.press("Enter");
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("by keyboard");
   await page.keyboard.press("Tab");
   await pause(250);
@@ -139,7 +136,6 @@ try {
 
   await cell("aliases").locator(".prop-chip").nth(1).click();
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("Changed");
   await page.keyboard.press("Enter");
   await pause(300);
@@ -290,7 +286,7 @@ try {
   await pause(500);
   check("a change during Edit reaches the file", (await disk("Editing.md")) === NOTES["Editing.md"].replace("draft", "done"));
   await page.locator(".cm-content").click();
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
   await pause(700);
   check("one undo in the editor takes it back", (await disk("Editing.md")) === NOTES["Editing.md"]);
   await pause(200);
@@ -301,7 +297,6 @@ try {
   await open("Conflict.md");
   await value("status").click();
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("mine");
   await writeFile(file("Conflict.md"), "---\nstatus: theirs\n---\nConflict body\n");
   await pause(60);
@@ -321,7 +316,6 @@ try {
   await page.route("**/@vault/write", refuseWrites);
   await value("status").click();
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("z");
   await page.keyboard.press("Enter");
   await pause(400);
@@ -337,7 +331,6 @@ try {
   await pause(300);
   await value("status").click();
   await pause(60);
-  await page.keyboard.press("Meta+a");
   await page.keyboard.type("y");
   await page.keyboard.press("Enter");
   await pause(700);

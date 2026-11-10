@@ -309,8 +309,6 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
 
   for (const stop of vault.index.notes.filter((n) => n !== target).slice(0, 2))
     await reader.open(stop, { via: "link", focus: true });
-  const readout = document.querySelector<HTMLElement>(".trail-readout");
-  check("a followed link shows the trail readout", readout !== null && !readout.hidden, readout?.textContent);
   const titleTop = () => document.querySelector(".doc-title")?.getBoundingClientRect().top;
   const before = titleTop();
   check(
@@ -318,19 +316,19 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
     reader.inspector.sections.isOpen("trail") && reader.inspector.sections.isOpen("graph"),
   );
   reader.inspector.sections.setFolded("trail", true);
-  readout?.click();
+  reader.trail.togglePanel();
   await wait(350);
   check(
-    "the readout opens the trail",
+    "the shortcut opens the trail",
     reader.inspector.sections.isOpen("trail") && document.querySelectorAll(".trail-row").length === 3,
   );
   check("opening the trail leaves the note where it was", titleTop() === before, titleTop());
   document.querySelector<HTMLElement>(".trail-row:not(.is-current)")?.click();
   await wait(400);
   check("clicking a stop moves the tab and leaves the trail open", reader.inspector.sections.isOpen("trail"));
-  readout?.click();
+  reader.trail.togglePanel();
   await wait(100);
-  check("the readout puts the trail back", !reader.inspector.sections.isOpen("trail"));
+  check("the shortcut puts the trail back", !reader.inspector.sections.isOpen("trail"));
   reader.inspector.sections.setFolded("trail", false);
   reader.openGraph("vault");
   await wait(1500);

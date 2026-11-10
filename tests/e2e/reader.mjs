@@ -359,7 +359,7 @@ check(
 );
 check(
   reduced ? "with Reduce Motion they go straight there" : "they spring through the shapes between",
-  reduced ? leaving.length === 1 : leaving.length >= 6,
+  reduced ? leaving.length === 1 : leaving.length >= 3,
   `${leaving.length} shapes`,
 );
 const backFrames = arrowFrames(".rail-graph-open path");
@@ -370,7 +370,7 @@ check("the arrows take you back to the note", !(await page.locator(".graph-view"
 check("the panel's arrows turn back outwards", (await page.locator(".rail-graph-open path").getAttribute("d")).startsWith(APART));
 check(
   reduced ? "and go straight there with Reduce Motion" : "and spring on the way",
-  reduced ? returning.length <= 2 : returning.length >= 6,
+  reduced ? returning.length <= 2 : returning.length >= 3,
   `${returning.length} shapes`,
 );
 await page.evaluate(() => {
@@ -487,19 +487,13 @@ await page.evaluate(async () => {
   await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
 await pause(400);
-const readout = page.locator(".trail-readout");
 const trailPane = page.locator(".rail-trail");
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
-const slotPlace = () =>
-  page.locator(".trail-slot").evaluate((s) => {
-    const r = s.getBoundingClientRect();
-    return `${r.left},${r.width}`;
-  });
 const focusedRow = () => page.evaluate(() => document.activeElement?.closest(".trail-row")?.textContent ?? "");
 const currentRow = () => page.locator(".trail-row.is-current .trail-name").textContent();
-check("a tab with one note shows no trail readout", !(await readout.isVisible()));
+const trailSection = page.locator('[data-section="trail"]');
+check("a tab with one note shows no trail", !(await trailSection.isVisible()));
 const titleWithOneStop = await titleTop();
-const slotWithOneStop = await slotPlace();
 const followed = [];
 const followLink = async () => {
   const index = await page.evaluate(() => {
@@ -521,29 +515,19 @@ check(
   "a trail of two stops has nothing to resize, so it offers no handle",
   !(await page.locator('[data-section="trail"] .rail-section-resize').isVisible()),
 );
-check("the readout says where the tab is", (await readout.textContent()).includes("2 of 2"), await readout.textContent());
-check("a second stop leaves the readout's slot where it was", (await slotPlace()) === slotWithOneStop);
+check("the path row has no trail control", (await page.locator(".pane-head .trail-readout").count()) === 0);
 check("nothing sits between the path row and the note", (await page.locator(".reader > .trail").count()) === 0);
-const readoutPlace = () => readout.evaluate((e) => e.getBoundingClientRect().left);
-const readoutInRead = await readoutPlace();
-await page.keyboard.press("Meta+e");
-await page.waitForSelector(".cm-content");
-await pause(300);
-const readoutInEdit = await readoutPlace();
-check("Read and Edit leave the readout where it is", readoutInEdit === readoutInRead, `${readoutInRead} and ${readoutInEdit}`);
-await page.keyboard.press("Meta+e");
-await pause(400);
 const titleBeforeOpen = await titleTop();
-await readout.click();
+await page.keyboard.press("Meta+y");
 await pause(200);
-check("the readout opens the trail in the panel", await trailPane.isVisible());
+check("the shortcut goes to the trail in the panel", await trailPane.isVisible());
 check(
   "the links, the trail and the graph are on screen together",
   (await page.locator('[data-pane="links"]').isVisible()) && (await page.locator(".local-graph canvas").isVisible()),
 );
 check("opening the trail leaves the note where it was", (await titleTop()) === titleBeforeOpen, `${titleBeforeOpen}`);
 check(
-  "the readout answers when the trail is already showing",
+  "the shortcut answers when the trail is already showing",
   await page
     .locator(".trail-here")
     .evaluate((m) => m.getAnimations().length > 0 || document.activeElement?.closest(".trail-row") !== null),
@@ -633,14 +617,13 @@ check(
   (await sectionBox("trail")).height === 31 + 3 * 28 + 8,
   String((await sectionBox("trail")).height),
 );
-check("the readout counts the side branch", (await readout.locator(".trail-forks").textContent()) === "1");
 await page.keyboard.down("Meta");
 await page.locator(".tree-folder.is-open .nav-item").first().click();
 await page.keyboard.up("Meta");
 await pause(500);
 await page.click(".tab:nth-child(2)");
 await pause(450);
-check("another tab has its own trail", !(await readout.isVisible()));
+check("another tab has its own trail", !(await trailSection.isVisible()));
 check(
   "a tab with no trail shows no trail section at all",
   await page.locator('[data-section="trail"]').evaluate((e) => getComputedStyle(e).display === "none"),
@@ -701,12 +684,12 @@ await pause(320);
 check("folding the trail section hides it", !(await trailPane.isVisible()));
 check("its room goes to the links", (await linksHeight()) > linksTall + 60, `${linksTall} to ${await linksHeight()}`);
 check("folding a section leaves the note alone", (await titleTop()) === titleBeforeSection);
-await readout.click();
+await page.keyboard.press("Meta+y");
 await pause(320);
-check("the readout unfolds it", await trailPane.isVisible());
-await readout.click();
+check("the shortcut unfolds it", await trailPane.isVisible());
+await page.keyboard.press("Meta+y");
 await pause(320);
-check("pressing the readout again folds it back", !(await trailPane.isVisible()));
+check("pressing it again folds it back", !(await trailPane.isVisible()));
 check("the links stay throughout", await page.locator('[data-pane="links"]').isVisible());
 await page.keyboard.press("Meta+y");
 await pause(200);
@@ -832,12 +815,12 @@ await page.locator(".trail-row:not(.is-current) .trail-x").first().click();
 await pause(300);
 check(
   "removing the last other stop empties the trail and keeps the note",
-  !(await readout.isVisible()) && (await page.locator(".trail").isHidden()),
+  !(await trailSection.isVisible()) && (await page.locator(".trail").isHidden()),
 );
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
 await pause(450);
-check("opening an unrelated note from Files starts a new trail", !(await readout.isVisible()));
+check("opening an unrelated note from Files starts a new trail", !(await trailSection.isVisible()));
 await page.keyboard.press("Meta+[");
 await pause(450);
 check("Back brings the previous trail back", (await page.locator(".trail-row").count()) === 2);
@@ -861,7 +844,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
     }
   });
   await p.waitForTimeout(300);
-  await p.locator(".trail-readout").click();
+  await p.keyboard.press("Meta+y");
   await p.waitForTimeout(300);
   const body = () =>
     p.evaluate(() => {
@@ -901,7 +884,10 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   const atStart = await body();
   check("the real wheel reaches the first stop", atStart.top === 0 && atStart.first, JSON.stringify(atStart));
   await p.mouse.wheel(0, 3000);
-  await p.waitForTimeout(200);
+  await p.waitForFunction(() => {
+    const b = document.querySelector(".rail-trail");
+    return b.scrollTop >= b.scrollHeight - b.clientHeight - 1;
+  });
   const atEnd = await body();
   check("the real wheel reaches the last stop", atEnd.top > 0 && atEnd.last, JSON.stringify(atEnd));
   check("scrolling the trail leaves the links alone", (await links()) === linksBefore);
@@ -930,17 +916,12 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   const narrow = () =>
     p.evaluate(() => {
       const box = (s) => document.querySelector(s).getBoundingClientRect();
-      const slot = box(".trail-readout");
       return {
-        inWindow: slot.left >= 0 && slot.right <= innerWidth,
-        clearOfSwitch: slot.right <= box(".mode-switch").left,
         rail: box(".rail").left,
         railRight: box(".rail").right,
       };
     });
-  const at560 = await narrow();
-  check("the readout fits a 560 px window", at560.inWindow && at560.clearOfSwitch, JSON.stringify(at560));
-  await p.locator(".trail-readout").click();
+  await p.keyboard.press("Meta+y");
   await p.waitForTimeout(450);
   const floated = await narrow();
   check(

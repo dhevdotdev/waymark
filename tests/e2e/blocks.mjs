@@ -59,6 +59,34 @@ async function run(scheme) {
     !/rgba\(.*,\s*0?\.\d+\)/.test(resting.background),
     resting.background,
   );
+  const edge = () =>
+    page
+      .locator(".table-wrap")
+      .first()
+      .evaluate((w) => {
+        const style = getComputedStyle(w);
+        return {
+          width: style.outlineWidth,
+          style: style.outlineStyle,
+          radius: style.borderTopLeftRadius,
+          firstCell: Math.round(w.querySelector("th").getBoundingClientRect().left),
+        };
+      });
+  const headerEdges = await page.evaluate(() => {
+    const cells = [...document.querySelector(".scroller thead tr").children].map((c) => getComputedStyle(c).boxShadow);
+    return { first: cells[0], last: cells.at(-1) };
+  });
+  check(
+    label("the header row carries the outline across its band"),
+    headerEdges.first.split("inset").length >= 4 && headerEdges.last.split("inset").length >= 4,
+    JSON.stringify(headerEdges),
+  );
+  const outlined = await edge();
+  check(
+    label("a table has an outline around it"),
+    outlined.width === "1px" && outlined.style === "solid" && outlined.radius !== "0px",
+    JSON.stringify(outlined),
+  );
   const titleBefore = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().height);
   await page.mouse.move(700, 400);
   await page.mouse.wheel(0, 900);
@@ -84,6 +112,12 @@ async function run(scheme) {
   await pause(300);
   const editing = await head();
   check(label("the header stays in view in Edit too"), editing.top === 0 && editing.onTop, JSON.stringify(editing));
+  const outlinedEdit = await edge();
+  check(
+    label("the outline is the same in Edit, and the cells stay put"),
+    outlinedEdit.width === "1px" && outlinedEdit.radius === outlined.radius && outlinedEdit.firstCell === outlined.firstCell,
+    JSON.stringify(outlinedEdit),
+  );
   const grips = await page.evaluate(() => {
     const th = document.querySelector(".scroller th").getBoundingClientRect();
     return [...document.querySelectorAll(".cm-table-grip, .cm-table-add")]

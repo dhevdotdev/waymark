@@ -41,7 +41,7 @@ const failure = (error: unknown): WriteResult => ({
 /** The one way a note's text changes outside typing: through the open editor, or straight to the file if there is none. */
 export class NoteWriter {
   private readonly undoStack: Undo[] = [];
-  private toggling = false;
+  private tasks: Promise<void> = Promise.resolve();
 
   constructor(private readonly host: WriterHost) {}
 
@@ -100,9 +100,14 @@ export class NoteWriter {
     else this.undoStack.length = 0;
   }
 
-  async toggleTask(path: string, line: number, remember: boolean): Promise<void> {
-    if (this.toggling || !path) return;
-    this.toggling = true;
+  /** Runs in the order pressed, so a quick second task is not lost while the first is saving. */
+  toggleTask(path: string, line: number, remember: boolean): Promise<void> {
+    this.tasks = this.tasks.then(() => this.flipTask(path, line, remember));
+    return this.tasks;
+  }
+
+  private async flipTask(path: string, line: number, remember: boolean): Promise<void> {
+    if (!path) return;
     const { vault, toast, reshow, scroller } = this.host;
     try {
       const before = await vault.read(path);
@@ -128,8 +133,6 @@ export class NoteWriter {
       box.closest("li")?.classList.toggle("is-done", done);
     } catch (error) {
       toast(error instanceof Error ? error.message : "The task could not be saved.");
-    } finally {
-      this.toggling = false;
     }
   }
 }

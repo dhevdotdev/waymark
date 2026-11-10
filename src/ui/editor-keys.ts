@@ -32,28 +32,34 @@ function unheading(view: EditorView): boolean {
 }
 
 /**
- * Moves one line. It stops on a blank line the move would have stepped over,
- * because the gaps between blocks are short lines and a short line is easy to
- * jump. It also lands on a heading's text, never inside the marks beside it.
+ * Moves one line, and never past one. How far a move travels depends on the
+ * font and the height of the line, so a short gap or a heading with space above
+ * it can otherwise be stepped over. Lands on a heading's text, not in its marks.
  */
 function stepLine(view: EditorView, forward: boolean): boolean {
   if (!oneCaret(view.state)) return false;
-  const from = view.state.doc.lineAt(view.state.selection.main.head).number;
+  const start = view.state.selection.main.head;
+  const from = view.state.doc.lineAt(start).number;
+  const left = view.coordsAtPos(start)?.left;
   if (!(forward ? cursorLineDown : cursorLineUp)(view)) return false;
   const { state } = view;
   const { head } = state.selection.main;
   const landed = state.doc.lineAt(head).number;
   const next = from + (forward ? 1 : -1);
-  const skipped = landed !== from && landed !== next && next >= 1 && next <= state.doc.lines ? state.doc.line(next) : null;
-  if (skipped && skipped.text.trim() === "") {
+  let target = head;
+  if (landed !== from && landed !== next && next >= 1 && next <= state.doc.lines) {
+    const skipped = state.doc.line(next);
     const block = view.lineBlockAt(skipped.from);
     if (block.type === BlockType.Text && block.from === skipped.from && block.height > 0) {
-      view.dispatch({ selection: { anchor: skipped.from }, userEvent: "select", scrollIntoView: true });
-      return true;
+      const lineHeight = view.defaultLineHeight;
+      const y =
+        view.documentTop + (forward ? block.top + Math.min(block.height / 2, lineHeight * 2) : block.bottom - lineHeight / 2);
+      const at = left === undefined ? null : view.posAtCoords({ x: left, y }, false);
+      target = at === null ? skipped.from : Math.max(skipped.from, Math.min(skipped.to, at));
     }
   }
-  const textStart = landed === from ? -1 : headingTextStart(state, head);
-  if (head < textStart) view.dispatch({ selection: { anchor: textStart }, userEvent: "select", scrollIntoView: true });
+  if (state.doc.lineAt(target).number !== from) target = Math.max(target, headingTextStart(state, target));
+  if (target !== head) view.dispatch({ selection: { anchor: target }, userEvent: "select", scrollIntoView: true });
   return true;
 }
 

@@ -923,7 +923,7 @@ try {
     (await disk("Heads.md")) === HEADS.replace("### Beta sub", "Beta sub"),
   );
   await pause(600);
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(EDITOR_UNDO);
   await pause(650);
   await saved();
   check("one Undo brings the heading back", (await disk("Heads.md")) === HEADS);
@@ -939,7 +939,7 @@ try {
     "a hash inside code is left to ordinary Backspace",
     (await disk("Heads.md")) === HEADS.replace("# not a heading", "#not a heading"),
   );
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(EDITOR_UNDO);
   await pause(650);
   await saved();
   await page.keyboard.press("Meta+e");

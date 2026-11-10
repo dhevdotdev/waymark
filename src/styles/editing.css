@@ -188,7 +188,6 @@
 }
 .cm-table-widget .table-wrap {
   margin: 0 calc(-1 * var(--hang));
-  border-radius: 0;
 }
 .cm-table-widget.is-flush .table-wrap {
   margin-inline: 0;
@@ -228,7 +227,7 @@
 .cm-table-widget.has-handles th + th {
   box-shadow:
     inset 1px 0 0 var(--rule),
-    inset 0 -1px var(--rule-strong);
+    var(--th-edges);
 }
 .cm-table-widget th:empty::before {
   content: "Heading";

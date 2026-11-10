@@ -1,6 +1,5 @@
 import type { View } from "../vault/trail";
 import type { Tab } from "../vault/workspace";
-import { icons } from "./icons";
 import type { Inspector } from "./inspector";
 import { toast } from "./overlays";
 import type { ShellElements } from "./shell";
@@ -17,10 +16,9 @@ export interface TrailHost {
   inspector: () => Inspector;
 }
 
-/** A tab's trail: the readout above the note, the list in the panel, and what acting on them does. */
+/** A tab's trail: the list in the panel, and what acting on it does. */
 export class TrailActions {
   readonly panel: TrailPanel;
-  private readonly readout = document.createElement("button");
   private readonly tabButton: HTMLElement;
   private undoLast: (() => void) | null = null;
   private returnTo: { railWasHidden: boolean; wasFolded: boolean } | null = null;
@@ -35,12 +33,6 @@ export class TrailActions {
       toggle: (id) => this.toggle(id),
       leave: () => els.scroller.focus({ preventScroll: true }),
     });
-    this.readout.type = "button";
-    this.readout.className = "trail-readout";
-    this.readout.dataset.act = "trail";
-    this.readout.dataset.key = "⌘Y";
-    this.readout.hidden = true;
-    els.trailSlot.append(this.readout);
     els.trailPane.append(this.panel.root);
     els.trailPane.parentElement?.addEventListener("transitionend", (e) => {
       if (e.target === els.trailPane.parentElement) this.panel.reveal();
@@ -68,31 +60,6 @@ export class TrailActions {
     const { sections } = this.host.inspector();
     sections.setTrailRows(entries.length);
     sections.setEmpty("trail", !many);
-    this.readout.hidden = !this.available;
-    if (this.readout.hidden) return;
-    const position = entries.findIndex((entry) => entry.id === current) + 1;
-    const forks = entries.reduce((sum, entry) => sum + Math.max(0, entry.branches - 1), 0);
-    this.drawReadout(position, trail.size, forks);
-  }
-
-  private drawReadout(position: number, total: number, forks: number): void {
-    this.readout.replaceChildren();
-    const word = document.createElement("span");
-    word.className = "trail-word";
-    word.textContent = "Trail";
-    const place = document.createElement("span");
-    place.textContent = `${position} of ${total}`;
-    this.readout.append(word, place);
-    const sides = forks ? `, ${forks} side ${forks === 1 ? "branch" : "branches"}` : "";
-    const tip = `Stop ${position} of ${total}${sides}`;
-    this.readout.dataset.tip = tip;
-    this.readout.setAttribute("aria-label", `Show the trail. ${tip}`);
-    if (!forks) return;
-    const fork = document.createElement("span");
-    fork.className = "trail-forks";
-    fork.innerHTML = icons.branch;
-    fork.append(String(forks));
-    this.readout.append(fork);
   }
 
   /** Brings the trail into view on the current stop. Pressing again undoes whatever that had to open. */
