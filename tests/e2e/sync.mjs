@@ -317,6 +317,20 @@ try {
     await pause(120);
     check("another tab starts at its top", (await inBody()) === 0, String(await inBody()));
   }
+  {
+    const labelEdge = (tone) =>
+      page.evaluate((t) => {
+        const button = document.querySelector(".sync-btn");
+        button.dataset.tone = t;
+        return document.querySelector(".sync-label").getBoundingClientRect().left;
+      }, tone);
+    const idle = await labelEdge("ok");
+    const working = await labelEdge("busy");
+    check("the busy spinner does not move the status label", idle === working, `${idle} ${working}`);
+    const spinning = await page.locator(".sync-dot").evaluate((d) => getComputedStyle(d).animationName);
+    check("the spinner still spins", spinning === "spin", spinning);
+    await labelEdge("ok");
+  }
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, String(error).split("\n")[0]);
