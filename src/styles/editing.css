@@ -586,7 +586,10 @@
   align-items: center;
   gap: 8px;
   margin-inline-end: 12px;
-  color: var(--ink-2);
+  padding: var(--s1) var(--s2);
+  border-radius: var(--r-control);
+  background: color-mix(in oklab, var(--pending-ink) 14%, transparent);
+  color: var(--ink);
   font-size: 0.8125rem;
 }
 .pane-head:has(.edit-banner:not([hidden])) :is(.crumbs, .edit-state) {

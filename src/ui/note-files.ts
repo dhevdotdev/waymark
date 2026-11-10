@@ -419,9 +419,13 @@ export class NoteFiles {
   }
 
   private openRowMenu(button: HTMLElement, items: MenuItem[]): void {
-    const { right, bottom } = button.getBoundingClientRect();
+    const { right } = button.getBoundingClientRect();
+    const row = this.host.sidebar.querySelector(".has-actions") ?? button;
     this.rows.pin();
-    showContextMenu(right, bottom + MENU_GAP, items, { alignEnd: true, onClose: () => this.rows.release() });
+    showContextMenu(right, row.getBoundingClientRect().bottom + MENU_GAP, items, {
+      alignEnd: true,
+      onClose: () => this.rows.release(),
+    });
   }
 
   private reveal(path: string): MenuItem[] {
@@ -434,7 +438,7 @@ export class NoteFiles {
       { label: "New folder here…", run: () => void this.newFolder(folder) },
       { label: "Rename…", startsGroup: true, run: () => void this.startRenameFolder(folder) },
       ...this.reveal(folder),
-      { label: "Move to Trash", danger: true, run: () => void this.removeFolder(folder) },
+      { label: "Move to Trash", startsGroup: true, danger: true, run: () => void this.removeFolder(folder) },
     ];
   }
 

@@ -44,6 +44,28 @@ async function vaultBehindRemote(base) {
 const LIBRARY_BASE = `filters: note.sort-of == "yes"\nviews:\n  - type: table\n    order: [file.name, file.mtime]\n`;
 
 const SETUP = {
+  async organize(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await mkdir(path.join(vault, "Inbox"), { recursive: true });
+    await mkdir(path.join(vault, "Archive"), { recursive: true });
+    await writeFile(
+      path.join(vault, "Plot.md"),
+      "# Plot\n\n| Bed | Crop | Sown |\n| --- | --- | ---: |\n| North | Alliums | 12 |\n| East | Legumes | 9 |\n| South | Brassicas | 14 |\n\nAfter.\n",
+    );
+    await writeFile(path.join(vault, "Inbox/Alpha.md"), "Alpha.\n");
+    await writeFile(path.join(vault, "Inbox/Dup.md"), "Inbox copy.\n");
+    await writeFile(path.join(vault, "Archive/Dup.md"), "Archive copy.\n");
+    await writeFile(path.join(vault, "Refs.md"), "See [[Inbox/Alpha]].\n");
+    await commitAll(vault, "fixture");
+    return vault;
+  },
+  async empty(base) {
+    const vault = path.join(base, "vault");
+    await mkdir(vault, { recursive: true });
+    return vault;
+  },
   async read(base) {
     const vault = path.join(base, "vault");
     git(base, "init", "-q", "-b", "main", vault);

@@ -1,4 +1,5 @@
 import { git, native } from "./platform";
+import { runEmpty, runOrganize } from "./selftest-organize";
 import { runBackup, runConflict, runLibrary, runRelaunch, runRestore, type SelfTestContext } from "./selftest-recovery";
 import type { App } from "./ui/app";
 
@@ -422,6 +423,13 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   const report: Record<string, unknown> = { mode, userAgent: navigator.userAgent, startup: { ...app.metrics } };
   const ctx: SelfTestContext = { app, reader, vault, panel, check, wait, until, log, report };
 
+  if (mode === "empty") {
+    await runEmpty(ctx);
+    report.results = results;
+    report.passed = results.every((r) => r.ok);
+    return report;
+  }
+
   await until(() => app.metrics.indexMs > 0, 20000);
   report.startup = { ...app.metrics };
   check("vault indexed", vault.index.notes.length > 0, vault.index.notes.length);
@@ -439,6 +447,7 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   if (mode === "conflict") await runConflict(ctx);
   if (mode === "backup") await runBackup(ctx);
   if (mode === "library") await runLibrary(ctx);
+  if (mode === "organize") await runOrganize(ctx);
   if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
 
   report.results = results;
