@@ -1,9 +1,9 @@
 import { type MenuItem, showContextMenu } from "./context-menu";
 import { icons } from "./icons";
+import { trackPointerDrag } from "./pointer-drag";
 import { TABLE_ACTIONS, type TableAction, type TableAt, type TableContext } from "./table-actions";
 
 const MENU_GAP = 4;
-const DRAG_START_PX = 4;
 
 export type TargetKind = "row" | "column";
 
@@ -45,7 +45,6 @@ export class TableControls {
   readonly columnGrip: HTMLButtonElement;
   readonly addRow: HTMLButtonElement;
   readonly addColumn: HTMLButtonElement;
-  private dragged = false;
 
   constructor(private readonly host: ControlsHost) {
     this.rowGrip = this.button("cm-table-grip is-row", icons.grip, "Row actions", () => this.openFromHandle("row"));
@@ -78,10 +77,7 @@ export class TableControls {
     button.dataset.tip = label;
     button.dataset.tipSide = "above";
     button.addEventListener("mousedown", (e) => e.preventDefault());
-    button.addEventListener("click", () => {
-      if (this.dragged) this.dragged = false;
-      else run();
-    });
+    button.addEventListener("click", run);
     button.addEventListener("keydown", (e) => this.onKey(button, e));
     return button;
   }
@@ -188,7 +184,6 @@ export class TableControls {
       if (down.button !== 0) return;
       const at = this.host.aimed();
       if (!at) return;
-      this.dragged = false;
       this.trackDrag(grip, kind, kind === "row" ? at.row : at.column, down);
     });
   }
@@ -223,43 +218,27 @@ export class TableControls {
     line.className = `cm-table-drop is-${kind}`;
     let boxes: DOMRect[] = [];
     let boundary = from;
-    let active = false;
-    const finish = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("keydown", onKey, true);
-      line.remove();
-      root.classList.remove("is-dragging");
-      this.clearHighlight();
-    };
-    const onMove = (e: PointerEvent) => {
-      if (!active) {
-        if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG_START_PX) return;
-        active = true;
-        this.dragged = true;
+    grip.setPointerCapture?.(down.pointerId);
+    trackPointerDrag(down, {
+      start: () => {
         boxes = this.boundaries(kind);
         root.classList.add("is-dragging");
         root.append(line);
         this.highlightIndex(kind, from);
-      }
-      boundary = this.dropIndex(kind, boxes, e);
-      this.showDrop(line, kind, boxes, boundary);
-    };
-    const onUp = () => {
-      finish();
-      if (!active) return;
-      const to = boundary > from ? boundary - 1 : boundary;
-      if (to !== from) this.host.move(kind, from, to);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      finish();
-    };
-    grip.setPointerCapture?.(down.pointerId);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("keydown", onKey, true);
+      },
+      move: (e) => {
+        boundary = this.dropIndex(kind, boxes, e);
+        this.showDrop(line, kind, boxes, boundary);
+      },
+      finish: () => {
+        line.remove();
+        root.classList.remove("is-dragging");
+        this.clearHighlight();
+      },
+      drop: () => {
+        const to = boundary > from ? boundary - 1 : boundary;
+        if (to !== from) this.host.move(kind, from, to);
+      },
+    });
   }
 }

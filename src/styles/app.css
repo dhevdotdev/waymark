@@ -1585,7 +1585,7 @@ kbd {
   max-inline-size: 240px;
   overflow: clip;
   padding: var(--s1) var(--s2);
-  border-radius: var(--r-control);
+  border-radius: var(--r-float);
   background: var(--float-bg);
   box-shadow: var(--shadow-float);
   color: var(--ink);
@@ -1630,9 +1630,6 @@ kbd {
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linejoin: round;
-}
-.tab.is-pinned {
-  max-inline-size: min(var(--tab-limit, 180px), 180px);
 }
 [data-act="sort-files"].is-on {
   color: var(--accent);

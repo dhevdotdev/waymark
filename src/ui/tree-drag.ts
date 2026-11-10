@@ -1,6 +1,6 @@
 import type { FileTree } from "./file-tree";
+import { trackPointerDrag } from "./pointer-drag";
 
-const DRAG_START_PX = 5;
 const OPEN_FOLDER_MS = 600;
 const EDGE_PX = 28;
 const EDGE_SPEED = 10;
@@ -15,7 +15,7 @@ interface TreeDragHost {
   drop: (path: string, folder: string) => void;
 }
 
-/** Dragging a note onto a folder in the file list. The list stays put: only the marks change until the drop. */
+/** Dragging a note onto a folder in the file list. The rows hold still unless the pointer rests on a closed folder or reaches an edge. */
 export class TreeDrag {
   private openTimer = 0;
   private scrollFrame = 0;
@@ -85,48 +85,32 @@ export class TreeDrag {
     let chip: HTMLElement | null = null;
     let folder: string | null = null;
     let pointerY = down.clientY;
-    const finish = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("keydown", onKey, true);
-      clearTimeout(this.openTimer);
-      cancelAnimationFrame(this.scrollFrame);
-      chip?.remove();
-      row.classList.remove("is-drag-source");
-      box.classList.remove("is-dragging-note");
-      this.mark(null, path);
-    };
-    const onMove = (e: PointerEvent) => {
-      pointerY = e.clientY;
-      if (!chip) {
-        if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG_START_PX) return;
+    trackPointerDrag(down, {
+      start: () => {
         chip = this.chip(path);
         row.classList.add("is-drag-source");
         box.classList.add("is-dragging-note");
         this.scrollNearEdges(() => pointerY);
-      }
-      chip.style.transform = `translate(${e.clientX + 12}px, ${e.clientY + 8}px)`;
-      const next = this.folderUnder(e.clientX, e.clientY);
-      this.watchFolder(next, folder);
-      folder = next;
-      this.mark(folder, path);
-    };
-    const onUp = () => {
-      const dragged = chip !== null;
-      const target = folder;
-      finish();
-      if (!dragged) return;
-      window.addEventListener("click", (e) => e.stopPropagation(), { capture: true, once: true });
-      if (target !== null && target !== this.host.folderOf(path)) this.host.drop(path, target);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      finish();
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("keydown", onKey, true);
+      },
+      move: (e) => {
+        pointerY = e.clientY;
+        if (chip) chip.style.transform = `translate(${e.clientX + 12}px, ${e.clientY + 8}px)`;
+        const next = this.folderUnder(e.clientX, e.clientY);
+        this.watchFolder(next, folder);
+        folder = next;
+        this.mark(folder, path);
+      },
+      finish: () => {
+        clearTimeout(this.openTimer);
+        cancelAnimationFrame(this.scrollFrame);
+        chip?.remove();
+        row.classList.remove("is-drag-source");
+        box.classList.remove("is-dragging-note");
+        this.mark(null, path);
+      },
+      drop: () => {
+        if (folder !== null && folder !== this.host.folderOf(path)) this.host.drop(path, folder);
+      },
+    });
   }
 }

@@ -481,17 +481,23 @@ try {
   git(origin, "commit", "-qm", "seed");
   const clone = path.join(base, "clone");
   git(base, "clone", "-q", origin, clone);
-  const stamps = await Promise.all(
-    (await readdir(clone))
-      .filter((f) => f.endsWith(".md"))
-      .map(async (f) => Math.floor((await stat(path.join(clone, f))).mtimeMs / 1000)),
-  );
-  const seconds = new Set(stamps).size;
+  const notes = (await readdir(clone)).filter((f) => f.endsWith(".md")).sort();
+  const seconds = async () =>
+    new Map(await Promise.all(notes.map(async (f) => [f, Math.floor((await stat(path.join(clone, f))).mtimeMs / 1000)])));
+  const byDate = (times) => [...notes].sort((x, y) => times.get(y) - times.get(x) || x.localeCompare(y));
+  const cloned = await seconds();
+  const distinct = new Set(cloned.values()).size;
   check(
-    "a fresh clone stamps every note within a second or two, so date order is close to name order",
-    seconds <= 3,
-    `${seconds} distinct second(s) across 40 notes`,
+    "a fresh clone sorts by date in name order when its files land in the same second",
+    distinct > 1 || byDate(cloned).join() === notes.join(),
+    `${distinct} distinct second(s) across 40 notes`,
   );
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  await writeFile(path.join(origin, "Note 20.md"), "changed\n");
+  git(origin, "add", "-A");
+  git(origin, "commit", "-qm", "edit");
+  git(clone, "pull", "-q");
+  check("a note changed by a pull rises to the top", byDate(await seconds())[0] === "Note 20.md", byDate(await seconds())[0]);
 } finally {
   await rm(base, { recursive: true, force: true });
 }

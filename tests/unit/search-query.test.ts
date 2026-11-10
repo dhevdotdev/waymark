@@ -26,6 +26,11 @@ describe("parseSearchQuery", () => {
     expect(usesFilters(parseSearchQuery("rye path:"))).toBe(false);
   });
 
+  it("ignores a filter whose quote is still open", () => {
+    expect(usesFilters(parseSearchQuery('rye path:"Night'))).toBe(false);
+    expect(usesFilters(parseSearchQuery('rye -"sour'))).toBe(false);
+  });
+
   it("leaves a plain query or one whole phrase to ordinary search", () => {
     expect(usesFilters(parseSearchQuery("two words"))).toBe(false);
     expect(usesFilters(parseSearchQuery('"one phrase"'))).toBe(false);

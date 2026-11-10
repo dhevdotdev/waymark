@@ -15,8 +15,9 @@ export function parseSearchQuery(raw: string): SearchQuery {
   const query: SearchQuery = { words: [], phrases: [], notWords: [], notPhrases: [], paths: [], notPaths: [] };
   for (const [, minus, field, quoted, bare] of raw.matchAll(TOKEN)) {
     const value = (quoted ?? bare ?? "").replace(/"/g, "").trim();
-    if (!value || value === "-" || value.toLowerCase() === "path:") continue;
     const not = minus === "-";
+    const openQuote = quoted === undefined && bare?.startsWith('"') && (not || !!field);
+    if (!value || value === "-" || value.toLowerCase() === "path:" || openQuote) continue;
     if (field) (not ? query.notPaths : query.paths).push(value);
     else if (quoted !== undefined) (not ? query.notPhrases : query.phrases).push(value);
     else (not ? query.notWords : query.words).push(value);

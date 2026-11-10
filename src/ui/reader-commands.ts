@@ -37,16 +37,22 @@ export function readerCommands(r: Reader): Command[] {
     render: () => r.renderTabs(),
     persist: () => r.persist(),
     close: (index) => r.closeTab(index),
+    toast,
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
   const { tree } = r.sidebar;
-  const sortButton = () => r.els.sidebar.parentElement?.querySelector<HTMLElement>('[data-act="sort-files"]');
+  const sortButton = () => r.els.shell.querySelector<HTMLElement>('[data-act="sort-files"]');
   tree.fileTimes = async (paths) => {
-    const stats = await r.vault.source.fileStats(paths);
-    return new Map(Object.entries(stats).map(([path, stat]) => [path, Math.floor(stat.mtime / 1000)]));
+    try {
+      const stats = await r.vault.source.fileStats(paths);
+      return new Map(Object.entries(stats).map(([path, stat]) => [path, Math.floor(stat.mtime / 1000)]));
+    } catch {
+      toast("File dates could not be read, so notes are in name order.");
+      return new Map();
+    }
   };
   tree.startSorted(prefs.value.fileSort === "modified");
-  requestAnimationFrame(() => sortButton()?.classList.toggle("is-on", prefs.value.fileSort === "modified"));
+  sortButton()?.classList.toggle("is-on", prefs.value.fileSort === "modified");
   const setSort = (mode: "name" | "modified") => {
     prefs.update((p) => {
       p.fileSort = mode;
@@ -127,8 +133,8 @@ export function readerCommands(r: Reader): Command[] {
       run: () => void copyLink(r.vault.index, r.current, currentHeading(r.els.scroller), toast),
     },
     { id: "pin-tab", label: "Pin or unpin this tab", keywords: "keep", run: () => tabs.togglePin() },
-    { id: "move-tab-left", label: "Move tab left", run: () => tabs.step(-1, toast) },
-    { id: "move-tab-right", label: "Move tab right", run: () => tabs.step(1, toast) },
+    { id: "move-tab-left", label: "Move tab left", run: () => tabs.step(-1) },
+    { id: "move-tab-right", label: "Move tab right", run: () => tabs.step(1) },
     {
       id: "rename-note",
       label: "Rename this note",

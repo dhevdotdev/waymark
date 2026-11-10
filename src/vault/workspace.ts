@@ -49,7 +49,10 @@ export class Workspace {
       const trail = Trail.restore(value, exists);
       return trail ? [{ id: this.nextId++, trail, pinned: pinned.has(i) }] : [];
     });
-    this.activeIndex = Math.max(0, Math.min(saved.active, this.tabs.length - 1));
+    const shown = this.tabs[Math.max(0, Math.min(saved.active, this.tabs.length - 1))];
+    /* Saved positions are outside data, and every move relies on pinned tabs coming first. */
+    this.tabs = [...this.tabs.filter((tab) => tab.pinned), ...this.tabs.filter((tab) => !tab.pinned)];
+    this.activeIndex = Math.max(0, this.tabs.indexOf(shown));
   }
 
   /** Adds a tab to the right of the active one without switching to it. */
@@ -83,11 +86,18 @@ export class Workspace {
     return this.tabs.filter((tab) => tab.pinned).length;
   }
 
+  /** The first and last place a tab may sit: pinned tabs stay together at the left. */
+  bounds(index: number): { low: number; high: number } {
+    return this.tabs[index]?.pinned
+      ? { low: 0, high: this.pinnedCount - 1 }
+      : { low: this.pinnedCount, high: this.tabs.length - 1 };
+  }
+
   /** Moves a tab, staying within the pinned tabs or the others, and keeps the same tab active. Returns where it landed, or null. */
   move(from: number, to: number): number | null {
     const tab = this.tabs[from];
     if (!tab) return null;
-    const [low, high] = tab.pinned ? [0, this.pinnedCount - 1] : [this.pinnedCount, this.tabs.length - 1];
+    const { low, high } = this.bounds(from);
     const target = Math.max(low, Math.min(to, high));
     if (target === from) return null;
     const active = this.active;

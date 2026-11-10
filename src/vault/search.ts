@@ -50,7 +50,7 @@ export class SearchIndex {
     const parsed = parseSearchQuery(query);
     if (usesFilters(parsed)) return this.filtered(parsed, limit);
     /* A filter still being typed counts for nothing, so it must not reach the words searched for. */
-    const q = parsed.phrases.length ? query.trim() : parsed.words.join(" ");
+    const q = parsed.phrases.length ? `"${parsed.phrases[0]}"` : parsed.words.join(" ");
     if (!q) return [];
     const phrase = /^".+"$/.test(q) ? q.slice(1, -1).toLowerCase() : null;
     const matches = this.mini.search(phrase ?? q);
@@ -85,7 +85,7 @@ export class SearchIndex {
     const hits = found
       .filter(({ id }) => passesFilters(query, id, `${titleOf(id)}\n${this.texts.get(id) ?? ""}`))
       .map(({ id, score, terms }): Hit => {
-        const marked = query.phrases.length ? query.phrases.map((p) => p.toLowerCase()) : terms;
+        const marked = query.phrases.length ? [...query.phrases, ...query.words].map((part) => part.toLowerCase()) : terms;
         return {
           path: id,
           title: titleOf(id),
