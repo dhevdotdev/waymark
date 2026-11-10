@@ -477,10 +477,7 @@
   transition:
     background-color var(--t-hover) ease,
     color var(--t-hover) ease,
-    transform var(--t-hover) ease;
-}
-.edit-bubble-btn:active {
-  transform: scale(0.94);
+    scale var(--t-press) var(--ease-out);
 }
 .edit-bubble-btn svg {
   inline-size: 15px;
@@ -808,10 +805,7 @@ button.task-box:focus-visible {
 .start-row {
   transition:
     background-color var(--t-hover) ease,
-    transform var(--t-press) var(--ease-out);
-}
-.start-action:active {
-  transform: scale(0.97);
+    scale var(--t-press) var(--ease-out);
 }
 .start-action kbd {
   color: var(--ink-3);

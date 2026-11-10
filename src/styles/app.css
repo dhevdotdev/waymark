@@ -204,7 +204,8 @@ kbd {
   transition:
     background-color var(--t-hover) ease,
     color var(--t-hover) ease,
-    opacity var(--t-menu) ease;
+    opacity var(--t-menu) ease,
+    scale var(--t-press) var(--ease-out);
 }
 .tab + .tab::before {
   content: "";
@@ -257,9 +258,6 @@ kbd {
 }
 .tab.is-clipped .tab-title {
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
-}
-.tab:active {
-  transform: scale(0.98);
 }
 .tab-close {
   width: 20px;
@@ -335,10 +333,7 @@ kbd {
   transition:
     background-color var(--t-hover) ease,
     color var(--t-hover) ease,
-    transform var(--t-press) var(--ease-out);
-}
-.sync-btn:active {
-  transform: scale(0.97);
+    scale var(--t-press) var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
   .sync-btn:hover {
@@ -468,7 +463,7 @@ kbd {
   cursor: default;
   transition:
     background-color var(--t-hover) ease,
-    transform var(--t-press) var(--ease-out);
+    scale var(--t-press) var(--ease-out);
 }
 .row-action svg {
   inline-size: 14px;
@@ -478,9 +473,6 @@ kbd {
   stroke-width: 1.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.row-action:active {
-  transform: scale(0.95);
 }
 @media (hover: hover) and (pointer: fine) {
   .row-action:hover {
@@ -977,7 +969,7 @@ kbd {
     background-color var(--t-hover) ease,
     color var(--t-hover) ease,
     opacity var(--t-hover) ease,
-    scale var(--t-hover) var(--ease-out);
+    scale var(--t-press) var(--ease-out);
 }
 .trail-fold[hidden],
 .trail-x[hidden] {
@@ -1395,11 +1387,7 @@ kbd {
     background-color var(--t-hover) ease,
     color var(--t-hover) ease,
     opacity var(--t-hover) ease,
-    scale var(--t-hover) var(--ease-out);
-}
-.prop-chip-add:active,
-.prop-remove:active {
-  scale: 0.9;
+    scale var(--t-press) var(--ease-out);
 }
 .prop-chip-add:focus-visible,
 .prop-remove:focus-visible {
