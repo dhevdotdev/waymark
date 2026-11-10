@@ -88,6 +88,7 @@ async function checkEditing({ app, reader, vault, check, until }: SelfTestContex
   );
   check("an image is never replaced", !replaced);
   check("Obsidian's settings can be read", typeof (await vault.source.settings()).attachmentFolder === "string");
+  check("Obsidian's line break setting can be read", typeof (await vault.source.settings()).strictLineBreaks === "boolean");
   await reader.files.renameTo(note, "Selftest renamed");
   check("a note can be renamed", (await vault.source.list()).includes("Selftest renamed.md"));
   check("the open tab follows the rename", reader.current === "Selftest renamed.md", reader.current);

@@ -452,6 +452,8 @@ try {
   await page.keyboard.press("Enter");
   await pause(200);
   check("the palette moves a tab without dragging", (await tabs()) === "Apple,Welcome,Refs", await tabs());
+  await writeFile(inVault("Reopen side.md"), "# Reopen side\n");
+  await writeFile(inVault("Reopen long.md"), `# Reopen long\n\n${"A plain paragraph of words.\n\n".repeat(200)}`);
   await page.evaluate(() => window.waymark.reader.persist());
   await pause(300);
   await page.goto(app.url);
@@ -462,6 +464,71 @@ try {
     (await tabs()) === "Apple,Welcome,Refs" && (await page.locator(".tab.is-pinned").count()) === 1,
     await tabs(),
   );
+
+  /* Reopening closed tabs */
+  const reopen = async () => {
+    await page.keyboard.press("Meta+Shift+t");
+    await pause(250);
+  };
+  const noteScroll = () => page.locator(".scroller").evaluate((s) => Math.round(s.scrollTop));
+  const trailSize = () => page.evaluate(() => window.waymark.reader.workspace.active.trail.size);
+  await reopen();
+  check("with nothing closed the shortcut still answers", (await toastText()).includes("No closed tabs"), await toastText());
+  await openTab("Reopen long");
+  await pause(200);
+  await page.evaluate(() => window.waymark.reader.open("Reopen side.md", { via: "link" }));
+  await pause(200);
+  await page.keyboard.press("Meta+[");
+  await pause(250);
+  await page.locator(".scroller").evaluate((s) => {
+    s.scrollTop = 900;
+  });
+  await pause(120);
+  const openOrder = await tabs();
+  const stops = await trailSize();
+  await page.keyboard.press("Meta+w");
+  await pause(250);
+  check("closing removes the tab", !(await tabs()).includes("Reopen long"), await tabs());
+  await reopen();
+  check("the tab comes back where it was", (await tabs()) === openOrder, await tabs());
+  check("and is the active tab", (await activeTab()) === "Reopen long", await activeTab());
+  check("with its place in the note", Math.abs((await noteScroll()) - 900) < 40, String(await noteScroll()));
+  check("and its trail", stops === 2 && (await trailSize()) === 2, `${stops} ${await trailSize()}`);
+  await page.keyboard.press("Meta+w");
+  await pause(250);
+  await page.keyboard.press("Meta+k");
+  await pause(150);
+  await page.keyboard.type(">reopen closed");
+  await pause(150);
+  const offered = await page.locator(".palette-row.is-selected").textContent();
+  check("the palette offers it with its shortcut", offered.includes("Reopen closed tab") && offered.includes("⌘⇧T"), offered);
+  await page.keyboard.press("Enter");
+  await pause(250);
+  check("the palette brings it back", (await tabs()) === openOrder, await tabs());
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(300);
+  await page.keyboard.press("Meta+w");
+  await pause(400);
+  await reopen();
+  check("it works from the editor too", (await tabs()) === openOrder, await tabs());
+  await page.keyboard.press("Meta+t");
+  await pause(200);
+  await page.evaluate(() => {
+    const { reader } = window.waymark;
+    reader.closeTab(reader.workspace.activeIndex);
+    reader.closeTab(reader.workspace.tabs.findIndex((t) => t.trail.current.view.path === "Reopen long.md"));
+  });
+  await pause(250);
+  await rm(inVault("Reopen long.md"));
+  await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Reopen long.md"]));
+  await pause(200);
+  const stillOpen = await tabs();
+  await reopen();
+  check("a note that has gone says so", (await toastText()).includes("no longer in the vault"), await toastText());
+  check("and no other note opens in its place", (await tabs()) === stillOpen, await tabs());
+  await reopen();
+  check("the blank tab was not kept", (await toastText()).includes("No closed tabs"), await toastText());
   check("no page errors", errors.length === 0, errors.join(" | "));
 } catch (e) {
   check("the run finished", false, String(e).split("\n")[0]);

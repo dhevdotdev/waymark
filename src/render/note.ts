@@ -20,6 +20,7 @@ export interface RenderContext {
   index: VaultIndex;
   highlighter: Highlighter;
   assetUrl: (path: string) => string;
+  strictLineBreaks?: boolean;
 }
 
 export async function renderNote(
@@ -44,6 +45,7 @@ export async function renderNote(
     headings: [],
     taskLineOffset: options.interactive ? offset : null,
     taskNonce,
+    strictLineBreaks: deps.strictLineBreaks,
   };
   const html = md.render(text, env as never);
   const fragment = sanitize(html);

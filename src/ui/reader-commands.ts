@@ -8,6 +8,7 @@ import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
 import { plural } from "./plural";
 import type { Reader } from "./reader";
+import { viewExists } from "./restore-tabs";
 import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
 import { focusedTable } from "./table-focus";
@@ -39,6 +40,9 @@ export function readerCommands(r: Reader): Command[] {
     persist: () => r.persist(),
     close: (index) => r.closeTab(index),
     toast,
+    saveScroll: () => r.saveScroll(),
+    show: () => void r.show({ keyboard: true }),
+    exists: (view) => viewExists(r.vault.index, view),
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
   const { tree } = r.sidebar;
@@ -85,6 +89,15 @@ export function readerCommands(r: Reader): Command[] {
   return [
     { id: "palette", keys: ["mod+k", "mod+o", "mod+p"], inField: true, run: () => r.palette.open() },
     { id: "new-tab", keys: ["mod+t"], inField: true, run: () => r.newTab() },
+    {
+      id: "reopen-tab",
+      label: "Reopen closed tab",
+      keys: ["mod+shift+t"],
+      hint: "⌘⇧T",
+      keywords: "undo close restore",
+      inField: true,
+      run: () => tabs.reopen(),
+    },
     {
       id: "edit",
       label: () => (r.editing.isOpen ? "Back to reading" : "Edit this note"),

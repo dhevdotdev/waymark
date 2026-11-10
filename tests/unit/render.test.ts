@@ -153,3 +153,41 @@ describe("task lists", () => {
     expect(div.textContent).toContain("[ ] paragraph");
   });
 });
+
+describe("single line breaks", () => {
+  const breaks = (div: HTMLElement) => div.querySelectorAll("br").length;
+  const strict = async (md: string) => {
+    const { fragment } = await renderNote(md, "Notes/A.md", { ...deps, strictLineBreaks: true });
+    const div = document.createElement("div");
+    div.append(fragment);
+    return div;
+  };
+
+  it("keeps a single newline in prose, callouts and list items", async () => {
+    expect(breaks((await render("one\ntwo\nthree")).div)).toBe(2);
+    expect(breaks((await render("> [!note] Title\n> one\n> two")).div)).toBe(1);
+    expect(breaks((await render("- one\n  two\n- three")).div)).toBe(1);
+  });
+
+  it("draws one break for a line ending in two spaces", async () => {
+    expect(breaks((await render("one  \ntwo")).div)).toBe(1);
+    expect(breaks(await strict("one  \ntwo"))).toBe(1);
+  });
+
+  it("does not break a callout between its title and body", async () => {
+    const { div } = await render("> [!note] Title\n> body");
+    expect(breaks(div)).toBe(0);
+    expect(div.querySelector(".callout-title")?.textContent).toContain("Title");
+  });
+
+  it("leaves code and paragraph gaps alone", async () => {
+    expect(breaks((await render("```\na\nb\n```")).div)).toBe(0);
+    expect(breaks((await render("one\n\ntwo")).div)).toBe(0);
+  });
+
+  it("joins lines when the vault sets strict line breaks", async () => {
+    expect(breaks(await strict("one\ntwo"))).toBe(0);
+    expect(breaks(await strict("> [!note] T\n> one\n> two"))).toBe(0);
+    expect((await strict("one\ntwo")).textContent).toContain("one\ntwo");
+  });
+});

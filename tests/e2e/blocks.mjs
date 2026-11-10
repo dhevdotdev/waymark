@@ -12,6 +12,8 @@ const wide = (word) => Array.from({ length: 14 }, (_, i) => `| ${word} number ${
 const KINDS = ["note", "tip", "warning", "danger", "info", "success", "question", "quote"];
 const NOTES = {
   "Tall.md": `# Tall\n\nBefore.\n\n| Name | Detail | Count |\n| --- | --- | ---: |\n${rows(60)}\n\n${"After.\n\n".repeat(30)}`,
+  "Breaks.md":
+    "# Breaks\n\none\ntwo  \nthree\n\n> [!note] Title\n> first\n> second\n\n- item\n  more\n\n| Head |\n| --- |\n| a<br>b |\n",
   "Picking.md":
     "# Picking\n\nBefore the table.\n\n| Step | Party A | Party B |\n| --- | --- | --- |\n| Public value | `5^6 mod 23` | `5^15 mod 23` |\n| Received | 19 | 8 |\n\nAfter the table.\n",
   "Layout.md": "# Layout\n\n|  |  |\n| --- | --- |\n| left | right |\n| more | cells |\n",
@@ -138,6 +140,37 @@ async function run(scheme) {
   await page.keyboard.press("Meta+e");
   await pause(400);
 
+  await open("Breaks.md");
+  const brs = (selector) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => el.querySelectorAll("br").length);
+  check(
+    label("a single newline is a line break, and two trailing spaces only one"),
+    (await brs(".doc p")) === 2,
+    String(await brs(".doc p")),
+  );
+  check(label("a callout keeps its lines"), (await brs(".callout")) === 1, String(await brs(".callout")));
+  check(label("a list item keeps its lines"), (await brs(".doc li")) === 1, String(await brs(".doc li")));
+  check(label("a table cell's break stays one break"), (await brs(".doc td")) === 1, String(await brs(".doc td")));
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await pause(400);
+  const editLines = await page.locator(".cm-line").allTextContents();
+  check(
+    label("Edit shows the same lines Read does"),
+    ["one", "three"].every((word) => editLines.some((t) => t.trim() === word)) &&
+      editLines.some((t) => t.trim().startsWith("two")),
+    JSON.stringify(editLines.slice(0, 6)),
+  );
+  check(
+    label("the rendered table cell in Edit keeps its one break"),
+    (await page.locator(".cm-table-widget [data-row] br").count()) === 1,
+    String(await page.locator(".cm-table-widget [data-row] br").count()),
+  );
+  await page.keyboard.press("Meta+e");
+  await pause(300);
   await open("Picking.md");
   const spanned = () => page.locator(".doc .is-spanned").evaluateAll((cells) => cells.map((c) => c.textContent));
   const pick = (from, fromAt, to, toAt) =>

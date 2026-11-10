@@ -20,6 +20,7 @@ export interface VaultChange {
  * Note text is read once and kept, and every derived index is updated together.
  */
 export class VaultStore {
+  strictLineBreaks = false;
   readonly texts = new Map<string, string>();
   readonly search = new SearchIndex();
   index: VaultIndex;
@@ -35,9 +36,16 @@ export class VaultStore {
     this.links = new LinkGraph(this.index);
   }
 
+  /** What drawing a note needs from this vault. */
+  get renderFacts() {
+    return { index: this.index, assetUrl: this.source.assetUrl, strictLineBreaks: this.strictLineBreaks };
+  }
+
   static async open(source: VaultSource): Promise<VaultStore> {
     const settings = await source.settings().catch(() => null);
-    return new VaultStore(source, await source.list(), excludedBy(settings?.ignoreFilters));
+    const store = new VaultStore(source, await source.list(), excludedBy(settings?.ignoreFilters));
+    store.strictLineBreaks = settings?.strictLineBreaks ?? false;
+    return store;
   }
 
   /** The note's text, read from disk the first time it is asked for. */

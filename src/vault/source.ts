@@ -9,6 +9,7 @@ export interface VaultSettings {
   newNoteFolder: string;
   /** Obsidian's "Excluded files" list, as written in its settings. */
   ignoreFilters: string[];
+  strictLineBreaks: boolean;
 }
 
 export interface FileStat {

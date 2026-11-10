@@ -13,6 +13,8 @@ export interface RenderEnv {
   /** Lines above the rendered text in the file, or null when tasks here should not be clickable. */
   taskLineOffset?: number | null;
   taskNonce?: string;
+  /** Obsidian's "Strict line breaks" setting: a single newline joins the lines. */
+  strictLineBreaks?: boolean;
   headings: { level: number; text: string; id: string }[];
 }
 
@@ -58,6 +60,7 @@ export function createMarkdown(): MarkdownIt {
     if (offset === null) return `<span class="task-box" role="checkbox" aria-checked="${done}" aria-disabled="true"></span>`;
     return `<button class="task-box" type="button" role="checkbox" aria-checked="${done}" aria-label="Task" data-task-line="${(env as unknown as RenderEnv).taskNonce}:${line + offset}"></button>`;
   };
+  md.renderer.rules.softbreak = (_tokens, _i, _opts, env) => ((env as unknown as RenderEnv).strictLineBreaks ? "\n" : "<br>\n");
   md.renderer.rules.wikilink = (tokens, i, _opts, env) => renderWikilink(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.fence = (tokens, i, _opts, env) => renderFence(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.blockquote_open = (tokens, i, opts, _env, self) => {

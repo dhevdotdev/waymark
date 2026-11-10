@@ -118,3 +118,99 @@ describe("Workspace", () => {
     });
   });
 });
+
+describe("reopening closed tabs", () => {
+  const all = () => true;
+  const paths = (w: Workspace) => w.tabs.map((t) => (t.trail.current.view as { path: string }).path);
+
+  it("says when there is nothing to bring back", () => {
+    expect(open("a").reopen(all).kind).toBe("nothing");
+  });
+
+  it("brings the tab back where it was, active, as the same tab", () => {
+    const w = open("a", "b", "c");
+    const b = w.tabs[1];
+    w.close(1);
+    expect(paths(w)).toEqual(["a", "c"]);
+    expect(w.reopen(all).kind).toBe("opened");
+    expect(paths(w)).toEqual(["a", "b", "c"]);
+    expect(w.active).toBe(b);
+  });
+
+  it("brings tabs back last closed first, then runs out", () => {
+    const w = open("a", "b", "c");
+    w.close(2);
+    w.close(1);
+    w.reopen(all);
+    w.reopen(all);
+    expect(paths(w)).toEqual(["a", "b", "c"]);
+    expect(w.reopen(all).kind).toBe("nothing");
+  });
+
+  it("keeps the trail and the place in the note", () => {
+    const w = open("a", "b");
+    w.active.trail.current.scroll = 420;
+    const trail = w.active.trail;
+    w.close(1);
+    w.reopen(all);
+    expect(w.active.trail).toBe(trail);
+    expect(w.active.trail.current.scroll).toBe(420);
+  });
+
+  it("does not keep blank tabs", () => {
+    const w = open("a");
+    w.addBeside({ kind: "blank" });
+    w.close(1);
+    expect(w.reopen(all).kind).toBe("nothing");
+  });
+
+  it("keeps only the most recent", () => {
+    const w = open("a");
+    for (let i = 0; i < 25; i++) {
+      w.addBeside(note(`n${i}`));
+      w.close(1);
+    }
+    let count = 0;
+    while (w.reopen(all).kind === "opened") count += 1;
+    expect(count).toBe(20);
+  });
+
+  it("clamps to the tab strip and stays after pinned tabs", () => {
+    const w = open("a", "b", "c", "d");
+    w.close(3);
+    w.close(2);
+    w.close(1);
+    w.reopen(all);
+    expect(w.activeIndex).toBe(1);
+    const p = open("a", "b", "c");
+    p.close(0);
+    p.togglePin(0);
+    p.togglePin(1);
+    p.reopen(all);
+    expect(paths(p)).toEqual(["b", "c", "a"]);
+  });
+
+  it("refuses a note that has gone and opens nothing else", () => {
+    const w = open("a", "b", "c");
+    w.close(1);
+    const result = w.reopen((v) => v.kind === "note" && v.path !== "b");
+    expect(result).toEqual({ kind: "gone", view: note("b") });
+    expect(paths(w)).toEqual(["a", "c"]);
+    expect(w.reopen(all).kind).toBe("nothing");
+  });
+
+  it("follows a note renamed while its tab was closed", () => {
+    const w = open("a", "b");
+    w.close(1);
+    w.replaceNote("b", "moved/b");
+    w.reopen(all);
+    expect(paths(w)).toEqual(["a", "moved/b"]);
+  });
+
+  it("forgets closed tabs with a new vault", () => {
+    const w = open("a", "b");
+    w.close(1);
+    w.startWith(note("x"));
+    expect(w.reopen(all).kind).toBe("nothing");
+  });
+});

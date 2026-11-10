@@ -96,6 +96,7 @@ async function respondWithSettings(root: string, res: ServerResponse): Promise<v
       newNoteLocation: app.newFileLocation ?? "",
       newNoteFolder: app.newFileFolderPath ?? "",
       ignoreFilters: Array.isArray(app.userIgnoreFilters) ? app.userIgnoreFilters : [],
+      strictLineBreaks: app.strictLineBreaks === true,
     }),
   );
 }

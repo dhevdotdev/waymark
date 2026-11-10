@@ -26,6 +26,7 @@ On first launch, choose **Open a vault…** (an existing folder) or **Clone from
 | ⌘-click, middle-click | Open a link in a background tab (⌘⇧-click: foreground) |
 | ⌘⇧[ / ⌘⇧], ⌃Tab, ⌘1…9 | Switch tabs |
 | ⌘W | Close tab |
+| ⌘⇧T | Reopen the last closed tab |
 | ⌘G / ⌘⇧G | Graph of the vault / around this note |
 | ⌘\ / ⌥⌘\ | Toggle sidebar / inspector |
 | ⌘⇧S | Sync: fetch, then fast-forward if safe |

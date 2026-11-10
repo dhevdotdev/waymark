@@ -476,10 +476,10 @@ export class Reader {
   }
 
   private renderContext(): RenderContext {
-    return { index: this.vault.index, highlighter: this.deps.highlighter, assetUrl: this.vault.source.assetUrl };
+    return { ...this.vault.renderFacts, highlighter: this.deps.highlighter };
   }
 
-  private async show(opts: ShowOptions = {}): Promise<void> {
+  async show(opts: ShowOptions = {}): Promise<void> {
     if (this.editing.isOpen) {
       if (opts.quiet || !(await this.editing.close())) return;
     }
@@ -640,7 +640,7 @@ export class Reader {
     forward.disabled = !trail.canForward;
   }
 
-  private saveScroll(): void {
+  saveScroll(): void {
     const node = this.tab?.trail.current;
     const drawn = (node?.view.kind === "note" || node?.view.kind === "base") && node.view.path === this.current;
     if (drawn) node.scroll = this.els.scroller.scrollTop;

@@ -64,6 +64,8 @@ A table has a thin rounded outline, in the same shape as code blocks and callout
 
 Inline code inside a callout takes a stronger tint of that callout's own colour. The plain grey only suits plain paper.
 
+A single newline in a paragraph, callout or list item is a line break, as in Obsidian, unless the vault turns on Strict line breaks.
+
 A selection that runs across table cells in Read fills each whole cell as one block. Text selected inside one cell stays ordinary text highlighting.
 
 ## Moving through a note in Edit
@@ -140,6 +142,10 @@ Each round was judged from WebKit screenshots of real notes, not from mockups.
 | 3 | At 760px the reader collapsed to zero width | Below 960px the sidebar floats over the sheet instead of taking a column |
 | 3 | Scrolling to a block shifted the whole window chrome | The shell clips instead of hiding overflow, so programmatic scrolls stay in the reader |
 | 3 | The sanitizer removed the copy and fold buttons | Buttons are allowed. Only renderer-emitted `data-*` attributes survive, so note HTML cannot trigger app actions |
+
+## Reopening tabs
+
+⌘⇧T brings back the last closed tab where it was, with its trail and place in the note, up to the last 20 closed this session. Blank tabs are not kept. A tab whose note has left the vault says so and never opens another note instead.
 
 ## Scrolling
 

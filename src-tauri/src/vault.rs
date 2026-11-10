@@ -179,6 +179,7 @@ pub struct VaultSettings {
     pub new_note_location: String,
     pub new_note_folder: String,
     pub ignore_filters: Vec<String>,
+    pub strict_line_breaks: bool,
 }
 
 /// Read only. Waymark never writes to `.obsidian`.
@@ -200,6 +201,7 @@ pub fn settings(root: &Path) -> VaultSettings {
                     .collect()
             })
             .unwrap_or_default(),
+        strict_line_breaks: config["strictLineBreaks"].as_bool().unwrap_or_default(),
     }
 }
 
@@ -590,13 +592,14 @@ mod tests {
         std::fs::create_dir(dir.path().join(".obsidian")).unwrap();
         std::fs::write(
             dir.path().join(".obsidian/app.json"),
-            r#"{"attachmentFolderPath":"/Files","newFileLocation":"folder","newFileFolderPath":"/In"}"#,
+            r#"{"attachmentFolderPath":"/Files","newFileLocation":"folder","strictLineBreaks":true,"newFileFolderPath":"/In"}"#,
         )
         .unwrap();
         let read = settings(dir.path());
         assert_eq!(read.attachment_folder, "/Files");
         assert_eq!(read.new_note_location, "folder");
         assert_eq!(read.new_note_folder, "/In");
+        assert!(read.strict_line_breaks);
         std::fs::write(dir.path().join(".obsidian/app.json"), "not json").unwrap();
         assert_eq!(settings(dir.path()), VaultSettings::default());
     }

@@ -14,12 +14,16 @@ export interface SavedWorkspace {
 }
 
 const isBlank = (tab: Tab) => tab.trail.current.view.kind === "blank";
+const MOST_CLOSED = 20;
+
+export type Reopened = { kind: "nothing" } | { kind: "gone"; view: View } | { kind: "opened" };
 
 /** The open tabs and which one is showing. Each tab owns a trail of where it has been. */
 export class Workspace {
   tabs: Tab[] = [];
   activeIndex = 0;
   private nextId = 1;
+  private closed: { tab: Tab; index: number }[] = [];
 
   get active(): Tab {
     return this.tabs[this.activeIndex];
@@ -39,11 +43,13 @@ export class Workspace {
   }
 
   startWith(view: View): void {
+    this.closed = [];
     this.tabs = [this.make(view)];
     this.activeIndex = 0;
   }
 
   restore(saved: SavedWorkspace, exists: (view: View) => boolean): void {
+    this.closed = [];
     const pinned = new Set(saved.pinned ?? []);
     this.tabs = saved.tabs.flatMap((value, i): Tab[] => {
       const trail = Trail.restore(value, exists);
@@ -76,10 +82,23 @@ export class Workspace {
   /** Closes a tab, keeping the same tab active where it survives. The last tab stays open. */
   close(index: number): boolean {
     if (this.tabs.length === 1 || !this.tabs[index] || this.tabs[index].pinned) return false;
-    this.tabs.splice(index, 1);
+    const [tab] = this.tabs.splice(index, 1);
+    if (!isBlank(tab)) this.closed = [...this.closed, { tab, index }].slice(-MOST_CLOSED);
     if (this.activeIndex >= this.tabs.length) this.activeIndex = this.tabs.length - 1;
     else if (index < this.activeIndex) this.activeIndex -= 1;
     return true;
+  }
+
+  /** Brings back the most recently closed tab where it was, with its trail, unless its note has gone. */
+  reopen(exists: (view: View) => boolean): Reopened {
+    const last = this.closed.pop();
+    if (!last) return { kind: "nothing" };
+    const { view } = last.tab.trail.current;
+    if (!exists(view)) return { kind: "gone", view };
+    const at = Math.max(this.pinnedCount, Math.min(last.index, this.tabs.length));
+    this.tabs.splice(at, 0, last.tab);
+    this.activeIndex = at;
+    return { kind: "opened" };
   }
 
   get pinnedCount(): number {
@@ -121,7 +140,7 @@ export class Workspace {
 
   /** A note was renamed or moved. */
   replaceNote(from: string, to: string): void {
-    for (const tab of this.tabs) tab.trail.replaceNote(from, to);
+    for (const tab of [...this.tabs, ...this.closed.map((entry) => entry.tab)]) tab.trail.replaceNote(from, to);
   }
 
   /** A note is gone, so a tab showing it goes back to being blank. */

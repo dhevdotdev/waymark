@@ -1,3 +1,4 @@
+import type { View } from "../vault/trail";
 import type { Workspace } from "../vault/workspace";
 import { type MenuItem, showContextMenu } from "./context-menu";
 import { trackPointerDrag } from "./pointer-drag";
@@ -9,6 +10,17 @@ interface TabActionsHost {
   persist: () => void;
   close: (index: number) => void;
   toast: (message: string) => void;
+  saveScroll: () => void;
+  show: () => void;
+  exists: (view: View) => boolean;
+}
+
+function nameOf(view: View): string {
+  const path = view.kind === "note" || view.kind === "base" ? view.path : view.kind === "graph" ? view.note : "";
+  return path
+    .split("/")
+    .pop()!
+    .replace(/\.[^.]+$/, "");
 }
 
 /** Pinning and reordering tabs, by dragging, from a tab's menu or from the palette. */
@@ -35,6 +47,15 @@ export class TabActions {
     const landed = this.host.workspace.move(index, index + delta);
     if (landed === null) this.host.toast(delta < 0 ? "This tab is already first." : "This tab is already last.");
     else this.landed(landed);
+  }
+
+  /** Brings the last closed tab back, or says why it cannot. */
+  reopen(): void {
+    this.host.saveScroll();
+    const result = this.host.workspace.reopen(this.host.exists);
+    if (result.kind === "opened") this.host.show();
+    else if (result.kind === "nothing") this.host.toast("No closed tabs to reopen.");
+    else this.host.toast(`${nameOf(result.view)} is no longer in the vault, so its tab can't come back.`);
   }
 
   private onMenu(e: MouseEvent): void {
