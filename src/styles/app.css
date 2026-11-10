@@ -1933,6 +1933,9 @@ kbd {
 .tree.is-settling .tree-folder.is-open > .tree-body > .tree-inner {
   overflow: visible;
 }
+.props.is-settling {
+  overflow: clip;
+}
 @keyframes landed {
   from {
     background-color: color-mix(in oklab, var(--accent) 26%, transparent);
