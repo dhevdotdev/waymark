@@ -69,6 +69,11 @@ function bindMenuKeys(menu: HTMLElement, leave: () => void): () => void {
     } else if (e.key in moves) {
       e.preventDefault();
       items[moves[e.key]]?.focus();
+    } else if (e.key.length === 1 && e.key !== " " && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      const letter = e.key.toLowerCase();
+      const ordered = [...items.slice(at + 1), ...items.slice(0, at + 1)];
+      ordered.find((item) => item.textContent?.toLowerCase().startsWith(letter))?.focus();
     } else if (at < 0 && !e.metaKey && !e.ctrlKey && e.key !== "Escape") {
       e.preventDefault();
     } else {

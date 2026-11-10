@@ -43,6 +43,10 @@ const FILES = {
   Bare: "# Bare\n\nName | Age\n--- | ---\nAda | 36\n\nAfter.\n",
   Tight: "# Tight\n\nA paragraph.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n# Heading right after\n",
   Blank: "# Blank\n\n",
+  Headed: "# Headed\n\n## Above\n\n| A | B |\n| --- | ---: |\n| 1 | 2 |\n\n### Below\n\nAfter.\n",
+  LongLast:
+    "# LongLast\n\nBefore.\n\n| Item | Detail |\n| --- | --- |\n| One | A long last column whose words run all the way to the far edge of the table so the text meets the end |\n| Two | Short |\n\nAfter.\n",
+  OneColumn: "# OneColumn\n\nBefore.\n\n| Only |\n| --- |\n| Value |\n| Second |\n\nAfter.\n",
   Long: `# Long\n\n${Array.from({ length: 60 }, (_, i) => `Paragraph ${i}.`).join("\n\n")}\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n\nEnd.\n`,
 };
 
@@ -196,7 +200,7 @@ try {
     "handles attach to their row and column",
     Math.abs(grip.y - shapes.row.top) <= 1 &&
       Math.abs(grip.height - shapes.row.height) <= 1 &&
-      Math.abs(top.bottom - shapes.table.top) <= 1 &&
+      Math.abs(top.bottom - (shapes.table.top - 6)) <= 1 &&
       Math.abs(top.x - shapes.column.left) <= 1 &&
       Math.abs(top.width - shapes.column.width) <= 1,
     JSON.stringify([grip.y, shapes.row, top.bottom, shapes.table.top]),
@@ -280,18 +284,168 @@ try {
   await page.keyboard.press("Escape");
 
   await open("Awkward");
+  const blankBefore = await cell(2, 2).evaluate((el) => getComputedStyle(el).backgroundColor);
   await cell(2, 2).hover();
-  await pause(150);
-  const ghostRead = await page.evaluate(() => {
+  await pause(220);
+  const emptyLook = await page.evaluate(() => {
     const emptyHeader = document.querySelector('.cm-table-widget [data-row="0"][data-column="3"]');
     const emptyCell = document.querySelector('.cm-table-widget [data-row="2"][data-column="2"]');
-    return { header: getComputedStyle(emptyHeader, "::before").content, cell: getComputedStyle(emptyCell, "::before").content };
+    return {
+      header: getComputedStyle(emptyHeader, "::before").content,
+      ghost: getComputedStyle(emptyCell, "::before").content,
+      fill: getComputedStyle(emptyCell).backgroundColor,
+      cursor: getComputedStyle(emptyCell).cursor,
+    };
   });
   check(
     "empty cells show they can be typed in",
-    /Heading/.test(ghostRead.header) && /Empty/.test(ghostRead.cell),
-    JSON.stringify(ghostRead),
+    /Heading/.test(emptyLook.header) && emptyLook.fill !== blankBefore && emptyLook.cursor === "text",
+    JSON.stringify(emptyLook),
   );
+  check("a blank cell shows no stray word under the pointer", emptyLook.ghost === "none", emptyLook.ghost);
+
+  /* The geometry gate: every control, in every state, at every width, in both themes, measured from the table's real box. */
+  const auditGeometry = () =>
+    page.evaluate(() => {
+      const root = document.querySelector(".cm-table-widget");
+      const table = root.querySelector("table").getBoundingClientRect();
+      const wrap = root.querySelector(".table-wrap").getBoundingClientRect();
+      const box = {
+        left: Math.max(table.left, wrap.left),
+        right: Math.min(table.right, wrap.right),
+        top: table.top,
+        bottom: table.bottom,
+      };
+      const gap = (a, b) =>
+        Math.hypot(
+          Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right)),
+          Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom)),
+        );
+      const intersects = (a, b) =>
+        a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+      const glyphs = [...document.querySelectorAll(".cm-table-widget :is(th, td), .cm-line, .doc-title")].flatMap((el) => {
+        if (el.matches(".cm-line") && el.closest(".cm-table-widget")) return [];
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return [...range.getClientRects()]
+          .filter((r) => r.width > 0)
+          .map((r) => ({
+            left: Math.max(r.left, el.closest(".table-wrap") ? wrap.left : r.left),
+            right: Math.min(r.right, el.closest(".table-wrap") ? wrap.right : r.right),
+            top: r.top,
+            bottom: r.bottom,
+          }))
+          .filter((r) => r.right > r.left);
+      });
+      const controls = [...root.querySelectorAll(".cm-table-grip:not([hidden]), .cm-table-add")].map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          name: el.className.replace(/cm-table-/g, ""),
+          hitsTable: intersects(r, box),
+          toTable: Math.round(gap(r, box) * 10) / 10,
+          toText: Math.round(Math.min(...glyphs.map((g) => gap(r, g))) * 10) / 10,
+          onScreen: r.left >= -0.5 && r.right <= innerWidth + 0.5,
+        };
+      });
+      const tinted = [...root.querySelectorAll(".is-acted-on, .is-marked")].map((c) => c.getBoundingClientRect());
+      const tint = tinted.length
+        ? { left: Math.min(...tinted.map((r) => r.left)), right: Math.max(...tinted.map((r) => r.right)) }
+        : null;
+      const rowOrColumn = root.querySelector(".is-acted-on")?.dataset;
+      const spansWidth =
+        !tint ||
+        (rowOrColumn &&
+          document.querySelectorAll(`.cm-table-widget .is-acted-on[data-column="${rowOrColumn.column}"]`).length > 1) ||
+        (Math.abs(tint.left - table.left) <= 1 && Math.abs(tint.right - table.right) <= 1);
+      const ghost = [...root.querySelectorAll(".cm-table-ghost-cell")].map((c) => c.getBoundingClientRect());
+      const ghostInside = ghost.every((r) => r.left >= table.left - 1 && r.right <= table.right + 1);
+      return { controls, spansWidth, ghostInside, tint, table: { left: table.left, right: table.right } };
+    });
+  const judge = (label, audit) => {
+    const bad = audit.controls.filter((c) => c.hitsTable || c.toTable < 5.5 || c.toText < 5.5 || !c.onScreen);
+    check(
+      `geometry: ${label}`,
+      bad.length === 0 && audit.spansWidth && audit.ghostInside,
+      JSON.stringify({ bad, spans: audit.spansWidth, ghost: audit.ghostInside, tint: audit.tint, table: audit.table }),
+    );
+  };
+  for (const width of [1400, 900, 560]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const scheme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: scheme });
+      for (const name of ["Plot", "LongLast", "OneColumn", "Wide", "Headed"]) {
+        const where = `${name} at ${width} in ${scheme}`;
+        await open(name);
+        await aim(1, 0);
+        judge(`hover, ${where}`, await auditGeometry());
+        await cell(1, 0).click();
+        await pause(60);
+        judge(`cell focus, ${where}`, await auditGeometry());
+        await page.keyboard.press("Escape");
+        await pause(40);
+        judge(`grid focus, ${where}`, await auditGeometry());
+        await page.keyboard.press("Enter");
+        await aim(1, 0);
+        await rowGrip().click();
+        await pause(120);
+        judge(`row menu open, ${where}`, await auditGeometry());
+        await page.keyboard.press("Escape");
+        await pause(150);
+        await aim(1, 0);
+        await addRow().click();
+        await page.evaluate(() => {
+          for (const a of document.getAnimations()) a.playbackRate = 0.05;
+        });
+        for (const sample of [1, 2, 3]) {
+          await pause(60);
+          judge(`arrival frame ${sample}, ${where}`, await auditGeometry());
+        }
+      }
+    }
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await open("Plot");
+  const restLook = await page.evaluate(() => {
+    const add = document.querySelector(".cm-table-add.is-row");
+    const side = document.querySelector(".cm-table-add.is-column");
+    return { add: getComputedStyle(add).backgroundColor, side: getComputedStyle(side).backgroundColor };
+  });
+  await aim(1, 0);
+  await pause(200);
+  const shownLook = await page.evaluate(() => {
+    const add = document.querySelector(".cm-table-add.is-row");
+    const side = document.querySelector(".cm-table-add.is-column");
+    return {
+      add: getComputedStyle(add).backgroundColor,
+      side: getComputedStyle(side).backgroundColor,
+      label: getComputedStyle(add.querySelector("span")).opacity,
+    };
+  });
+  check(
+    "no grey band at rest: add controls have no fill until hovered",
+    /rgba\(0, 0, 0, 0\)|transparent/.test(shownLook.side) &&
+      /rgba\(0, 0, 0, 0\)|transparent/.test(shownLook.add) &&
+      shownLook.label === "0",
+    JSON.stringify({ restLook, shownLook }),
+  );
+  await addColumn().hover();
+  await pause(220);
+  check(
+    "hovering an add control fills only that control",
+    await page.evaluate(() => {
+      const add = document.querySelector(".cm-table-add.is-row");
+      const side = document.querySelector(".cm-table-add.is-column");
+      return (
+        !/rgba\(0, 0, 0, 0\)/.test(getComputedStyle(side).backgroundColor) &&
+        /rgba\(0, 0, 0, 0\)/.test(getComputedStyle(add).backgroundColor)
+      );
+    }),
+  );
+  await addRow().hover();
+  await pause(450);
+  const namedOpacity = await page.evaluate(() => getComputedStyle(document.querySelector(".cm-table-add.is-row span")).opacity);
+  check("hovering Add row names it", Number(namedOpacity) > 0.95, namedOpacity);
 
   /* New tables */
   await open("Blank");
@@ -530,7 +684,13 @@ try {
   check("Escape returns the caret to where it was", caret === "Legumes".length - 1, String(caret));
   await page.keyboard.press("Shift+F10");
   await pause(120);
-  while (!(await menuFocus()).startsWith("Align center")) await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("a");
+  await page.keyboard.press("a");
+  check(
+    "menus work from the keyboard: typing a letter jumps to it",
+    (await menuFocus()).startsWith("Align center"),
+    await menuFocus(),
+  );
   await page.keyboard.press("Enter");
   await pause(120);
   check("alignment works from the keyboard", (await activeCell()) === "2,1", await activeCell());
@@ -879,6 +1039,7 @@ try {
   await page.setViewportSize({ width: 560, height: 800 });
   for (const name of ["Plot", "Awkward", "Wide"]) {
     await open(name);
+    await addRow().scrollIntoViewIfNeeded();
     await aim(1, 1);
     const narrow = await geometry();
     check(

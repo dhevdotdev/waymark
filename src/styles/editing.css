@@ -173,27 +173,30 @@
 }
 .cm-table-widget {
   --table-control: 24px;
+  --table-clear: 6px;
+  --table-offset: calc(var(--table-control) + var(--table-clear));
   position: relative;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
 .cm-table-widget.no-gap-above {
-  margin-block-start: var(--table-control);
+  margin-block-start: var(--table-room);
 }
 .cm-table-widget.no-gap-below {
-  margin-block-end: var(--table-control);
+  margin-block-end: var(--table-room);
 }
 .cm-table-widget .table-wrap {
   margin: 0 calc(-1 * var(--hang));
+  border-radius: 0;
 }
-.cm-table-widget.is-overflowing .table-wrap {
+.cm-table-widget.is-flush .table-wrap {
   margin-inline: 0;
 }
-.cm-table-widget.is-overflowing :is(th, td):first-child {
+.cm-table-widget.is-flush :is(th, td):first-child {
   padding-inline-start: 0;
 }
-.cm-table-widget.is-overflowing :is(th, td):last-child {
+.cm-table-widget.is-flush :is(th, td):last-child {
   padding-inline-end: 0;
 }
 .cm-table-widget :is(th, td) {
@@ -237,15 +240,11 @@
   .cm-table-widget :is(th, td):hover {
     background: var(--fill);
   }
-  .cm-table-widget td:empty:hover::before {
-    content: "Empty";
-    color: var(--ink-3);
-  }
 }
 .cm-table-widget :is(th, td).is-acted-on {
   background: color-mix(in oklab, var(--accent) 13%, var(--paper));
 }
-.cm-table-widget :is(th, td).is-marked {
+.cm-table-widget :is(th, td).is-marked:not(:focus) {
   animation: table-mark 520ms var(--ease-out);
 }
 @keyframes table-mark {
@@ -314,35 +313,38 @@
   display: none;
 }
 .cm-table-grip.is-row {
-  inset-inline-start: calc(-1 * var(--table-control));
+  inset-inline-start: calc(var(--table-left) - var(--table-offset));
   inline-size: var(--table-control);
 }
 .cm-table-grip.is-column {
-  inset-block-start: calc(-1 * var(--table-control));
+  inset-block-start: calc(var(--table-top) - var(--table-offset));
   block-size: var(--table-control);
 }
 .cm-table-add {
   border-radius: var(--r-chip);
-  background: var(--fill);
 }
 .cm-table-add.is-row {
-  inset-block-start: 100%;
-  inset-inline: calc(-1 * var(--hang));
+  inset-block-start: calc(var(--table-bottom) + var(--table-clear));
+  inset-inline-start: var(--table-left);
+  inline-size: calc(var(--table-right) - var(--table-left));
   block-size: var(--table-control);
   grid-auto-flow: column;
-  justify-content: start;
+  justify-content: center;
   column-gap: var(--s1);
-  padding-inline-start: var(--hang);
   font: 500 0.75rem / 1 var(--font-ui);
 }
-.cm-table-widget.is-overflowing .cm-table-add.is-row {
-  inset-inline: 0;
-  padding-inline-start: 0;
+.cm-table-add.is-row > span {
+  opacity: 0;
+  transition: opacity var(--t-hover) ease;
+}
+.cm-table-add.is-row:is(:focus-visible, :active) > span {
+  opacity: 1;
 }
 .cm-table-add.is-column {
-  inset-block: 0;
-  inset-inline-start: 100%;
+  inset-block-start: var(--table-top);
+  inset-inline-start: calc(var(--table-right) + var(--table-clear));
   inline-size: var(--table-control);
+  block-size: calc(var(--table-bottom) - var(--table-top));
 }
 .cm-table-drop {
   position: absolute;
@@ -350,11 +352,13 @@
   pointer-events: none;
 }
 .cm-table-drop.is-row {
-  inset-inline: calc(-1 * var(--hang));
+  inset-inline-start: var(--table-left);
+  inline-size: calc(var(--table-right) - var(--table-left));
   block-size: 2px;
 }
 .cm-table-drop.is-column {
-  inset-block: 0;
+  inset-block-start: var(--table-top);
+  block-size: calc(var(--table-bottom) - var(--table-top));
   inline-size: 2px;
 }
 .cm-table-widget.is-dragging,
@@ -386,8 +390,11 @@
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.cm-table-grip, .cm-table-add):hover {
-    background: var(--selected);
+    background: var(--fill);
     color: var(--ink);
+  }
+  .cm-table-add.is-row:hover > span {
+    opacity: 1;
   }
 }
 .doc-editing .cm-table-line {
@@ -1127,6 +1134,13 @@ button.task-box:focus-visible {
 }
 .doc-editing .cm-h3 + .cm-blank {
   line-height: 8px;
+}
+.doc-editing .cm-blank:has(+ .cm-table-widget),
+.doc-editing .cm-table-widget + .cm-blank:not(:has(+ .cm-h2)) {
+  line-height: var(--table-room);
+}
+.doc-editing .cm-table-widget + .cm-blank:has(+ :is(.cm-h3, .cm-h4)) {
+  line-height: calc(var(--table-room) - 11px);
 }
 .doc-editing .cm-list-line + .cm-list-line {
   padding-block-start: 5.7px;

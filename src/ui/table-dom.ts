@@ -39,3 +39,24 @@ export function lineChange(doc: Text, lineBreak: string, from: number, before: s
     ? { from: start, to: end, insert: (removed > 0 ? "" : lineBreak) + added.join(lineBreak) }
     : { from: Math.max(from, start - lineBreak.length), to: end };
 }
+
+/** Holds the columns at their width for as long as the table is being edited, so typing never slides them. */
+export function freezeColumns(table: HTMLTableElement): void {
+  if (table.style.tableLayout === "fixed") return;
+  const widths = [...table.querySelectorAll("th")].map((head) => head.getBoundingClientRect().width);
+  const columns = document.createElement("colgroup");
+  for (const width of widths) {
+    const column = document.createElement("col");
+    column.style.width = `${width}px`;
+    columns.append(column);
+  }
+  table.prepend(columns);
+  table.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
+  table.style.tableLayout = "fixed";
+}
+
+export function releaseColumns(table: HTMLTableElement): void {
+  table.querySelector("colgroup")?.remove();
+  table.style.width = "";
+  table.style.tableLayout = "";
+}

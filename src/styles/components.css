@@ -1784,9 +1784,11 @@
   display: none;
 }
 
-.diff.is-compare .diff-line.is-del,
+.diff.is-compare .diff-line.is-del {
+  --row-tint: var(--fill);
+}
 .diff.is-compare .is-del .diff-word {
-  background: var(--fill);
+  background: color-mix(in oklab, var(--ink) 12%, transparent);
   color: var(--ink);
 }
 .diff.is-compare .diff-line.is-del .diff-sign,

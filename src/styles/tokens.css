@@ -29,6 +29,7 @@
   --measure: 42rem;
   --wide-extra: 5rem;
   --gutter: 2.5rem;
+  --table-room: 40px;
 
   /* Space scale (4px base). */
   --s1: 0.25rem;

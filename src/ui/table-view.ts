@@ -5,7 +5,7 @@ import { insertColumn, insertRow, moveColumn, moveRow, parseTable, setCell } fro
 import { toast } from "./overlays";
 import { actionForKey, gridTarget, type TableAction, type TableAt, type TableContext, type TableMode } from "./table-actions";
 import { type ControlsHost, TableControls, type TargetKind } from "./table-controls";
-import { caretOffset, lineChange, placeCaret } from "./table-dom";
+import { caretOffset, freezeColumns, lineChange, placeCaret, releaseColumns } from "./table-dom";
 import { reveal, snapshot } from "./table-feedback";
 
 export interface TableEditorOptions {
@@ -29,6 +29,9 @@ export interface TableHost {
 export const tableWrite = Annotation.define<true>();
 
 const HANG = 16;
+/** A control and the clear space between it and the table. */
+const CONTROL_ROOM = 30;
+const HOVER_GRACE_MS = 140;
 let nextId = 0;
 
 const linesOf = (state: EditorState, { from, to }: TableRange): string[] => state.sliceDoc(from, to).split(state.lineBreak);
@@ -80,6 +83,7 @@ export class EditableTable implements ControlsHost {
   private mode: TableMode = "edit";
   private isolateNext = false;
   private savedCaret: number | null = null;
+  private hideHandles = 0;
 
   constructor(
     private readonly view: EditorView,
@@ -192,6 +196,7 @@ export class EditableTable implements ControlsHost {
       cell.dataset.source = text;
       this.present(cell, active);
     }
+    this.layout();
     return true;
   }
 
@@ -255,12 +260,30 @@ export class EditableTable implements ControlsHost {
     this.layout();
   }
 
-  /** Keeps a table that is too wide for the column scrolling inside its own box, and clear of the handles. */
+  /** Lets the table hang into the margins only where the controls still fit outside it, and measures it for them. */
   private layout(): void {
-    const overflowing = this.root.classList.contains("is-overflowing");
-    const needed = this.table.getBoundingClientRect().width - (overflowing ? 0 : HANG * 2);
-    this.root.classList.toggle("is-overflowing", needed > this.root.clientWidth + 1);
+    const box = this.root.getBoundingClientRect();
+    const pane = (this.root.closest(".scroller") ?? this.view.scrollDOM).getBoundingClientRect();
+    const room = Math.min(box.left - pane.left, pane.right - box.right);
+    const flush = this.root.classList.contains("is-flush");
+    const needed = this.table.getBoundingClientRect().width - (flush ? 0 : HANG * 2);
+    this.root.classList.toggle("is-flush", needed > this.root.clientWidth + 1 || room < HANG + CONTROL_ROOM);
+    this.measureTable();
     this.placeHandles();
+  }
+
+  /** The table's real edges, the one coordinate system every control is placed in. */
+  private measureTable(): void {
+    const box = this.root.getBoundingClientRect();
+    const table = this.table.getBoundingClientRect();
+    const view = this.wrap.getBoundingClientRect();
+    const edges = {
+      "--table-left": Math.max(table.left, view.left) - box.left,
+      "--table-right": Math.min(table.right, view.right) - box.left,
+      "--table-top": table.top - box.top,
+      "--table-bottom": table.bottom - box.top,
+    };
+    for (const [name, value] of Object.entries(edges)) this.root.style.setProperty(name, `${value}px`);
   }
 
   private placeHandles(): void {
@@ -280,27 +303,6 @@ export class EditableTable implements ControlsHost {
     this.controls.columnGrip.hidden = right - left < 24;
     this.controls.rowGrip.setAttribute("aria-label", `Row ${this.aim.row + 1} actions`);
     this.controls.columnGrip.setAttribute("aria-label", `Column ${this.aim.column + 1} actions`);
-  }
-
-  /** Holds the columns at their width for as long as the table is being edited, so typing never slides them. */
-  private freeze(): void {
-    if (this.table.style.tableLayout === "fixed") return;
-    const widths = [...this.table.querySelectorAll("th")].map((head) => head.getBoundingClientRect().width);
-    const columns = document.createElement("colgroup");
-    for (const width of widths) {
-      const column = document.createElement("col");
-      column.style.width = `${width}px`;
-      columns.append(column);
-    }
-    this.table.prepend(columns);
-    this.table.style.width = `${widths.reduce((sum, width) => sum + width, 0)}px`;
-    this.table.style.tableLayout = "fixed";
-  }
-
-  private release(): void {
-    this.table.querySelector("colgroup")?.remove();
-    this.table.style.width = "";
-    this.table.style.tableLayout = "";
   }
 
   private write(change: (lines: string[]) => string[], userEvent: string, isolate?: "full" | "before"): boolean {
@@ -568,7 +570,7 @@ export class EditableTable implements ControlsHost {
     }
     this.at = positionOf(cell);
     this.isolateNext = true;
-    this.freeze();
+    freezeColumns(this.table);
     this.enter(cell);
     this.aimAt(this.at);
   }
@@ -578,7 +580,7 @@ export class EditableTable implements ControlsHost {
     if (cell) cell.replaceChildren(this.render(cell.dataset.source ?? ""));
     const next = e.relatedTarget as Node | null;
     if (this.root.contains(next) || menuHolds(next)) return;
-    this.release();
+    releaseColumns(this.table);
     this.mode = "edit";
     this.root.classList.remove("is-grid");
     if (!this.root.matches(":hover")) this.root.classList.remove("has-handles");
@@ -614,8 +616,12 @@ export class EditableTable implements ControlsHost {
       const cell = cellOf(e);
       if (cell && pointerMoved(e) && !openMenu() && !root.classList.contains("is-dragging")) this.aimAt(positionOf(cell));
     });
+    /* The clear space around the table belongs to no element, so crossing it to a control must not hide the control. */
+    root.addEventListener("pointerenter", () => clearTimeout(this.hideHandles));
     root.addEventListener("pointerleave", () => {
-      if (!root.contains(document.activeElement) && !openMenu()) root.classList.remove("has-handles");
+      this.hideHandles = window.setTimeout(() => {
+        if (!root.contains(document.activeElement) && !openMenu()) root.classList.remove("has-handles");
+      }, HOVER_GRACE_MS);
     });
     this.wrap.addEventListener("scroll", () => this.placeHandles());
     root.addEventListener("keydown", (e) => {
