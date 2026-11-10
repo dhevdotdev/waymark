@@ -299,6 +299,98 @@ await page.keyboard.press("Escape");
 await pause(150);
 check("Escape closes find", (await page.locator(".findbar").count()) === 0);
 
+// Find marks only the current query, and every way of ending the search clears them.
+// The macOS system WebKit leaves stale marks painted when a Highlight is replaced in or removed from the registry
+// after the note has scrolled. Playwright's WebKit repaints correctly, so the registered objects must stay the same.
+const findMarks = () =>
+  page.evaluate(() => {
+    const now = ["find", "find-current"].map((name) => CSS.highlights.get(name));
+    window.findHighlights ??= now;
+    const kept = window.findHighlights;
+    return {
+      texts: [...(now[0] ?? [])].map((range) => range.toString().toLowerCase()),
+      current: now[1]?.size ?? 0,
+      kept: now.every((highlight, i) => highlight && highlight === kept[i]),
+    };
+  });
+const startFind = async (query) => {
+  await page.keyboard.press("Meta+f");
+  await page.keyboard.type(query);
+  await pause(80);
+};
+const cleared = async (how) => {
+  const marks = await findMarks();
+  check(`${how} clears every find mark`, marks.texts.length === 0 && marks.current === 0, JSON.stringify(marks));
+  check(`${how} keeps the registered highlights`, marks.kept);
+};
+await startFind("c");
+await findMarks();
+await page.keyboard.type("old");
+await pause(80);
+let marks = await findMarks();
+check(
+  "find marks only the whole current query, not earlier keystrokes",
+  marks.texts.length > 1 && marks.texts.every((text) => text === "cold"),
+  marks.texts.join(),
+);
+check("growing the query keeps the registered highlights", marks.kept);
+await page.keyboard.press("Backspace");
+await pause(80);
+marks = await findMarks();
+check("Backspace widens the marks", marks.texts.length > 1 && marks.texts.every((text) => text === "col"), marks.texts.join());
+for (let i = 0; i < 3; i++) await page.keyboard.press("Backspace");
+await pause(80);
+await cleared("emptying the query");
+await page.keyboard.type("zzqxv");
+await pause(80);
+await cleared("a query with no match");
+await page.fill(".findbar input", "");
+await page.keyboard.type("COLD RETARD");
+await pause(80);
+marks = await findMarks();
+check("find ignores case", marks.texts.length > 1 && marks.texts.every((text) => text === "cold retard"), marks.texts.join());
+await page.keyboard.press("Escape");
+await pause(80);
+await cleared("Escape");
+await startFind("cold");
+await page.click('[data-find="close"]');
+await pause(80);
+await cleared("the close button");
+await startFind("cold");
+await page.keyboard.press("Meta+e");
+await page.waitForSelector(".cm-content");
+await pause(150);
+check("switching to Edit closes find in Read", (await page.locator(".findbar:not(.cm-search)").count()) === 0);
+await cleared("switching to Edit");
+await page.keyboard.press("Meta+e");
+await page.waitForSelector(".doc:not(.doc-editing)");
+await pause(150);
+await startFind("cold");
+await page.keyboard.press("Meta+Shift+f");
+await pause(150);
+await cleared("opening vault search");
+await page.keyboard.press("Escape");
+await pause(150);
+await startFind("cold");
+await page.click(`.doc a.wikilink[data-path*="${NOTES.starter}"]`);
+await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent.startsWith(t), NOTES.starter);
+await pause(150);
+check("opening another note closes find", (await page.locator(".findbar").count()) === 0);
+await cleared("opening another note");
+await page.click(`.doc a.wikilink[data-path*="${NOTES.hero}"]`, { modifiers: ["Meta"] });
+await pause(300);
+await startFind("feed");
+await page.click(".tab:nth-child(2)");
+await pause(300);
+check("switching tabs closes find", (await page.locator(".findbar").count()) === 0);
+await cleared("switching tabs");
+await page.keyboard.press("Meta+w");
+await pause(300);
+await page.keyboard.press("Meta+[");
+await pause(600);
+await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent.startsWith(t), NOTES.hero);
+await pause(300);
+
 // Backlinks and local graph
 await page.click('[data-rail="links"]');
 await pause(120);

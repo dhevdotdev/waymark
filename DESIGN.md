@@ -48,6 +48,7 @@ Every state has a visible way in and a visible way out.
 - Notes can be ordered by date modified. The choice is kept with the app's preferences, never in the vault. Date means the file's time on disk, so a fresh clone stamps its notes within about a second, and they fall back to name order until they are edited. Notes a pull changes rise to the top. Folders stay in name order.
 - Tabs reorder by dragging and from the tab's menu or the palette. Pinned tabs sit together at the left, survive a relaunch and cannot be closed by accident: closing one says to unpin it first.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
+- Find in Read marks only the query as it stands. It ends, and every mark goes, when it is closed, when another note, another tab or the editor takes the note's place, and when vault search opens. Only one search marks a note at a time.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
 - Nothing sits between the path row and the note. The trail is a section in the right panel, so a note starts at the same height whether or not its tab has a trail.
 - A destructive confirmation arms nothing when it opens. The dialog holds focus, Return moves to Cancel, and Delete needs its button reached on purpose. Other confirmations keep Return.
