@@ -412,8 +412,8 @@ try {
   };
   const strip = () => page.locator(".row-actions:not([hidden]) .row-action");
   check(
-    "the file-actions row has new note, new folder and collapse",
-    (await page.locator(".files-actions .icon-btn").count()) === 3,
+    "the file-actions row has new note, new folder, sort and collapse",
+    (await page.locator(".files-actions .icon-btn").count()) === 4,
   );
   check("new note left the title bar", (await page.locator('.titlebar [data-act="new-note"]').count()) === 0);
   const moreMenu = async (selector, item) => {

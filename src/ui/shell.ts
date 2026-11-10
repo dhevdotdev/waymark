@@ -64,8 +64,8 @@ function template(options: ShellOptions): string {
         <div class="files-actions" data-side-pane="files">
           <button class="icon-btn" data-act="new-note" data-tip="New note" data-key="⌘N" aria-label="New note">${icons.newNote}</button>
           <button class="icon-btn" data-act="new-folder" data-tip="New folder" aria-label="New folder">${icons.newFolder}</button>
-          <button class="icon-btn files-actions-end" data-act="sort-files" data-tip="Sort notes" aria-label="Sort notes">${icons.sort}</button>
-          <button class="icon-btn" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
+          <button class="icon-btn" data-act="sort-files" data-tip="Sort notes" aria-label="Sort notes">${icons.sort}</button>
+          <button class="icon-btn files-actions-end" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
         </div>
         <div class="sidebar-inner" data-side-pane="files"></div>
         <div class="sidebar-search" data-side-pane="search" hidden>

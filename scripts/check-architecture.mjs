@@ -14,7 +14,8 @@ const LAYERS = {
   prefs: ["platform"],
   themes: [],
   ui: ["vault", "render", "platform", "prefs", "themes"],
-  selftest: ["ui", "platform", "vault", "selftest-recovery"],
+  selftest: ["ui", "platform", "vault", "selftest-recovery", "selftest-organize"],
+  "selftest-organize": ["ui", "platform", "vault", "selftest-recovery"],
   "selftest-recovery": ["ui", "platform", "vault"],
   main: ["ui", "vault", "platform", "selftest"],
 };
