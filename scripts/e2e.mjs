@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 const SHARDS = [
   [["tables"], ["blocks"], ["scrolling"], ["link-tooltips"]],
   [["reader"], ["reader", "reduced"], ["edge"], ["dialogs"]],
-  [["editing"], ["organize"], ["properties"]],
+  [["editing"], ["organize"], ["properties"], ["list-motion"]],
   [["note-files"], ["recovery"], ["backup"], ["library"], ["sync"], ["mac-behaviours"]],
 ];
 
