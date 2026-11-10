@@ -188,9 +188,11 @@ Native scrollbars are hidden everywhere and nothing rubber-bands past its edge. 
 The rules come from Emil Kowalski's animation standards, good-css.com, Impeccable and taste-skill. Where those sources disagree, a short distillation records which rule Waymark follows.
 
 - Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
-- Following a link with the pointer fades the new page in over 180ms, with no movement.
+- Following a note link with the pointer fades the new page in over 180ms, with no movement. Files, search, the palette, tabs, back and forward show the page at once.
+- The palette and the menu bar count as the keyboard, even when a choice in them is clicked. A heading reached by the pointer takes a brief tint that holds until the eye can land on it, and a heading reached any other way does not.
 - Popovers scale from their trigger, while sheets and the lightbox stay centred. Toasts rise and stay interruptible because they are transitions, not keyframes.
-- Collapsed callouts and sidebar groups open by animating grid rows, so the content keeps its height and nothing jumps.
+- Collapsed callouts and sidebar groups open by animating grid rows when clicked, so the content keeps its height and nothing jumps. Anything revealed for a search, a find or an open note lands at once, so a scroll target is never moving when it is measured.
+- Floating panels slide, and the narrow-window scrim fades with the sidebar. Docked panels never animate their width, because that would move the page. Rail sections move only when a fold is clicked, not when the window resizes or a note changes what they hold.
 - While writing, each key sounds like a recorded mechanical switch, with a press and its own release, placed left to right by where the key sits. Quick typing lands softer than a deliberate press, and a held key repeats silently. Linear, Tactile or Clicky are chosen in settings, and picking one plays a few keys so it can be judged at once.
 - Sound is a small synthesised palette: copy, a new background tab, sync finished, incoming changes, commit, push, and a problem. Each cue has a 900ms cooldown, so repeated actions never pile up. Nothing plays for clicks, scrolling, typing or background fetches. One toggle mutes everything.
 
