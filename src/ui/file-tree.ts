@@ -63,7 +63,10 @@ export class FileTree {
     return active && this.box.contains(active) ? active.closest<HTMLElement>(ROW) : null;
   }
 
-  /** Moves focus to the row that had it, or else the nearest folder still in the list, or else the open note. */
+  /**
+   * Moves focus to the row that had it, or else the nearest folder still in the list, or else the open note, whose
+   * folders open so focus has somewhere to land.
+   */
   private refocus(lost: HTMLElement): void {
     if (lost.isConnected) {
       lost.focus({ preventScroll: true });
@@ -75,7 +78,13 @@ export class FileTree {
     const parents = ancestors(path ?? `${folder}/`)
       .reverse()
       .map(head);
-    const row = [same, ...parents, this.notes.get(this.current) ?? null].find((r) => r && isShown(r));
+    let row = [same, ...parents].find((r) => r && isShown(r));
+    const note = this.notes.get(this.current);
+    if (!row && note) {
+      this.expandTo(this.current, note, false);
+      this.onChange();
+      row = note;
+    }
     (row ?? this.box.querySelector<HTMLElement>(ROW))?.focus({ preventScroll: true });
   }
 
