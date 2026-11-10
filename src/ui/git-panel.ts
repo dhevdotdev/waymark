@@ -404,9 +404,20 @@ export class GitPanel {
       return b;
     };
     const blocked = this.needsTerminal(st);
-    if (blocked)
-      btn("Open in Terminal", true, true, () => void native.openTerminal(), "Resolve it there, where Git can ask you what to do");
-    if (!st.upstream) return actions;
+    const terminal = () => {
+      if (blocked)
+        btn(
+          "Open in Terminal",
+          true,
+          true,
+          () => void native.openTerminal(),
+          "Resolve it there, where Git can ask you what to do",
+        );
+    };
+    if (!st.upstream) {
+      terminal();
+      return actions;
+    }
     /* Commit & Sync is the main action whenever there is something to commit, so one button leads at a time. */
     const leads = !blocked && !st.files.length;
     btn(
@@ -423,6 +434,7 @@ export class GitPanel {
       () => void this.push(),
       st.behind ? "Sync first" : undefined,
     );
+    terminal();
     return actions;
   }
 
@@ -525,10 +537,6 @@ export class GitPanel {
     });
     const row = el("div", "commit-actions");
     const hasRemote = Boolean(st.upstream);
-    const publish = el("button", "btn btn-primary", hasRemote ? "Commit & Sync" : "Commit");
-    publish.type = "submit";
-    publish.disabled = this.busy;
-    row.append(publish);
     if (hasRemote) {
       const localOnly = el("button", "btn", "Commit only");
       localOnly.type = "button";
@@ -536,6 +544,10 @@ export class GitPanel {
       localOnly.onclick = () => void send(false);
       row.append(localOnly);
     }
+    const publish = el("button", "btn btn-primary", hasRemote ? "Commit & Sync" : "Commit");
+    publish.type = "submit";
+    publish.disabled = this.busy;
+    row.append(publish);
     box.append(msg, row);
     const send = async (share: boolean) => {
       if (!msg.value.trim()) {

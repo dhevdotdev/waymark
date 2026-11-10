@@ -50,6 +50,7 @@ Every state has a visible way in and a visible way out.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
 - Nothing sits between the path row and the note. The trail is a section in the right panel, so a note starts at the same height whether or not its tab has a trail.
+- Buttons in a row follow what the row is. A panel's own actions, such as Sync and Push or the commit box, share the row in equal widths with the leading action last, so a label or busy change never moves a neighbour and a label too long for its share wraps the row. A dialog keeps Mac order at natural width, Cancel then the action on the right. Buttons over content, in a notice, or on a page such as Welcome keep their natural width and start at the text edge.
 - A destructive confirmation arms nothing when it opens. The dialog holds focus, Return moves to Cancel, and Delete needs its button reached on purpose. Other confirmations keep Return.
 - The outline is a dash per heading on the right edge, whether or not the inspector is open. Hovering opens the titles. There is one outline, so the inspector has no tab for it. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.

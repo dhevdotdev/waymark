@@ -1136,12 +1136,14 @@
 .sync-fact.is-changed dd {
   color: var(--pending-ink);
 }
-.sync-actions {
+/* A panel's own actions share the row equally, so a label or busy change never moves its neighbour; a label too long for its share wraps the row instead. */
+:is(.sync-actions, .commit-actions) {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.sync-actions .btn {
-  flex: 1;
+:is(.sync-actions, .commit-actions) .btn {
+  flex: 1 1 0;
 }
 .sync-uptodate {
   margin: 2px 0 14px;
@@ -1317,10 +1319,6 @@
   display: grid;
   gap: 8px;
   padding: 6px 6px 16px;
-}
-.commit-actions {
-  display: flex;
-  gap: 8px;
 }
 .commit-box textarea {
   resize: none;
