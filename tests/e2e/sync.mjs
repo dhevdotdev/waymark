@@ -107,6 +107,8 @@ const stage = async (state, error = null) => {
     [state, error],
   );
   await pause(350);
+  /* A slow machine can still be running the sheet's open, and a scaling sheet moves what sits inside it. */
+  await page.waitForFunction(() => document.querySelector(".sync-sheet")?.getAnimations().length === 0);
 };
 const closeAll = () => page.evaluate(() => window.waymark.reader.sync.panel.close());
 const text = (selector) => page.locator(selector).first().textContent();
