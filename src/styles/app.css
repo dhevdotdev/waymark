@@ -828,6 +828,8 @@ kbd {
   inset-inline: 0;
   inset-block-start: 38px;
   z-index: 3;
+  display: flex;
+  gap: var(--s2);
   padding: 5px var(--s4) 5px;
   background: var(--paper);
   border-block-end: 1px solid var(--rule);
