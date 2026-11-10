@@ -9,10 +9,10 @@ export async function serveFixture({ empty = false } = {}) {
   const vault = await mkdtemp(path.join(tmpdir(), "waymark-fixture-"));
   if (!empty) await writeFixtureVault(vault);
   process.env.WAYMARK_VAULT = vault;
-  const server = await createServer({ logLevel: "error" });
+  const server = await createServer({ logLevel: "error", server: { port: 0, strictPort: false } });
   await server.listen();
   return {
-    url: "http://localhost:5178/",
+    url: `http://localhost:${server.httpServer.address().port}/`,
     vault,
     async close() {
       await server.close();

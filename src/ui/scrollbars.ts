@@ -6,7 +6,7 @@ const LEAST = 32;
 const IDLE_MS = 800;
 const INPUT_MS = 250;
 const YIELDS_TO = ".sidebar-resize, .rail-resize, .rail-section-resize, .trail-x";
-const BARLESS = ".graph-groups";
+const BARLESS = ".graph-groups, .is-preview *";
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "]);
 
 const roomOn = (el: Element, axis: Axis) => (axis === "y" ? el.scrollHeight - el.clientHeight : el.scrollWidth - el.clientWidth);
@@ -26,15 +26,15 @@ export function nearest(from: Element | null, axis: Axis): Element | null {
 
 /** The part of a scroller on screen: a wide table can run past the bottom of the note holding it. */
 function visibleBox(el: Element): DOMRect {
-  const box = el.getBoundingClientRect();
-  let { left, top, right, bottom } = box;
-  for (const axis of ["x", "y"] as const) {
-    const outer = nearest(el.parentElement, axis)?.getBoundingClientRect();
-    if (!outer) continue;
-    left = Math.max(left, outer.left);
-    top = Math.max(top, outer.top);
-    right = Math.min(right, outer.right);
-    bottom = Math.min(bottom, outer.bottom);
+  let { left, top, right, bottom } = el.getBoundingClientRect();
+  for (let outer = el.parentElement; outer && outer !== document.body; outer = outer.parentElement) {
+    const style = getComputedStyle(outer);
+    if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+    const clip = outer.getBoundingClientRect();
+    left = Math.max(left, clip.left);
+    top = Math.max(top, clip.top);
+    right = Math.min(right, clip.right);
+    bottom = Math.min(bottom, clip.bottom);
   }
   return new DOMRect(left, top, right - left, bottom - top);
 }

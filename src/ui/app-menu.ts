@@ -28,7 +28,7 @@ export async function bindAppMenu(reader: Reader): Promise<void> {
   new MutationObserver(() => {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(() => {
+    queueMicrotask(() => {
       queued = false;
       update();
     });

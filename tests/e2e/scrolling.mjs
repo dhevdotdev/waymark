@@ -150,6 +150,38 @@ check(
     .evaluate((t) => t.scrollLeft)) > 0,
 );
 
+await pause(1000);
+await page.evaluate(() => {
+  const card = document.createElement("div");
+  card.style.cssText = "position:fixed;left:400px;top:200px;width:300px;height:80px;overflow:hidden;z-index:60";
+  card.className = "x-card";
+  const doc = document.createElement("div");
+  doc.className = "doc is-preview";
+  const wrap = document.createElement("div");
+  wrap.className = "table-wrap";
+  wrap.style.overflowX = "auto";
+  wrap.innerHTML = `<div style="width:1200px;height:200px">wide</div>`;
+  doc.append(wrap);
+  card.append(doc);
+  document.querySelector(".shell").append(card);
+});
+await pause(80);
+await page.mouse.move(500, 230);
+await pause(40);
+await page.mouse.wheel(120, 0);
+await pause(160);
+check("a note preview never shows a bar", !(await bar("x")).on, JSON.stringify(await bar("x")));
+await page.evaluate(() => {
+  const wrap = document.querySelector(".x-card .doc");
+  wrap.classList.remove("is-preview");
+});
+await page.mouse.wheel(-40, 0);
+await pause(160);
+const clipped = await bar("x");
+check("a bar stays inside whatever clips its table", clipped.on && clipped.bottom <= 280.5, JSON.stringify(clipped));
+await page.evaluate(() => document.querySelector(".x-card").remove());
+await pause(1000);
+
 const sidebar = await page.locator(".sidebar-resize").boundingBox();
 await page.mouse.move(sidebar.x + sidebar.width / 2, 300);
 await pause(150);
