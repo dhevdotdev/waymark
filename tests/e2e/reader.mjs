@@ -438,9 +438,28 @@ const trailClearance = () =>
   );
 check("a note's title clears the map above it", (await trailClearance()) >= 16, String(await trailClearance()));
 check(
-  "the map can grow past three rows",
-  (await page.locator(".trail-scroll").evaluate((s) => Number.parseFloat(getComputedStyle(s).maxBlockSize))) >= 96,
+  "the map takes one row above the note",
+  (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) <= 44,
 );
+check(
+  "the note's area starts below the map",
+  await page.evaluate(
+    () =>
+      document.querySelector(".scroller").getBoundingClientRect().top >=
+      document.querySelector(".trail").getBoundingClientRect().bottom - 1,
+  ),
+);
+const titleBeforeOpen = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
+await page.locator(".trail-more").click();
+await pause(120);
+check(
+  "the whole map opens over the note without moving it",
+  (await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top)) === titleBeforeOpen &&
+    (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) > 44,
+);
+await page.keyboard.press("Escape");
+await pause(120);
+check("Escape closes the whole map", (await page.locator(".trail").evaluate((t) => t.getBoundingClientRect().height)) <= 44);
 const closeControlIsLeading = (root, [button, label]) => {
   const box = (selector) => root.querySelector(selector).getBoundingClientRect();
   const control = box(button);

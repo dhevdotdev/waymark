@@ -1,5 +1,6 @@
 import type { Placement } from "../vault/trail";
 import { icons } from "./icons";
+import { dismissOnOutside } from "./overlays";
 
 export interface TrailEntry extends Placement {
   label: string;
@@ -23,6 +24,9 @@ export class TrailMap {
   private scroller = document.createElement("div");
   private seen = new Set<number>();
   private tabId = -1;
+  private readonly more = document.createElement("button");
+  private active: Box | undefined;
+  private stopListening: (() => void) | null = null;
 
   constructor(
     private on: { select: (id: number, newTab: boolean) => void; remove: (id: number) => void; toggle: (id: number) => void },
@@ -32,13 +36,20 @@ export class TrailMap {
     this.scroller.className = "trail-scroll";
     this.inner.className = "trail-inner";
     this.scroller.append(this.inner);
-    this.root.append(this.scroller);
+    this.more.type = "button";
+    this.more.className = "icon-btn trail-more";
+    this.more.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>`;
+    this.more.setAttribute("aria-label", "Show the whole trail");
+    this.more.setAttribute("aria-expanded", "false");
+    this.more.dataset.tip = "Show the whole trail";
+    this.more.addEventListener("click", () => this.setOpen(!this.isOpen));
+    this.root.append(this.scroller, this.more);
     this.scroller.addEventListener("scroll", () => this.markEnds(), { passive: true });
     this.scroller.addEventListener(
       "wheel",
       (e) => {
         const s = this.scroller;
-        if (s.scrollHeight > s.clientHeight || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+        if ((this.isOpen && s.scrollHeight > s.clientHeight) || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
         e.preventDefault();
         s.scrollLeft += e.deltaY;
       },
@@ -137,6 +148,7 @@ export class TrailMap {
     }
     this.inner.style.inlineSize = `${width + 4}px`;
     this.inner.style.blockSize = `${height}px`;
+    this.more.hidden = height <= ROW;
     svg.setAttribute("width", String(width + 4));
     svg.setAttribute("height", String(height));
     return box;
@@ -179,8 +191,23 @@ export class TrailMap {
     this.inner.append(fold);
   }
 
+  private get isOpen(): boolean {
+    return this.root.classList.contains("is-open");
+  }
+
+  /** One row sits above the note. The whole map opens over it, and closing returns to the row holding the current note. */
+  setOpen(open: boolean): void {
+    if (open === this.isOpen) return;
+    this.root.classList.toggle("is-open", open);
+    this.more.setAttribute("aria-expanded", String(open));
+    this.stopListening?.();
+    this.stopListening = open ? dismissOnOutside([this.root], () => this.setOpen(false)) : null;
+    if (!open) this.scrollTo(this.active);
+  }
+
   /** Brings the current node into view. */
   private scrollTo(active: Box | undefined): void {
+    this.active = active;
     if (!active) return;
     const s = this.scroller;
     if (active.x < s.scrollLeft) s.scrollLeft = Math.max(0, active.x - 12);

@@ -9,7 +9,6 @@ export interface TrailHost {
   saveScroll: () => void;
   show: () => void;
   persist: () => void;
-  scroller: HTMLElement;
 }
 
 /** The map of where a tab has been, and what clicking on it does. */
@@ -40,13 +39,15 @@ export class TrailActions {
     this.reserveRoom();
   }
 
-  /** A note starts below the map. Folding or removing a stop leaves the note where it is, and the next note fits the map again. */
+  /** The note's area starts below the map, so nothing slides under it. Removing the last stop leaves the note where it is until the next note. */
   private reserveRoom(): void {
     const { id, trail } = this.host.tab();
     const key = `${id}:${trail.current.id}`;
     if (key === this.roomFor) return;
     this.roomFor = key;
-    this.host.scroller.style.setProperty("--trail-room", `${this.map.root.hidden ? 0 : this.map.root.offsetHeight}px`);
+    this.map.setOpen(false);
+    const scroller = this.map.root.parentElement?.querySelector<HTMLElement>(".scroller");
+    scroller?.style.setProperty("--trail-room", `${this.map.root.hidden ? 0 : this.map.root.offsetHeight}px`);
   }
 
   private select(id: number, newTab: boolean): void {

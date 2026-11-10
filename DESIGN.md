@@ -49,6 +49,7 @@ Every state has a visible way in and a visible way out.
 - Tabs reorder by dragging and from the tab's menu or the palette. Pinned tabs sit together at the left, survive a relaunch and cannot be closed by accident: closing one says to unpin it first.
 - Search reads `path:part` and `-word` alongside words and "quoted phrases". Filters narrow the list and are never highlighted. A query of only filters lists what passes.
 - Copy link gives the vault's own `[[Note#Heading]]` form, using the path only when another note shares the name.
+- The trail is one row above the note, and the note's area starts below it, so nothing slides under it. Branches open over the page from its chevron and close with Escape.
 - A destructive confirmation arms nothing when it opens. The dialog holds focus, Return moves to Cancel, and Delete needs its button reached on purpose. Other confirmations keep Return.
 - The outline is a dash per heading on the right edge, whether or not the inspector is open. Hovering opens the titles. There is one outline, so the inspector has no tab for it. The dashes step aside while editing.
 - A new tab shows the date, three ways to go somewhere, and recently open notes with their task progress.

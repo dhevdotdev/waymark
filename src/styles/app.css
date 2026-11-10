@@ -836,9 +836,34 @@ kbd {
   position: static;
   grid-row: 1;
 }
+.scroller {
+  margin-block-start: var(--trail-room, 0px);
+}
 .reader:has(> .trail:not([hidden])) .scroller {
-  padding-block-start: var(--trail-room, 0px);
-  scroll-padding-top: calc(var(--trail-room, 40px) + 12px);
+  scroll-padding-top: 12px;
+}
+.trail.is-open {
+  box-shadow: var(--shadow-float);
+}
+.trail.is-open .trail-scroll {
+  max-block-size: min(50vh, 420px);
+}
+.trail-more {
+  flex: none;
+  align-self: center;
+}
+.trail-more svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.trail-more[hidden] {
+  display: none;
+}
+.trail.is-open .trail-more svg {
+  rotate: 180deg;
 }
 .trail[hidden] {
   display: none;
@@ -848,8 +873,7 @@ kbd {
   --fade-end: 0px;
   flex: 1;
   min-inline-size: 0;
-  /* Three and a half rows, so a cut-off row shows there is more below. */
-  max-block-size: 112px;
+  max-block-size: 32px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -1107,7 +1131,7 @@ kbd {
 .scroller {
   overflow-y: auto;
   overflow-x: hidden;
-  height: 100%;
+  height: calc(100% - var(--trail-room, 0px));
   container: reader / inline-size;
   user-select: text;
   -webkit-user-select: text;
