@@ -453,16 +453,27 @@ check(
     );
   }),
 );
+/**
+ * Every shape the icon is drawn in, from before the click until it has moved and then rested, or for three seconds.
+ * The spring runs on time, so a machine that paints the graph slowly gives it fewer frames, and a fixed window can
+ * end before it settles.
+ */
 const arrowFrames = (selector) =>
   page.evaluate(
     (target) =>
       new Promise((resolve) => {
         const seen = new Set();
         const started = performance.now();
+        let changed = started;
         const look = () => {
+          const now = performance.now();
           const d = document.querySelector(target)?.getAttribute("d");
-          if (d) seen.add(d);
-          if (performance.now() - started < 500) requestAnimationFrame(look);
+          if (d && !seen.has(d)) {
+            seen.add(d);
+            changed = now;
+          }
+          const rested = seen.size > 1 && now - changed >= 300;
+          if (!rested && now - started < 3000) requestAnimationFrame(look);
           else resolve([...seen]);
         };
         look();
