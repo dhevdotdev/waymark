@@ -181,7 +181,10 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘⇧F",
       keywords: "find full text",
       inField: true,
-      run: (origin) => r.sidebar.showSearch(origin === "key" ? window.getSelection()?.toString().trim() || undefined : undefined),
+      run: (origin) =>
+        r.sidebar.showSearch(
+          r.palette.takeQuery() ?? (origin === "key" ? window.getSelection()?.toString().trim() || undefined : undefined),
+        ),
     },
     {
       id: "graph",

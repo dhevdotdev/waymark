@@ -100,7 +100,7 @@ function template(options: ShellOptions): string {
             <div class="rail-section-body rail-trail"></div>
           </section>
           <section class="rail-section" data-section="graph" aria-label="Local graph">
-            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="graph"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Graph</span></button><button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph">${icons.expand}</button></div>
+            <div class="rail-section-head"><button class="rail-section-toggle" data-fold-section="graph"><svg class="rail-section-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg><span class="rail-section-name">Graph</span></button><button class="icon-btn rail-graph-open" data-act="graph-local" data-tip="Open as a full graph" data-key="⌘⇧G" aria-label="Open as a full graph"></button></div>
             <div class="rail-section-body rail-graph"></div>
           </section>
         </div>

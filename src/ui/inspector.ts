@@ -5,6 +5,7 @@ import { FloatingOutline } from "./floating-outline";
 import { icons } from "./icons";
 import { LocalGraph } from "./local-graph";
 import { railFloats } from "./media";
+import { MorphArrows } from "./morph-arrows";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import { bindPanelResize } from "./panel-resize";
 import type { ShellElements } from "./shell";
@@ -31,6 +32,7 @@ export class Inspector {
   private localGraph: LocalGraph | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
+  private readonly expandArrows = new MorphArrows("apart");
   private readonly vacant: Record<RailSection, boolean> = { trail: true, graph: true };
 
   constructor(
@@ -42,6 +44,9 @@ export class Inspector {
   ) {
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
+    const expand = els.shell.querySelector<HTMLElement>(".rail-graph-open")!;
+    expand.append(this.expandArrows.svg);
+    expand.addEventListener("click", () => this.expandArrows.snap("together"));
     bindPanelResize(els.railResize, {
       shell: els.shell,
       variable: "--rail-w",
@@ -60,6 +65,7 @@ export class Inspector {
   render(path: string, rendered: RenderedNote): void {
     this.current = path;
     this.rendered = rendered;
+    this.expandArrows.to("apart");
     this.floating.render(rendered.headings.filter((h) => h.level === 2 || h.level === 3));
     this.renderLinks();
     this.renderInfo(rendered);

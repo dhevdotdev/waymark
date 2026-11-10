@@ -869,6 +869,16 @@
 .graph-foot {
   bottom: 10px;
 }
+@media (max-width: 680px) {
+  .graph-stats {
+    display: none;
+  }
+  .graph-toolbar .graph-filter {
+    flex: 1 1 40px;
+    width: auto;
+    min-inline-size: 0;
+  }
+}
 .graph-filter {
   flex: none;
   margin-left: auto;

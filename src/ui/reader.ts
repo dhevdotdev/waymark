@@ -588,6 +588,7 @@ export class Reader {
           const shown = this.tab.trail.current.view;
           return shown.kind === "graph" ? shown : null;
         },
+        leave: () => this.leaveGraph(),
         setScope: (scope) => {
           const shown = this.tab.trail.current.view;
           if (shown.kind !== "graph") return;

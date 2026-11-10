@@ -93,6 +93,14 @@ export class Palette {
     this.update();
   }
 
+  /** Closes and hands over what was typed, so it can be searched for instead. A command search has nothing to hand over. */
+  takeQuery(): string | undefined {
+    if (!this.root) return undefined;
+    const typed = this.input.value.trim();
+    this.close();
+    return typed && !typed.startsWith(">") ? typed : undefined;
+  }
+
   close(): void {
     if (!this.root) return;
     const root = this.root;

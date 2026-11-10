@@ -48,6 +48,5 @@ export const icons = {
   moon: svg(`<path d="M12.8 9.8A5.3 5.3 0 0 1 6.2 3.2a5.3 5.3 0 1 0 6.6 6.6z"/>`),
   plus: svg(`<path d="M8 3.5v9M3.5 8h9"/>`),
   minus: svg(`<path d="M3.5 8h9"/>`),
-  expand: svg(`<path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/>`),
   fit: svg(`<path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3"/>`),
 };

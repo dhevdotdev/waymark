@@ -4,6 +4,7 @@ import { GraphCanvas } from "./graph";
 import { groupColor } from "./graph-paint";
 import type { GraphData } from "./graph-types";
 import { icons } from "./icons";
+import { MorphArrows } from "./morph-arrows";
 import { plural } from "./plural";
 
 export type GraphTabView = Extract<View, { kind: "graph" }>;
@@ -18,6 +19,7 @@ const TEMPLATE = `
     <span class="graph-stats"></span>
     <div class="graph-filter">${icons.search}<input type="text" placeholder="Highlight notes" aria-label="Highlight notes by name" spellcheck="false" /></div>
     <div class="graph-zoom"><button class="icon-btn" data-gz="out" aria-label="Zoom out">${icons.minus}</button><button class="icon-btn" data-gz="fit" aria-label="Fit to view">${icons.fit}</button><button class="icon-btn" data-gz="in" aria-label="Zoom in">${icons.plus}</button></div>
+    <button class="icon-btn graph-leave" data-gleave data-tip="Back to the note" data-key="esc" aria-label="Back to the note"></button>
   </div>
   <div class="graph-foot"><div class="graph-groups"></div></div>`;
 
@@ -26,6 +28,7 @@ export interface GraphViewHost {
   /** The graph view of the active tab, if it is showing one. */
   currentView: () => GraphTabView | null;
   setScope: (scope: GraphScope) => void;
+  leave: () => void;
 }
 
 function graphData(vault: VaultStore, paths: Set<string> | null): GraphData {
@@ -51,6 +54,7 @@ export class GraphView {
   private readonly strip: HTMLElement;
   private depth = 2;
   private spotlit: number | null = null;
+  private readonly leaveArrows = new MorphArrows("apart");
 
   constructor(
     parent: HTMLElement,
@@ -63,6 +67,8 @@ export class GraphView {
     this.root.querySelector(".graph-stage")!.append(this.canvas.canvas);
     this.strip = this.root.querySelector<HTMLElement>(".graph-groups")!;
     parent.append(this.root);
+    this.root.querySelector(".graph-leave")!.append(this.leaveArrows.svg);
+    this.leaveArrows.to("together");
     this.bind();
   }
 
@@ -75,6 +81,7 @@ export class GraphView {
   }
 
   destroy(): void {
+    this.leaveArrows.stop();
     this.canvas.destroy();
     this.root.remove();
   }
@@ -135,6 +142,10 @@ export class GraphView {
   }
 
   private onClick(target: HTMLElement): void {
+    if (target.closest("[data-gleave]")) {
+      this.host.leave();
+      return;
+    }
     const view = this.host.currentView();
     if (!view) return;
     const chip = target.closest<HTMLElement>("[data-ggroup]");

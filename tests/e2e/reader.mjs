@@ -230,6 +230,19 @@ check("palette opens the note", (await title()).startsWith("Tide charts"));
 
 await page.keyboard.press("Meta+k");
 await pause(150);
+await page.fill(".palette input", "harbour approach");
+await pause(100);
+await page.keyboard.press("Meta+Shift+f");
+await pause(250);
+check(
+  "⌘⇧F from the palette searches for what was typed there",
+  !(await page.isVisible(".palette")) && (await page.inputValue(".search-field input")) === "harbour approach",
+);
+check("and shows its results", (await page.locator(".search-hit").count()) > 0);
+await page.keyboard.press("Escape");
+await pause(150);
+await page.keyboard.press("Meta+k");
+await pause(150);
 const paletteSizeFor = async (query) => {
   await page.fill(".palette input", query);
   await pause(120);
@@ -309,11 +322,49 @@ check(
     );
   }),
 );
+const arrowFrames = (selector) =>
+  page.evaluate(
+    (target) =>
+      new Promise((resolve) => {
+        const seen = new Set();
+        const started = performance.now();
+        const look = () => {
+          const d = document.querySelector(target)?.getAttribute("d");
+          if (d) seen.add(d);
+          if (performance.now() - started < 500) requestAnimationFrame(look);
+          else resolve([...seen]);
+        };
+        look();
+      }),
+    selector,
+  );
+const APART = "M9.50 2.50L13.50 2.50L13.50 6.50";
+const TOGETHER = "M13.30 6.70L9.30 6.70L9.30 2.70";
+const leaveFrames = arrowFrames(".graph-leave path");
 await openGraph.click();
-await pause(900);
-check("the icon opens the full graph", await page.locator(".graph-view canvas").isVisible());
-await page.keyboard.press("Escape");
+const leaving = await leaveFrames;
 await pause(500);
+check("the icon opens the full graph", await page.locator(".graph-view canvas").isVisible());
+check(
+  "the arrows in the full graph turn inwards",
+  (await page.locator(".graph-leave path").getAttribute("d")).startsWith(TOGETHER),
+);
+check(
+  reduced ? "with Reduce Motion they go straight there" : "they spring through the shapes between",
+  reduced ? leaving.length === 1 : leaving.length >= 6,
+  `${leaving.length} shapes`,
+);
+const backFrames = arrowFrames(".rail-graph-open path");
+await page.locator(".graph-leave").click();
+const returning = await backFrames;
+await pause(300);
+check("the arrows take you back to the note", !(await page.locator(".graph-view").isVisible()));
+check("the panel's arrows turn back outwards", (await page.locator(".rail-graph-open path").getAttribute("d")).startsWith(APART));
+check(
+  reduced ? "and go straight there with Reduce Motion" : "and spring on the way",
+  reduced ? returning.length <= 2 : returning.length >= 6,
+  `${returning.length} shapes`,
+);
 await page.evaluate(() => {
   window.__graphText = 0;
   const original = CanvasRenderingContext2D.prototype.fillText;
