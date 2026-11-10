@@ -962,6 +962,58 @@ try {
     await activeCell(),
   );
 
+  const caretOnLine = (text) =>
+    page.evaluate((wanted) => {
+      const selection = getSelection();
+      const caret = selection.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
+      const line = [...document.querySelectorAll(".cm-line")].find(
+        (l) => !l.closest(".cm-table-widget") && l.textContent === wanted,
+      );
+      const box = line?.getBoundingClientRect();
+      return !!caret && !!box && caret.height > 0 && caret.top >= box.top - 2 && caret.bottom <= box.bottom + 2;
+    }, text);
+  const gaps = [
+    ["below", "Keep the notes", ["Home", "ArrowUp"], PLOT.replace("\n\nKeep", "\n\nx\n\nKeep")],
+    ["above", "Rotate the beds", ["End", "ArrowDown"], PLOT.replace("itself.\n\n", "itself.\n\nx\n\n")],
+  ];
+  for (const [side, from, keys, expected] of gaps) {
+    await open("Plot");
+    await page.locator(".cm-line", { hasText: from }).click();
+    for (const key of keys) await page.keyboard.press(key);
+    await page.keyboard.type("x");
+    await pause(80);
+    check(
+      `typing on the blank line ${side} a table keeps the text out of it and the caret in view`,
+      (await page.locator(".cm-table-widget tr").count()) === 4 && (await caretOnLine("x")),
+      `${await page.locator(".cm-table-widget tr").count()} rows`,
+    );
+    await settle();
+    check(
+      `the blank line ${side} the table stays between it and the typed text`,
+      (await disk("Plot")) === expected,
+      await disk("Plot"),
+    );
+  }
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".doc table");
+  check(
+    "Read agrees that the typed text is not a row",
+    (await page.locator(".doc table tr").count()) === 4 && (await page.locator(".doc p", { hasText: /^x$/ }).count()) === 1,
+  );
+  await open("Plot");
+  await page.locator(".cm-line", { hasText: "Keep the notes" }).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Delete");
+  await pause(150);
+  check(
+    "Delete on the blank line under a table never pulls the next line into it",
+    (await page.locator(".cm-table-widget tr").count()) === 4 && (await caretOnLine("Keep the notes after the table.")),
+    `${await page.locator(".cm-table-widget tr").count()} rows`,
+  );
+  await settle().catch(() => {});
+  check("and the file is untouched", (await disk("Plot")) === PLOT, await disk("Plot"));
+
   /* Semantics */
   await open("Plot");
   const grid = await page.evaluate(() => {
