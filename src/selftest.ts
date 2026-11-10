@@ -118,8 +118,12 @@ async function checkEditPreview({ app, reader, vault, check, until }: SelfTestCo
   await vault.applyChanges([]);
 }
 
+const NEEDS_FRAMES = "needs a drawn page; run with --drawn when nobody is using the Mac";
+
 /** Whole words must not jump between lines above the cursor. Only the system WebKit reflows this way, so only this check can see it. */
-async function checkLinesHoldStill({ app, reader, vault, check, until, wait }: SelfTestContext): Promise<void> {
+async function checkLinesHoldStill(ctx: SelfTestContext): Promise<void> {
+  const { app, reader, vault, check, until, wait } = ctx;
+  if (!ctx.drawn) return ctx.inconclusive("typing never moves words on the lines above", NEEDS_FRAMES);
   const note = "Selftest wrap.md";
   const text =
     "The idea here is to build apps that would help boost my identity in particular and it goes on for a good while longer than one line can hold, so that the note wraps over several lines of the column before the end of it";
@@ -170,6 +174,15 @@ async function checkLinesHoldStill({ app, reader, vault, check, until, wait }: S
   await reader.editing.finish();
   await vault.source.trashNote(note);
   await vault.applyChanges([]);
+}
+
+/** The run's window never reaches the screen, and WebKit stretches the timers of a page nobody can see. */
+async function checkTimersRunFree({ check, wait, log }: SelfTestContext): Promise<void> {
+  log(`page visibility: ${document.visibilityState}, focused: ${document.hasFocus()}`);
+  const start = performance.now();
+  for (let i = 0; i < 40; i++) await wait(5);
+  const elapsed = Math.round(performance.now() - start);
+  check("timers run at full speed with no window on screen", elapsed < 1000, elapsed);
 }
 
 /** Renaming and deleting folders in the packaged app, where the native commands run. */
@@ -228,6 +241,7 @@ async function runRead(ctx: SelfTestContext): Promise<void> {
   await checkDockIcons(ctx);
   await checkEditing(ctx);
   await checkEditPreview(ctx);
+  await checkTimersRunFree(ctx);
   await checkLinesHoldStill(ctx);
   await checkFolders(ctx);
   const sample = vault.index.attachments.find((p) => /\.png$/i.test(p));
@@ -389,14 +403,16 @@ async function runGit(ctx: SelfTestContext, played: string[]): Promise<void> {
     ? Math.abs(sheet.left + sheet.width / 2 - innerWidth / 2) <= 2 &&
       Math.abs(sheet.top + sheet.height / 2 - innerHeight / 2) <= 2
     : false;
-  check("the sync sheet opens in the centre of the window", centred, sheet);
+  if (ctx.drawn) check("the sync sheet opens in the centre of the window", centred, sheet);
+  else ctx.inconclusive("the sync sheet opens in the centre of the window", NEEDS_FRAMES);
   check("the sync sheet is not part of the reading pane", !document.querySelector(".reader .sync-sheet"));
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   await wait(300);
   check("Escape closes the sync sheet", !panel.isOpen && !document.querySelector(".sync-overlay"));
 }
 
-async function runCommit({ panel, vault, check, until, wait }: SelfTestContext): Promise<void> {
+async function runCommit(ctx: SelfTestContext): Promise<void> {
+  const { panel, vault, check, until, wait } = ctx;
   await panel.refresh();
   const saved = await vault.save("Written here.md", "# Written here\n", null);
   check("the note is saved", saved.kind === "saved", saved);
@@ -409,10 +425,11 @@ async function runCommit({ panel, vault, check, until, wait }: SelfTestContext):
   [...document.querySelectorAll<HTMLElement>(".sync-sheet .link-btn")].find((b) => b.textContent === "Stage all")?.click();
   while (panel.state.kind === "busy") {
     seen.add(tabsAt());
-    await new Promise((frame) => requestAnimationFrame(frame));
+    await (ctx.drawn ? new Promise((frame) => requestAnimationFrame(frame)) : wait(16));
   }
   seen.add(tabsAt());
-  check("staging moves nothing in the sync panel", seen.size === 1, [...seen]);
+  if (ctx.drawn) check("staging moves nothing in the sync panel", seen.size === 1, [...seen]);
+  else ctx.inconclusive("staging moves nothing in the sync panel", NEEDS_FRAMES);
   panel.close();
   await panel.commitAndSync("From Waymark");
   const after = await git.status();
@@ -490,15 +507,23 @@ async function runMode(ctx: SelfTestContext, mode: string): Promise<void> {
   if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
 }
 
-export async function runSelfTest(app: App, mode: string, log: (line: string) => void): Promise<Record<string, unknown>> {
+export async function runSelfTest(
+  app: App,
+  { mode, drawn }: { mode: string; drawn: boolean },
+  log: (line: string) => void,
+): Promise<Record<string, unknown>> {
   const reader = app.reader;
   if (!reader) throw new Error("The self-test needs an open vault");
   const { vault, sync } = reader;
   const panel = sync.panel;
-  const results: { name: string; ok: boolean; detail?: unknown }[] = [];
+  const results: { name: string; ok: boolean; detail?: unknown; inconclusive?: boolean }[] = [];
   const check = (name: string, ok: boolean, detail?: unknown) => {
     results.push({ name, ok, detail });
     log(`${ok ? "PASS" : "FAIL"} ${name} ${JSON.stringify(detail ?? "")}`);
+  };
+  const inconclusive = (name: string, why: string) => {
+    results.push({ name, ok: false, detail: why, inconclusive: true });
+    log(`INCONCLUSIVE ${name}: ${why}`);
   };
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (fn: () => boolean, ms = 8000) => {
@@ -510,12 +535,12 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
     return false;
   };
   const report: Record<string, unknown> = { mode, userAgent: navigator.userAgent, startup: { ...app.metrics } };
-  const ctx: SelfTestContext = { app, reader, vault, panel, check, wait, until, log, report };
+  const ctx: SelfTestContext = { app, reader, vault, panel, check, drawn, inconclusive, wait, until, log, report };
 
   if (mode === "empty") {
     await runEmpty(ctx);
     report.results = results;
-    report.passed = results.every((r) => r.ok);
+    report.passed = results.every((r) => r.ok || r.inconclusive);
     return report;
   }
 
@@ -530,6 +555,6 @@ export async function runSelfTest(app: App, mode: string, log: (line: string) =>
   }
 
   report.results = results;
-  report.passed = results.every((r) => r.ok);
+  report.passed = results.every((r) => r.ok || r.inconclusive);
   return report;
 }

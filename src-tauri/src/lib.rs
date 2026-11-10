@@ -533,7 +533,8 @@ async fn write_prefs(app: AppHandle, prefs: serde_json::Value) -> CmdResult<()> 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut app = tauri::Builder::default()
+        .activate_ignoring_other_apps(!selftest::unseen())
         .setup(|app| {
             menu::install(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
@@ -624,21 +625,22 @@ pub fn run() {
             selftest::selftest_log
         ])
         .build(tauri::generate_context!())
-        .expect("error while running Waymark")
-        .run(|app, event| match event {
-            RunEvent::ExitRequested {
-                code: None, api, ..
-            } => {
-                api.prevent_exit();
-                quit_after_saving(app);
-            }
-            RunEvent::WindowEvent {
-                event: WindowEvent::CloseRequested { api, .. },
-                ..
-            } => {
-                api.prevent_close();
-                quit_after_saving(app);
-            }
-            _ => {}
-        });
+        .expect("error while running Waymark");
+    selftest::stay_in_the_background(&mut app);
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested {
+            code: None, api, ..
+        } => {
+            api.prevent_exit();
+            quit_after_saving(app);
+        }
+        RunEvent::WindowEvent {
+            event: WindowEvent::CloseRequested { api, .. },
+            ..
+        } => {
+            api.prevent_close();
+            quit_after_saving(app);
+        }
+        _ => {}
+    });
 }

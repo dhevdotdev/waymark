@@ -10,6 +10,14 @@ import { writeFixtureVault } from "../e2e/fixture-vault.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const APP = path.join(ROOT, "src-tauri/target/release/bundle/macos/Waymark.app/Contents/MacOS/waymark");
 const TIMEOUT_MS = 180_000;
+/** A drawn page puts a transparent window up, which can activate the app, so it waits until nobody is using the Mac. */
+const IDLE_FOR_DRAWN_S = 300;
+const FORCE_DRAWN = process.argv.includes("--drawn");
+
+function idleSeconds() {
+  const found = /"HIDIdleTime" = (\d+)/.exec(execFileSync("ioreg", ["-c", "IOHIDSystem", "-d", "4"]).toString());
+  return found ? Number(found[1]) / 1e9 : 0;
+}
 
 const git = (cwd, ...args) =>
   execFileSync(
@@ -193,6 +201,7 @@ function launch(vault, mode, out, home) {
         WAYMARK_SELFTEST_OUT: out,
         WAYMARK_SELFTEST_VAULT: vault,
         WAYMARK_SELFTEST_MODE: mode,
+        ...(FORCE_DRAWN || idleSeconds() >= IDLE_FOR_DRAWN_S ? { WAYMARK_SELFTEST_DRAWN: "1" } : {}),
       },
       stdio: "ignore",
     });
@@ -209,7 +218,9 @@ function launch(vault, mode, out, home) {
 }
 
 let failed = 0;
-for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys(SETUP)) {
+let unsure = 0;
+const modes = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
+for (const mode of modes.length ? modes : Object.keys(SETUP)) {
   const base = await mkdtemp(path.join(tmpdir(), "waymark-native-"));
   try {
     const out = path.join(base, "report.json");
@@ -226,12 +237,16 @@ for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys
     }
     const report = JSON.parse(await readFile(out, "utf8"));
     await VERIFY[mode]?.(base);
-    const bad = report.results.filter((r) => !r.ok);
+    const bad = report.results.filter((r) => !r.ok && !r.inconclusive);
+    const open = report.results.filter((r) => r.inconclusive);
     failed += bad.length;
+    unsure += open.length;
+    const passed = report.results.length - bad.length - open.length;
     console.log(
-      `${bad.length ? "FAIL" : "PASS"}  ${mode}: ${report.results.length - bad.length}/${report.results.length}${report.render ? ` p50=${report.render.p50}ms p95=${report.render.p95}ms` : ""}`,
+      `${bad.length ? "FAIL" : open.length ? "INCONCLUSIVE" : "PASS"}  ${mode}: ${passed}/${report.results.length}${report.render ? ` p50=${report.render.p50}ms p95=${report.render.p95}ms` : ""}`,
     );
     for (const r of bad) console.log(`  FAIL ${r.name} ${JSON.stringify(r.detail ?? "")}`);
+    for (const r of open) console.log(`  INCONCLUSIVE ${r.name}: ${r.detail}`);
   } catch (err) {
     failed += 1;
     console.log(`FAIL  ${mode}: ${err.message}`);
@@ -239,4 +254,5 @@ for (const mode of process.argv.length > 2 ? process.argv.slice(2) : Object.keys
     await rm(base, { recursive: true, force: true });
   }
 }
+if (unsure) console.log(`${unsure} checks did not run. Rerun with --drawn when nobody is using the Mac.`);
 process.exit(failed ? 1 : 0);

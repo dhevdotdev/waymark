@@ -108,6 +108,10 @@ fn screens<R: Runtime>(window: &WebviewWindow<R>) -> Vec<Screen> {
 
 /// Sets the window's place while it is still hidden, then shows it.
 pub fn restore<R: Runtime>(window: &WebviewWindow<R>) {
+    if crate::selftest::unseen() {
+        crate::selftest::show(window);
+        return;
+    }
     let saved = state_path(window.app_handle()).and_then(|path| read(&path));
     if let Some(saved) = saved {
         if let Some(placement) = place(&saved, &screens(window)) {
@@ -163,7 +167,7 @@ static SAVE_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// Saves shortly after the window stops moving, so a drag writes the file once.
 fn note_change<R: Runtime>(window: &Window<R>) {
-    if SAVE_PENDING.swap(true, Ordering::SeqCst) {
+    if crate::selftest::unseen() || SAVE_PENDING.swap(true, Ordering::SeqCst) {
         return;
     }
     let window = window.clone();
