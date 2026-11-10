@@ -269,7 +269,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: min(460px, 72vh);
+  height: min(460px, 72vh);
 }
 .palette-field {
   display: flex;
@@ -1784,6 +1784,15 @@
   display: none;
 }
 
+.diff.is-compare .diff-line.is-del,
+.diff.is-compare .is-del .diff-word {
+  background: var(--fill);
+  color: var(--ink);
+}
+.diff.is-compare .diff-line.is-del .diff-sign,
+.diff.is-compare .diff-line.is-add .diff-sign {
+  visibility: hidden;
+}
 .compare-key {
   display: flex;
   gap: 16px;
@@ -1800,7 +1809,7 @@
   border-radius: 2px;
 }
 .compare-key .is-del::before {
-  background: color-mix(in oklab, var(--danger) 45%, var(--paper));
+  background: color-mix(in oklab, var(--ink) 18%, var(--paper));
 }
 .compare-key .is-add::before {
   background: color-mix(in oklab, var(--ok) 45%, var(--paper));

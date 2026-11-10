@@ -106,6 +106,7 @@ export class Palette {
     const q = this.input.value;
     this.items = q.trim() ? this.source(q) : this.recent();
     const commandsOnly = q.startsWith(">");
+    this.root?.querySelector<HTMLElement>(".palette-foot span:last-child")?.toggleAttribute("hidden", commandsOnly);
     const needle = commandsOnly ? q.slice(1).trim() : q.trim();
     const scored = this.items
       .filter((i) => (commandsOnly ? i.group === "Commands" : true))

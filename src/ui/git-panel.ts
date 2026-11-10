@@ -387,7 +387,7 @@ export class GitPanel {
       btn("Open in Terminal", true, true, () => void native.openTerminal(), "Resolve it there, where Git can ask you what to do");
     btn(
       blocked ? "Check again" : "Sync",
-      st.files.length === 0 && !blocked,
+      st.behind > 0 && !blocked,
       true,
       () => void this.sync(),
       blocked ? "Fetch and look again" : "Fetch, then apply incoming commits when that is a fast-forward",
