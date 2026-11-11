@@ -347,9 +347,26 @@ try {
   await page.unroute("**/@vault/rename");
 
   await page.emulateMedia({ reducedMotion: "reduce" });
+  /* The mark goes on once the move is written, which a slow machine takes longer to do than a fixed pause. */
+  const landing = page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const look = () => {
+          const count = document.querySelectorAll(".nav-item.is-landed").length;
+          if (!count) return;
+          observer.disconnect();
+          resolve(count);
+        };
+        const observer = new MutationObserver(look);
+        observer.observe(document.body, { attributes: true, attributeFilter: ["class"], childList: true, subtree: true });
+        setTimeout(() => {
+          observer.disconnect();
+          resolve(0);
+        }, 3000);
+      }),
+  );
   await dragTo(row("Inbox/Dup.md"), folder("Closed"));
-  await pause(80);
-  const marked = await page.locator(".nav-item.is-landed").count();
+  const marked = await landing;
   await pause(600);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   check("Reduce Motion keeps the landing mark", marked === 1, String(marked));
