@@ -108,11 +108,29 @@ const openHistorySheet = async () => {
   await page.locator(".rail-commit", { hasText: "An older commit" }).first().click();
   await page.waitForSelector(".sheet");
 };
+/** Runs `act`, then waits for the app to answer with a new toast or a question, since a restore reads and writes the vault first. */
+const answered = async (act) => {
+  await page.evaluate(() => {
+    window.answer = new Promise((resolve) => {
+      const observer = new MutationObserver((records) => {
+        const added = records.flatMap((r) => [...r.addedNodes]);
+        if (!added.some((n) => n.classList?.contains("toast") || n.classList?.contains("prompt-overlay"))) return;
+        observer.disconnect();
+        resolve();
+      });
+      observer.observe(document.body, { childList: true });
+      setTimeout(resolve, 5000);
+    });
+  });
+  await act();
+  await page.evaluate(() => window.answer);
+};
 const restoreClick = async () => {
   await openHistorySheet();
-  await page.locator('.sheet button:has-text("Restore this version")').click();
+  await answered(() => page.locator('.sheet button:has-text("Restore this version")').click());
   await pause(350);
 };
+const confirmRestore = () => answered(() => page.locator('button:has-text("Save a copy and restore")').click());
 const typeInEditor = async (text) => {
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
@@ -158,7 +176,7 @@ try {
   check("cancelling changes nothing", (await disk("Dirty.md")) === "Work not committed.\n");
   check("cancelling leaves no copy", !readdirSync(app.vault).some((f) => f.startsWith("Dirty (before restore")));
   await restoreClick();
-  await page.locator('button:has-text("Save a copy and restore")').click();
+  await confirmRestore();
   await pause(400);
   const copies = readdirSync(app.vault).filter((f) => f.startsWith("Dirty (before restore"));
   check(
@@ -181,7 +199,7 @@ try {
   await restoreClick();
   check("an unsaved editor asks first", await page.locator('button:has-text("Save a copy and restore")').isVisible());
   await page.unroute("**/@vault/write");
-  await page.locator('button:has-text("Save a copy and restore")').click();
+  await confirmRestore();
   await pause(500);
   const unsavedCopies = readdirSync(app.vault).filter((f) => f.startsWith("Unsaved (before restore"));
   check(
@@ -224,7 +242,7 @@ try {
   });
   await openHistorySheet();
   await unlink(file("Gone.md"));
-  await page.locator('.sheet button:has-text("Restore this version")').click();
+  await answered(() => page.locator('.sheet button:has-text("Restore this version")').click());
   await pause(400);
   check("a note deleted meanwhile comes back with the old text", (await disk("Gone.md")) === "The older text.\n");
 
