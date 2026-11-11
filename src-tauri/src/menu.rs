@@ -172,7 +172,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     app.on_menu_event(|app, event| {
         let id = event.id().0.as_str();
         if id == QUIT {
-            crate::quit_after_saving(app);
+            crate::quit::quit_after_saving(app);
         } else if every_item().any(|item| item.id == id) {
             let _ = app.emit("menu-command", id);
         }
