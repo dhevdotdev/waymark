@@ -262,15 +262,17 @@ const uneven = await sampleSwipe(
 );
 const during = uneven.samples.filter((s) => s.sent > 0 && s.t <= uneven.last);
 const easedFrames = during.filter((s, i) => i > 0 && s.sent === during[i - 1].sent && s.back.x !== during[i - 1].back.x);
-const finalSteps = steps(uneven.samples.slice(-4), "back", "x");
+const unevenEnd = uneven.samples.at(-1).back;
+/** Where the cue rests for a progress: 30px of travel from outside the edge, slowing towards the threshold. */
+const restingX = -(1 - (1 - (1 - unevenEnd.progress) ** 2)) * 30;
 const xs = uneven.samples.filter((s) => s.back.o > 0).map((s) => s.back.x);
 check(
   "the cue eases between uneven events and settles where the fingers are",
   easedFrames.length >= 3 &&
     xs.every((x, i) => i === 0 || x >= xs[i - 1] - 0.01) &&
-    finalSteps.every((d) => d < 0.05) &&
+    Math.abs(unevenEnd.x - restingX) < 0.1 &&
     Math.abs(xs.at(-1) - during.at(-1).back.x) > 0.5,
-  `eased frames ${easedFrames.length}, last steps ${finalSteps.map((d) => d.toFixed(3)).join("/")}`,
+  `eased frames ${easedFrames.length}, rests at ${unevenEnd.x.toFixed(2)} for ${restingX.toFixed(2)}`,
 );
 await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
 await pause(250);
