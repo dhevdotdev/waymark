@@ -680,8 +680,22 @@ try {
 
   await open("Plot");
   await aim(2, 1);
+  /* The trace fades over a press's length, so a slow machine can finish it before a fixed pause ends. Count it as it is drawn. */
+  await page.evaluate(() => {
+    window.ghostCells = new Promise((resolve) => {
+      const observer = new MutationObserver((records) => {
+        const layer = records.flatMap((r) => [...r.addedNodes]).find((n) => n.classList?.contains("cm-table-ghost"));
+        if (!layer) return;
+        observer.disconnect();
+        resolve(layer.querySelectorAll(".cm-table-ghost-cell").length);
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+  });
   await menuPick(rowGrip(), "Delete row");
-  const ghostCount = await page.locator(".cm-table-ghost-cell").count();
+  const ghostCount = await page.evaluate(() =>
+    Promise.race([window.ghostCells, new Promise((r) => setTimeout(() => r(0), 3000))]),
+  );
   check("a deleted row leaves a trace", ghostCount === 3, String(ghostCount));
   check("the cursor stays where the row was", (await activeCell()) === "2,1", await activeCell());
   await settle();
