@@ -118,24 +118,29 @@ const swipe = async (dx, dy = 0, steps = 8, settle = 320) => {
 /** Whether the cue was ever both showing and filled, however briefly it held. */
 const watchFill = () =>
   page.evaluate(() => {
-    const el = document.querySelector(".swipe-cue");
     window.__filled = false;
-    new MutationObserver((_, observer) => {
-      if (el.classList.contains("is-on") && el.classList.contains("is-ready")) {
-        window.__filled = true;
-        observer.disconnect();
-      }
-    }).observe(el, { attributes: true, attributeFilter: ["class"] });
+    for (const el of document.querySelectorAll(".swipe-cue")) {
+      new MutationObserver((_, observer) => {
+        if (el.classList.contains("is-on") && el.classList.contains("is-ready")) {
+          window.__filled = true;
+          observer.disconnect();
+        }
+      }).observe(el, { attributes: true, attributeFilter: ["class"] });
+    }
   });
+/** The cue that is on, or else the one still showing, read after the frame that presents the latest event. */
 const cue = () =>
-  page.evaluate(() => {
-    const el = document.querySelector(".swipe-cue");
+  page.evaluate(async () => {
+    await new Promise(requestAnimationFrame);
+    const cues = [...document.querySelectorAll(".swipe-cue")];
+    const el =
+      cues.find((c) => c.classList.contains("is-on")) ?? cues.find((c) => Number(getComputedStyle(c).opacity) > 0) ?? cues[0];
     const style = getComputedStyle(el);
     return {
-      on: el.classList.contains("is-on"),
+      on: cues.some((c) => c.classList.contains("is-on")),
       ready: el.classList.contains("is-ready"),
       side: el.dataset.side,
-      progress: Number(style.getPropertyValue("--swipe")),
+      progress: Number(el.dataset.progress ?? 0),
       opacity: Number(style.opacity),
       clicks: style.pointerEvents,
       placed: style.position,
@@ -163,7 +168,7 @@ check(
   partway.clicks === "none" && partway.placed === "absolute" && (await docBox()) === layoutBefore,
 );
 await page
-  .waitForFunction(() => getComputedStyle(document.querySelector(".swipe-cue")).opacity === "0", null, {
+  .waitForFunction(() => [...document.querySelectorAll(".swipe-cue")].every((c) => getComputedStyle(c).opacity === "0"), null, {
     polling: 50,
     timeout: 2000,
   })
@@ -203,9 +208,179 @@ await swipe(-260, 0, 16, 400);
 check("crossing the threshold fills the cue", await page.evaluate(() => window.__filled));
 check("it goes back one step however long the momentum runs", (await title()) === "Swipe one", await title());
 check("the filled cue fades once it has stepped", (await cue()).opacity === 0, JSON.stringify(await cue()));
+/**
+ * Dispatches wheel events in the page at chosen gaps and samples both cues on every frame until
+ * `tail` ms after the last one, so timing is the page's own and not the runner's.
+ */
+const sampleSwipe = (events, tail) =>
+  page.evaluate(
+    async ([script, after]) => {
+      const p = document.querySelector(".doc p");
+      const read = (side) => {
+        const el = document.querySelector(`.swipe-cue[data-side="${side}"]`);
+        const style = getComputedStyle(el);
+        return {
+          o: Number(style.opacity),
+          x: new DOMMatrix(style.transform).m41,
+          left: el.getBoundingClientRect().left,
+          progress: Number(el.dataset.progress ?? 0),
+        };
+      };
+      const samples = [];
+      let sent = 0;
+      let running = true;
+      const frame = (t) => {
+        samples.push({ t, sent, back: read("back"), forward: read("forward") });
+        if (running) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+      for (const [gap, dx, dy] of script) {
+        await new Promise((r) => setTimeout(r, gap));
+        p.dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy ?? 0, bubbles: true }));
+        sent += 1;
+      }
+      const last = performance.now();
+      await new Promise((r) => setTimeout(r, after));
+      running = false;
+      return { samples, last };
+    },
+    [events, tail],
+  );
+const steps = (samples, side, key) => samples.slice(1).map((s, i) => Math.abs(s[side][key] - samples[i][side][key]));
+await page.mouse.move(...(await notePoint(".doc p")));
+const uneven = await sampleSwipe(
+  [
+    [0, -10],
+    [8, -10],
+    [40, -10],
+    [10, -10],
+    [45, -10],
+    [12, -10],
+    [30, -10],
+  ],
+  150,
+);
+const during = uneven.samples.filter((s) => s.sent > 0 && s.t <= uneven.last);
+const easedFrames = during.filter((s, i) => i > 0 && s.sent === during[i - 1].sent && s.back.x !== during[i - 1].back.x);
+const finalSteps = steps(uneven.samples.slice(-4), "back", "x");
+const xs = uneven.samples.filter((s) => s.back.o > 0).map((s) => s.back.x);
+check(
+  "the cue eases between uneven events and settles where the fingers are",
+  easedFrames.length >= 3 &&
+    xs.every((x, i) => i === 0 || x >= xs[i - 1] - 0.01) &&
+    finalSteps.every((d) => d < 0.05) &&
+    Math.abs(xs.at(-1) - during.at(-1).back.x) > 0.5,
+  `eased frames ${easedFrames.length}, last steps ${finalSteps.map((d) => d.toFixed(3)).join("/")}`,
+);
+await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
+await pause(250);
+const nearSlack = await sampleSwipe([[0, -30], ...Array.from({ length: 10 }, (_, i) => [16, 0, i % 2 === 0 ? 16 : -16])], 60);
+const flicker = Math.max(...steps(nearSlack.samples, "back", "o"));
+check(
+  "a swipe that hovers near the slack or turns vertical does not flicker",
+  flicker < 0.15 && nearSlack.samples.some((s) => s.back.o > 0),
+  `largest change in one frame ${flicker.toFixed(3)}`,
+);
+await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
+await pause(250);
+const bothWays = await page.evaluate(() => {
+  const { trail } = window.waymark.reader.workspace.active;
+  return trail.canBack && trail.canForward;
+});
+const turned = await sampleSwipe(
+  [
+    [0, -10],
+    [16, -10],
+    [16, -10],
+    [16, -10],
+    [60, 20],
+    [16, 20],
+    [16, 20],
+    [16, 20],
+  ],
+  120,
+);
+const spread = (samples, side) => {
+  const lefts = samples.map((s) => s[side].left);
+  return Math.max(...lefts) - Math.min(...lefts);
+};
+const backPeak = Math.max(...turned.samples.map((s) => s.back.o));
+const ends = turned.samples.at(-1);
+check(
+  "changing sides withdraws one cue and brings in the other, each at its own edge",
+  bothWays &&
+    Math.max(...steps(turned.samples, "back", "o"), ...steps(turned.samples, "forward", "o")) < 0.2 &&
+    spread(turned.samples, "back") < 40 &&
+    spread(turned.samples, "forward") < 40 &&
+    Math.max(...turned.samples.map((s) => s.back.left)) < Math.min(...turned.samples.map((s) => s.forward.left)) &&
+    ends.back.o < backPeak / 2 &&
+    ends.forward.o > 0.3 &&
+    ends.forward.progress > 0,
+  `back peak ${backPeak.toFixed(2)}, ends ${ends.back.o.toFixed(2)} / ${ends.forward.o.toFixed(2)}`,
+);
+await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
+await pause(250);
+check("neither half of that swipe navigated", (await title()) === "Swipe one", await title());
+await page.evaluate(() => {
+  const commands = window.waymark.reader.commands;
+  window.__run = commands.run.bind(commands);
+  commands.run = (id, how) => (id === "back" ? undefined : window.__run(id, how));
+});
+const regrab = await sampleSwipe(
+  [...Array.from({ length: 12 }, () => [8, -10]), [200, -10], [16, -10], [16, -10], [16, -10]],
+  60,
+);
+await page.evaluate(() => {
+  window.waymark.reader.commands.run = window.__run;
+});
+const afterCommit = regrab.samples.filter((s) => s.back.o > 0 && s.sent >= 12);
+const jumps = { o: Math.max(...steps(afterCommit, "back", "o")), x: Math.max(...steps(afterCommit, "back", "x")) };
+check(
+  "a swipe during the exit picks the cue up where it was",
+  afterCommit.length > 5 && jumps.o < 0.25 && jumps.x < 8 && regrab.samples.at(-1).back.progress > 0,
+  `largest change in one frame: opacity ${jumps.o.toFixed(3)}, ${jumps.x.toFixed(1)} px`,
+);
+await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
+await pause(250);
 await page.mouse.move(...(await notePoint(".doc p")));
 await swipe(260, 0, 16);
 check("swiping left goes forward", (await title()) === "Swipe two", await title());
+await page.evaluate(() => {
+  const commands = window.waymark.reader.commands;
+  const run = commands.run.bind(commands);
+  window.__run = run;
+  const back = document.querySelector('.swipe-cue[data-side="back"]');
+  new MutationObserver((_, observer) => {
+    if (!back.classList.contains("is-ready")) return;
+    window.__readyAt = performance.now();
+    observer.disconnect();
+  }).observe(back, { attributes: true, attributeFilter: ["class"] });
+  commands.run = (id, how) => {
+    if (id === "back") {
+      window.__goAt = performance.now();
+      while (performance.now() - window.__goAt < 450) {}
+      requestAnimationFrame(() => {
+        window.__afterBusy = back.getAnimations().filter((a) => a.playState === "running").length;
+      });
+    }
+    return run(id, how);
+  };
+});
+await swipe(-260, 0, 16, 0);
+await page.waitForFunction(() => window.__afterBusy !== undefined, null, { timeout: 5000 });
+const busy = await page.evaluate(() => {
+  window.waymark.reader.commands.run = window.__run;
+  return { running: window.__afterBusy, wait: Math.round(window.__goAt - window.__readyAt) };
+});
+check(
+  "the exit runs while the next note holds the page, and the step waits at most a frame for it",
+  busy.running === 0 && busy.wait >= 0 && busy.wait < 120,
+  JSON.stringify(busy),
+);
+await pause(320);
+check("that swipe went back", (await title()) === "Swipe one", await title());
+await swipe(260, 0, 16);
+check("and the next goes forward again", (await title()) === "Swipe two", await title());
 const mouseButton = (button) =>
   page.evaluate(
     (b) =>
@@ -235,14 +410,14 @@ await page.emulateMedia({ reducedMotion: "reduce" });
 await page.mouse.move(...(await notePoint(".doc p")));
 await swipe(-50, 0, 6, 0);
 const still = await page.evaluate(() => {
-  const el = document.querySelector(".swipe-cue");
-  return { on: el.classList.contains("is-on"), translate: getComputedStyle(el).translate };
+  const el = document.querySelector(".swipe-cue.is-on");
+  return { on: el !== null, transform: el && getComputedStyle(el).transform };
 });
 await pause(400);
 const settled = await cue();
 check(
   "under Reduce Motion the cue appears whole without following the fingers",
-  still.on && still.translate === "none" && settled.opacity === 0,
+  still.on && still.transform === "none" && settled.opacity === 0,
   `${JSON.stringify(still)} ${JSON.stringify(settled)}`,
 );
 await swipe(-260, 0, 16);

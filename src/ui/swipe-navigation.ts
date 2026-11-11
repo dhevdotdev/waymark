@@ -1,57 +1,33 @@
-import { icons } from "./icons";
 import { nearest } from "./scrollbars";
+import { type Step, SwipeCue } from "./swipe-cue";
 
 const NEEDED = 110;
 /** Sideways travel ignored before the cue shows, so a vertical scroll's drift draws nothing. */
 const SLACK = 12;
 /** Longer than the gap between momentum events, so a flick stays one gesture. */
 const GESTURE_GAP_MS = 180;
-/** Long enough to see the filled cue before it fades over the next note. */
-const COMMITTED_HOLD_MS = 160;
-
-type Step = -1 | 1;
+/** Fallback for a window whose frames are paused, so the step is never lost. */
+const UNPAINTED_MS = 100;
 
 export interface SwipeTarget {
   can: (step: Step) => boolean;
   go: (step: Step) => void;
 }
 
-/** The arrow at the edge of the note area that tracks a swipe and fills when letting go would navigate. */
-class SwipeCue {
-  readonly el = document.createElement("div");
-  private hold = 0;
-
-  constructor(host: HTMLElement) {
-    this.el.className = "swipe-cue";
-    this.el.setAttribute("aria-hidden", "true");
-    host.append(this.el);
-  }
-
-  track(step: Step, progress: number): void {
-    clearTimeout(this.hold);
-    const side = step < 0 ? "back" : "forward";
-    if (this.el.dataset.side !== side) {
-      this.el.dataset.side = side;
-      this.el.innerHTML = icons[side];
-    }
-    this.el.style.setProperty("--swipe", progress.toFixed(3));
-    this.el.classList.add("is-on");
-    this.el.classList.toggle("is-ready", progress >= 1);
-  }
-
-  /** Slides back to the edge it came from. */
-  cancel(): void {
-    clearTimeout(this.hold);
-    this.el.style.setProperty("--swipe", "0");
-    this.el.classList.remove("is-on", "is-ready");
-  }
-
-  /** Stays where it is, filled, and fades. */
-  commit(): void {
-    this.el.classList.add("is-ready");
-    clearTimeout(this.hold);
-    this.hold = window.setTimeout(() => this.el.classList.remove("is-on"), COMMITTED_HOLD_MS);
-  }
+/**
+ * Runs `act` once the current frame has been painted. Opening the next note can hold the main
+ * thread for a long frame; yielding one frame first lets the filled cue and its exit reach the
+ * compositor, which keeps them moving while the note renders.
+ */
+function afterPaint(act: () => void): void {
+  let done = false;
+  const once = () => {
+    if (done) return;
+    done = true;
+    act();
+  };
+  requestAnimationFrame(() => setTimeout(once, 0));
+  setTimeout(once, UNPAINTED_MS);
 }
 
 /** A two-finger swipe across `area` goes back or forward, once per gesture, with a cue drawn beside it. */
@@ -98,8 +74,8 @@ export function bindSwipeNavigation(area: HTMLElement, target: SwipeTarget): voi
       cue.track(step, Math.min(1, (across - SLACK) / (NEEDED - SLACK)));
       if (across < NEEDED) return;
       spent = true;
-      cue.commit();
-      target.go(step);
+      cue.commit(step);
+      afterPaint(() => target.go(step));
     },
     { passive: true },
   );
