@@ -37,11 +37,23 @@ export function bindTreeKeys(box: HTMLElement): void {
     if (row && (e.target as HTMLElement).matches(ROW)) holdStop(row);
   });
 
-  const moveTo = (row: HTMLElement | undefined) => {
-    if (!row) return;
+  /*
+   * WebKit on macOS leaves a pressed button unfocused, so without this a click would leave the arrows with no row to
+   * move from. A click on empty space hands the keys to the row that holds the Tab stop.
+   */
+  box.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const row = target.closest<HTMLElement>(ROW);
+    if (row ? !row.matches("button") : target.closest("button, input, textarea, a, [contenteditable]")) return;
+    (row ?? stop)?.focus({ preventScroll: true, focusVisible: false });
+  });
+
+  const moveTo = (row: HTMLElement | undefined): boolean => {
+    if (!row) return false;
     holdStop(row);
     row.focus({ preventScroll: true });
     row.scrollIntoView({ block: "nearest" });
+    return true;
   };
 
   const parentHead = (row: HTMLElement) => {
@@ -55,26 +67,28 @@ export function bindTreeKeys(box: HTMLElement): void {
     const rows = shownRows();
     const at = rows.indexOf(row);
     const open = row.getAttribute("aria-expanded") === "true";
-    const actions: Record<string, () => void> = {
+    const actions: Record<string, () => boolean> = {
       ArrowDown: () => moveTo(rows[at + 1]),
       ArrowUp: () => moveTo(rows[at - 1]),
       Home: () => moveTo(rows[0]),
       End: () => moveTo(rows.at(-1)),
       ArrowRight: () => {
-        if (!row.matches(".tree-head")) return;
-        if (open) moveTo(parentHead(rows[at + 1] ?? row) === row ? rows[at + 1] : undefined);
-        else row.click();
+        if (!row.matches(".tree-head")) return false;
+        if (open) return moveTo(parentHead(rows[at + 1] ?? row) === row ? rows[at + 1] : undefined);
+        row.click();
+        return true;
       },
       ArrowLeft: () => {
-        if (open) row.click();
-        else moveTo(parentHead(row));
+        if (!open) return moveTo(parentHead(row));
+        row.click();
+        return true;
       },
     };
     const action = actions[e.key];
     if (!action) return;
-    e.preventDefault();
     e.stopPropagation();
-    action();
+    /* A key with no row to reach keeps its default, so the list still scrolls at its ends. */
+    if (action()) e.preventDefault();
   });
   settle();
 }
