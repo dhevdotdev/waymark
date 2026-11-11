@@ -59,25 +59,34 @@ export function bindSwipeNavigation(area: HTMLElement, target: SwipeTarget): voi
   const cue = new SwipeCue(area.parentElement ?? area);
   let sideways = 0;
   let upright = 0;
-  let last = 0;
+  let between = true;
   let spent = false;
   let ended = 0;
-  const settle = () => {
-    if (!spent) cue.cancel();
+  /** Ends the gesture once the wheel has been quiet for the gap, counting only time the page was free to hear it. */
+  const listen = () => {
+    const armed = performance.now();
+    ended = window.setTimeout(() => {
+      // A timer this late means the page was busy, often opening the note just stepped to, and the momentum queued behind it is still this swipe.
+      if (performance.now() - armed > GESTURE_GAP_MS * 2) {
+        listen();
+        return;
+      }
+      between = true;
+      if (!spent) cue.cancel();
+    }, GESTURE_GAP_MS);
   };
   area.addEventListener(
     "wheel",
     (e) => {
-      const now = performance.now();
-      if (now - last > GESTURE_GAP_MS) {
+      if (between) {
+        between = false;
         sideways = 0;
         upright = 0;
         spent = e.ctrlKey || nearest(e.target as Element, "x") !== null;
       }
-      last = now;
-      if (spent) return;
       clearTimeout(ended);
-      ended = window.setTimeout(settle, GESTURE_GAP_MS);
+      listen();
+      if (spent) return;
       sideways += e.deltaX;
       upright += e.deltaY;
       const step: Step = sideways < 0 ? -1 : 1;

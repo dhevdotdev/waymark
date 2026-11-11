@@ -110,13 +110,23 @@ const notePoint = async (selector) => {
   const box = await page.locator(selector).first().boundingBox();
   return [box.x + box.width / 2, box.y + box.height / 2];
 };
+/** Sends one swipe's wheel events back to back, as the trackpad does, so a slow runner cannot split them into separate gestures. */
 const swipe = async (dx, dy = 0, steps = 8, settle = 320) => {
-  for (let i = 0; i < steps; i++) {
-    await page.mouse.wheel(dx / steps, dy / steps);
-    await pause(16);
-  }
+  await Promise.all(Array.from({ length: steps }, () => page.mouse.wheel(dx / steps, dy / steps)));
   await pause(settle);
 };
+/** Whether the cue was ever both showing and filled, however briefly it held. */
+const watchFill = () =>
+  page.evaluate(() => {
+    const el = document.querySelector(".swipe-cue");
+    window.__filled = false;
+    new MutationObserver((_, observer) => {
+      if (el.classList.contains("is-on") && el.classList.contains("is-ready")) {
+        window.__filled = true;
+        observer.disconnect();
+      }
+    }).observe(el, { attributes: true, attributeFilter: ["class"] });
+  });
 const cue = () =>
   page.evaluate(() => {
     const el = document.querySelector(".swipe-cue");
@@ -152,7 +162,12 @@ check(
   "the cue takes no clicks and moves nothing",
   partway.clicks === "none" && partway.placed === "absolute" && (await docBox()) === layoutBefore,
 );
-await pause(320);
+await page
+  .waitForFunction(() => getComputedStyle(document.querySelector(".swipe-cue")).opacity === "0", null, {
+    polling: 50,
+    timeout: 2000,
+  })
+  .catch(() => {});
 const cancelled = await cue();
 check(
   "stopping short cancels and the cue fades",
@@ -183,11 +198,9 @@ const overTable = await cue();
 await pause(320);
 check("swiping over a wide table scrolls the table only", (await title()) === "Swipe two" && !overTable.on, await title());
 await page.mouse.move(...(await notePoint(".doc p")));
-await swipe(-130, 0, 8, 0);
-const committed = await cue();
-check("crossing the threshold fills the cue", committed.on && committed.ready, JSON.stringify(committed));
-await swipe(-130, 0, 8, 0);
-await pause(400);
+await watchFill();
+await swipe(-260, 0, 16, 400);
+check("crossing the threshold fills the cue", await page.evaluate(() => window.__filled));
 check("it goes back one step however long the momentum runs", (await title()) === "Swipe one", await title());
 check("the filled cue fades once it has stepped", (await cue()).opacity === 0, JSON.stringify(await cue()));
 await page.mouse.move(...(await notePoint(".doc p")));
