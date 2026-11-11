@@ -1115,6 +1115,70 @@ kbd {
   cursor: auto;
   outline: 2px solid transparent;
 }
+/* Rests in the note's outer gutter, which no block of a note reaches, and slides in from its own edge. */
+.swipe-cue {
+  --swipe: 0;
+  --edge: -1;
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 50%;
+  inline-size: 28px;
+  block-size: 28px;
+  margin-block-start: -14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--float-bg);
+  color: var(--ink-3);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  opacity: 0;
+  translate: calc((1 - var(--swipe)) * 24px * var(--edge)) 0;
+  transition:
+    opacity var(--t-exit) var(--ease-out),
+    translate var(--t-exit) var(--ease-out),
+    background-color var(--t-press) var(--ease-out),
+    color var(--t-press) var(--ease-out);
+}
+.swipe-cue[data-side="back"] {
+  inset-inline-start: 2px;
+}
+.swipe-cue[data-side="forward"] {
+  --edge: 1;
+  inset-inline-end: 2px;
+}
+.swipe-cue svg {
+  inline-size: 16px;
+  block-size: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* While fingers move it follows them one to one; only the fill eases. */
+.swipe-cue.is-on {
+  opacity: calc(var(--swipe) * 2.5);
+  transition:
+    background-color var(--t-press) var(--ease-out),
+    color var(--t-press) var(--ease-out);
+}
+.swipe-cue.is-ready {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-cue {
+    translate: none;
+  }
+  .swipe-cue.is-on {
+    opacity: 1;
+    transition:
+      opacity var(--t-exit) var(--ease-out),
+      background-color var(--t-press) var(--ease-out),
+      color var(--t-press) var(--ease-out);
+  }
+}
 .doc-enter {
   animation: doc-enter 180ms var(--ease-out);
 }
