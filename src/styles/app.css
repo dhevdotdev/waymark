@@ -163,8 +163,7 @@ kbd {
   padding-right: 8px;
   box-shadow: inset 1px 0 var(--rule);
 }
-.shell.rail-closed .titlebar-trail,
-.shell.is-graph .titlebar-trail {
+.shell:is(.rail-closed, .is-graph, .is-blank, .is-base, :has(.empty-state.is-page)) .titlebar-trail {
   box-shadow: none;
 }
 

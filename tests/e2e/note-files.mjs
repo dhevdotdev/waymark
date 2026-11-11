@@ -613,6 +613,26 @@ try {
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" ") === "0/2 2/3",
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" "),
   );
+  const inspectorEdge = () =>
+    page.evaluate(() => ({
+      rail: document.querySelector(".rail").getBoundingClientRect().width,
+      edge: getComputedStyle(document.querySelector(".titlebar-trail")).boxShadow !== "none",
+    }));
+  const onBlank = await inspectorEdge();
+  check(
+    "a blank tab hides the inspector's edge in the title bar along with the inspector",
+    onBlank.rail === 0 && !onBlank.edge,
+    JSON.stringify(onBlank),
+  );
+  await page.keyboard.press("Meta+n");
+  await page.waitForSelector(".cm-content");
+  await pause(300);
+  const onNew = await inspectorEdge();
+  check(
+    "a new note from a blank tab brings the inspector back whole",
+    onNew.rail > 0 && onNew.edge && (await page.locator(".rail-tabs").isVisible()),
+    JSON.stringify(onNew),
+  );
 
   const diffGeometry = await page.evaluate(async () => {
     const { renderDiff } = await import(/* @vite-ignore */ `${location.origin}/src/ui/diff.ts`);
