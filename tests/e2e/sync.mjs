@@ -260,6 +260,8 @@ try {
     const refreshNow = () => page.evaluate(() => window.waymark.reader.sync.panel.refresh());
     await page.keyboard.press("Tab");
     await page.locator(".change-act").nth(20).focus();
+    /* WebKit can leave scrolling to a newly focused control for the next frame, so that frame passes before scrolling away. */
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.evaluate(() => {
       document.querySelector(".sync-body").scrollTop = 300;
     });
