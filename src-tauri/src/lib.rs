@@ -4,13 +4,13 @@ mod folders;
 mod git;
 mod menu;
 mod navigation;
+mod quit;
 mod selftest;
 mod trash;
 mod vault;
 mod window_state;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -21,8 +21,6 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 use git::{GitError, Status};
 use vault::{Vault, VaultInfo};
-
-static QUITTING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 struct Watcher(Mutex<Option<Debouncer<notify_debouncer_mini::notify::RecommendedWatcher>>>);
@@ -370,25 +368,6 @@ async fn write_attachment(
     .await
 }
 
-/// Called once the frontend has saved anything pending, so quitting can finish.
-#[tauri::command]
-fn finish_quit(app: AppHandle) {
-    app.exit(0);
-}
-
-/// Gives the frontend a moment to save before the app goes away. The timer covers a frontend that never answers.
-pub(crate) fn quit_after_saving(app: &AppHandle) {
-    if QUITTING.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    let _ = app.emit("save-before-quit", ());
-    let handle = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(5));
-        handle.exit(0);
-    });
-}
-
 #[tauri::command]
 async fn git_stage(vault: State<'_, Vault>, paths: Vec<String>) -> CmdResult<Status> {
     let root = vault.root().map_err(plain_err)?;
@@ -599,7 +578,7 @@ pub fn run() {
             menu::menu_items,
             menu::set_menu_enabled,
             write_attachment,
-            finish_quit,
+            quit::finish_quit,
             reveal,
             open_terminal,
             git_status,
@@ -627,19 +606,20 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running Waymark");
     selftest::stay_in_the_background(&mut app);
+    quit::install(app.handle());
     app.run(|app, event| match event {
         RunEvent::ExitRequested {
             code: None, api, ..
         } => {
             api.prevent_exit();
-            quit_after_saving(app);
+            quit::quit_after_saving(app);
         }
         RunEvent::WindowEvent {
             event: WindowEvent::CloseRequested { api, .. },
             ..
         } => {
             api.prevent_close();
-            quit_after_saving(app);
+            quit::quit_after_saving(app);
         }
         _ => {}
     });

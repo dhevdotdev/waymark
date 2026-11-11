@@ -253,3 +253,21 @@ export async function runLibrary({ app, reader, vault, check, until, wait }: Sel
   await reader.editing.finish();
   app.reader?.persist();
 }
+
+/**
+ * Leaves an edit waiting to save and keeps typing faster than the save delay, so nothing reaches the
+ * disk unless quitting saves it. The runner then sends the quit Apple event and reads the file.
+ */
+export async function runQuit({ app, reader, vault, check, until }: SelfTestContext): Promise<void> {
+  const note = "Selftest quit.md";
+  await app.open(note);
+  await until(() => document.querySelector(".doc [data-line]") !== null);
+  await reader.editing.open();
+  const editor = document.querySelector<HTMLElement>(".cm-content");
+  editor?.focus();
+  document.execCommand("insertText", false, "typed before quitting ");
+  check("the edit reached the editor", editor?.textContent?.includes("typed before quitting") ?? false);
+  const disk = await vault.source.readText(note);
+  check("the edit is still waiting to save", !disk.includes("typed before quitting"), disk);
+  setInterval(() => document.execCommand("insertText", false, "q "), 150);
+}

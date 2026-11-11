@@ -20,6 +20,8 @@ A run never takes focus and shows no window, so it can run while someone is usin
 
 When the Mac has had no keyboard or pointer input for five minutes (`HIDIdleTime`), or with `--drawn`, the runner asks for a drawn page instead. The window is transparent, takes no clicks and floats above the others, so nothing can cover it, and every check runs. Putting it up can activate the app, which is why it waits for idle.
 
+The `quit` mode types into a note, then sends the quit Apple event to the app's pid, as the Dock and logout do, and fails unless the edit is on disk within 8 seconds.
+
 To run a single mode against an existing build, use `node tests/native/run.mjs read`, or `node tests/native/run.mjs read --drawn` to run every check now.
 
 ## Reading a problem report

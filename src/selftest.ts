@@ -1,6 +1,6 @@
 import { git, native } from "./platform";
 import { runEmpty, runOrganize } from "./selftest-organize";
-import { runBackup, runConflict, runLibrary, runRelaunch, runRestore, type SelfTestContext } from "./selftest-recovery";
+import { runBackup, runConflict, runLibrary, runQuit, runRelaunch, runRestore, type SelfTestContext } from "./selftest-recovery";
 import type { App } from "./ui/app";
 
 async function runShow(ctx: SelfTestContext, mode: string): Promise<void> {
@@ -505,6 +505,7 @@ async function runMode(ctx: SelfTestContext, mode: string): Promise<void> {
   if (mode === "library") await runLibrary(ctx);
   if (mode === "organize") await runOrganize(ctx);
   if (mode.startsWith("relaunch")) await runRelaunch(ctx, mode);
+  if (mode === "quit") await runQuit(ctx);
 }
 
 export async function runSelfTest(

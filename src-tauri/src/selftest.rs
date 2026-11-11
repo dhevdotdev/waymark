@@ -103,7 +103,9 @@ pub fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), 
         serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    if std::env::var("WAYMARK_SELFTEST_STAY").is_err() {
+    // The quit mode ends with the runner sending the quit Apple event, which is what it tests.
+    let quits_by_itself = std::env::var("WAYMARK_SELFTEST_MODE").as_deref() != Ok("quit");
+    if quits_by_itself && std::env::var("WAYMARK_SELFTEST_STAY").is_err() {
         app.exit(0);
     }
     Ok(())

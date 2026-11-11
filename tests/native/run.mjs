@@ -1,5 +1,5 @@
 // Runs the packaged app's self-test against disposable vaults and fails on any failed check.
-// Usage: node tests/native/run.mjs [read|git|commit|diverged|blocked ...]
+// Usage: node tests/native/run.mjs [read|git|commit|diverged|blocked|quit ...]
 import { execFileSync, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -147,12 +147,25 @@ const SETUP = {
     await commitAll(vault, "fixture");
     return vault;
   },
+  async quit(base) {
+    const vault = path.join(base, "vault");
+    git(base, "init", "-q", "-b", "main", vault);
+    await writeFixtureVault(vault);
+    await writeFile(path.join(vault, QUIT_NOTE), QUIT_BODY);
+    await commitAll(vault, "fixture");
+    return vault;
+  },
   async blocked(base) {
     const vault = await vaultBehindRemote(base);
     await writeFile(path.join(vault, "Welcome.md"), "# Welcome\n\nmy local edit\n");
     return vault;
   },
 };
+
+const QUIT_NOTE = "Selftest quit.md";
+const QUIT_BODY = "# Selftest quit\n\nThe first text.\n";
+/** Longer than the app's own 5 s limit on saving before it quits. */
+const QUIT_LIMIT_MS = 8000;
 
 /** What must be true on disk afterwards, read with Git itself rather than through the app. */
 const VERIFY = {
@@ -182,6 +195,12 @@ const VERIFY = {
     const status = run("status", "--porcelain");
     if (!/ M "?Selftest note\.md/.test(status) || !status.includes("before restore")) throw new Error(`status: ${status}`);
   },
+  async quit(base) {
+    const text = await readFile(path.join(base, "vault", QUIT_NOTE), "utf8");
+    if (!text.includes("typed before quitting ")) throw new Error(`the edit was lost: ${JSON.stringify(text)}`);
+    const untyped = text.replace("typed before quitting ", "").replaceAll("q ", "");
+    if (untyped !== QUIT_BODY) throw new Error(`the rest of the note changed: ${JSON.stringify(text)}`);
+  },
   commit(base) {
     const remote = path.join(base, "remote.git");
     const subject = execFileSync("git", ["-C", remote, "log", "-1", "--format=%s", "main"]).toString().trim();
@@ -192,7 +211,35 @@ const VERIFY = {
   },
 };
 
-function launch(vault, mode, out, home) {
+/** The quit Apple event the Dock, `osascript` and logout send, aimed at one pid so the owner's own Waymark is never hit. */
+function sendQuitEvent(pid) {
+  const script = `ObjC.import("AppKit"); $.NSRunningApplication.runningApplicationWithProcessIdentifier(${pid}).terminate`;
+  return execFileSync("osascript", ["-l", "JavaScript", "-e", script]).toString().trim();
+}
+
+async function whenWritten(file, child) {
+  for (;;) {
+    if (child.exitCode !== null) throw new Error("the app quit before the edit was typed");
+    try {
+      return await readFile(file, "utf8");
+    } catch {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+}
+
+/** Quits the app by Apple event while an edit is still waiting to save, and fails if quitting hangs. */
+async function quitWhileTyping(child, out) {
+  await whenWritten(out, child);
+  const exited = new Promise((r) => child.on("exit", r));
+  const sent = Date.now();
+  if (sendQuitEvent(child.pid) !== "true") throw new Error("the quit Apple event was not delivered");
+  const late = await Promise.race([exited.then(() => false), new Promise((r) => setTimeout(r, QUIT_LIMIT_MS, true))]);
+  if (late) throw new Error(`still running ${QUIT_LIMIT_MS / 1000}s after the quit Apple event`);
+  return Date.now() - sent;
+}
+
+function launch(vault, mode, out, home, during) {
   return new Promise((resolve, reject) => {
     const child = spawn(APP, [], {
       env: {
@@ -209,10 +256,15 @@ function launch(vault, mode, out, home) {
       child.kill();
       reject(new Error(`timed out after ${TIMEOUT_MS / 1000}s`));
     }, TIMEOUT_MS);
+    const watching = during?.(child);
+    watching?.catch((err) => {
+      child.kill();
+      reject(err);
+    });
     child.on("error", reject);
     child.on("exit", () => {
       clearTimeout(timer);
-      resolve();
+      resolve(watching);
     });
   });
 }
@@ -232,6 +284,12 @@ for (const mode of modes.length ? modes : Object.keys(SETUP)) {
       const first = JSON.parse(await readFile(out, "utf8"));
       if (!first.passed) throw new Error(`first launch failed: ${JSON.stringify(first.results.filter((r) => !r.ok))}`);
       await launch(vault, "relaunch-2", out, home);
+    } else if (mode === "quit") {
+      let quitMs = 0;
+      await launch(vault, mode, out, null, async (child) => {
+        quitMs = await quitWhileTyping(child, out);
+      });
+      console.log(`  quit ${quitMs}ms after the Apple event`);
     } else {
       await launch(vault, mode, out);
     }
