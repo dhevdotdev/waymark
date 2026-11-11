@@ -33,7 +33,11 @@ await page.addInitScript(() => {
       return original.apply(this, args);
     };
   };
-  wrap("clearRect", () => window.__frames.push({ t: performance.now(), x: 0, y: 0, k: 1, dots: [], fills: [], labels: 0 }));
+  window.addEventListener("click", () => (window.__clickAt = performance.now()), true);
+  /* Each frame is stamped with the time its frame was given, which is the time the camera places it for. */
+  wrap("clearRect", () =>
+    window.__frames.push({ t: document.timeline.currentTime, x: 0, y: 0, k: 1, dots: [], fills: [], labels: 0 }),
+  );
   wrap("translate", ([x, y]) => last() && Object.assign(last(), { x, y }));
   wrap("scale", ([k]) => last() && Object.assign(last(), { k }));
   wrap("arc", ([x, y]) => last()?.dots.push([x, y]));
@@ -60,6 +64,23 @@ await pause(400);
 
 const frames = () => page.evaluate(() => window.__frames.filter((f) => f.dots.length));
 const clearFrames = () => page.evaluate(() => (window.__frames = []));
+/** Resolves once two frames pass without the graph drawing, or after five seconds, since a glide draws on every frame until it lands. */
+const untilDrawingStops = () =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const started = performance.now();
+        let drawn = window.__frames.length;
+        let still = 0;
+        const look = () => {
+          still = window.__frames.length === drawn ? still + 1 : 0;
+          drawn = window.__frames.length;
+          if (still >= 2 || performance.now() - started > 5000) resolve();
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+  );
 const entrance = () => page.evaluate(() => window.__entrances);
 const clearEntrances = () => page.evaluate(() => (window.__entrances = []));
 const sameDots = (a, b) =>
@@ -158,11 +179,38 @@ await pause(100);
 const restK = (await frames()).at(-1).k;
 await clearFrames();
 await page.click('[data-gz="in"]');
-await pause(450);
+await untilDrawingStops();
 drawn = await frames();
 const ks = drawn.map((f) => f.k);
-const span = drawn.at(-1).t - drawn[0].t;
 const expectedK = restK * 1.3;
+/*
+ * How long the glide runs, read from each frame drawn partway: how far its scale has come along the easing curve says
+ * how much of the glide had passed since the click. A slow machine can draw the landing frame well after the glide ends,
+ * so the time of the last frame overstates it.
+ */
+const span = await page.evaluate(
+  async ({ drawn, from, to }) => {
+    const { parseCubicBezier } = await import(/* @vite-ignore */ `${location.origin}/src/ui/cubic-bezier.ts`);
+    const ease = parseCubicBezier(getComputedStyle(document.documentElement).getPropertyValue("--ease-in-out"));
+    const passed = (eased) => {
+      let low = 0;
+      let high = 1;
+      while (high - low > 1e-9) {
+        const mid = (low + high) / 2;
+        if (ease(mid) < eased) low = mid;
+        else high = mid;
+      }
+      return low;
+    };
+    const spans = drawn
+      .map((f) => ({ t: f.t, eased: (f.k - from) / (to - from) }))
+      .filter((f) => f.eased > 0.05 && f.eased < 0.95)
+      .map((f) => (f.t - window.__clickAt) / passed(f.eased))
+      .sort((a, b) => a - b);
+    return spans[Math.floor(spans.length / 2)] ?? 0;
+  },
+  { drawn, from: restK, to: expectedK },
+);
 check("a zoom lands exactly on its target", Math.abs(ks.at(-1) - expectedK) < 1e-6, `${ks.at(-1)} for ${expectedK}`);
 if (reduced) {
   check(
@@ -202,7 +250,7 @@ await pause(70);
 await page.mouse.click(zoomIn.x + zoomIn.width / 2, zoomIn.y + zoomIn.height / 2);
 await pause(70);
 await page.mouse.click(zoomIn.x + zoomIn.width / 2, zoomIn.y + zoomIn.height / 2);
-await pause(450);
+await untilDrawingStops();
 drawn = await frames();
 const threeSteps = restK * 1.3 ** 3;
 check("quick zooms add up to every step", Math.abs(drawn.at(-1).k - threeSteps) < 1e-6, `${drawn.at(-1).k} for ${threeSteps}`);
