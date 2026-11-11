@@ -110,25 +110,86 @@ const notePoint = async (selector) => {
   const box = await page.locator(selector).first().boundingBox();
   return [box.x + box.width / 2, box.y + box.height / 2];
 };
-const swipe = async (dx, dy = 0, steps = 8) => {
+const swipe = async (dx, dy = 0, steps = 8, settle = 320) => {
   for (let i = 0; i < steps; i++) {
     await page.mouse.wheel(dx / steps, dy / steps);
     await pause(16);
   }
-  await pause(320);
+  await pause(settle);
 };
+const cue = () =>
+  page.evaluate(() => {
+    const el = document.querySelector(".swipe-cue");
+    const style = getComputedStyle(el);
+    return {
+      on: el.classList.contains("is-on"),
+      ready: el.classList.contains("is-ready"),
+      side: el.dataset.side,
+      progress: Number(style.getPropertyValue("--swipe")),
+      opacity: Number(style.opacity),
+      clicks: style.pointerEvents,
+      placed: style.position,
+    };
+  });
+const docBox = () => page.evaluate(() => JSON.stringify(document.querySelector(".doc").getBoundingClientRect()));
 await page.mouse.move(...(await notePoint(".doc p")));
 await swipe(-40);
 check("a small sideways nudge does nothing", (await title()) === "Swipe two", await title());
+const layoutBefore = await docBox();
+await swipe(-60, 0, 6, 0);
+const partway = await cue();
+check(
+  "the cue follows a swipe on the back edge",
+  partway.on &&
+    !partway.ready &&
+    partway.side === "back" &&
+    partway.progress > 0.2 &&
+    partway.progress < 1 &&
+    partway.opacity > 0,
+  JSON.stringify(partway),
+);
+check(
+  "the cue takes no clicks and moves nothing",
+  partway.clicks === "none" && partway.placed === "absolute" && (await docBox()) === layoutBefore,
+);
+await pause(320);
+const cancelled = await cue();
+check(
+  "stopping short cancels and the cue fades",
+  !cancelled.on && cancelled.opacity === 0 && (await title()) === "Swipe two",
+  JSON.stringify(cancelled),
+);
+await swipe(-80, 0, 6, 0);
+await swipe(80, 0, 6, 0);
+check(
+  "reversing before the threshold withdraws the cue",
+  !(await cue()).on && (await title()) === "Swipe two",
+  JSON.stringify(await cue()),
+);
+await pause(320);
+await swipe(240, 0, 16, 0);
+check(
+  "with nothing forward there is no cue and no step",
+  !(await cue()).on && (await title()) === "Swipe two",
+  JSON.stringify(await cue()),
+);
+await pause(320);
 await swipe(60, 400);
 check("mostly vertical scrolling is not a swipe", (await title()) === "Swipe two", await title());
 await page.mouse.move(...(await notePoint(".table-wrap")));
 await swipe(300);
-await swipe(-600);
-check("swiping over a wide table scrolls the table only", (await title()) === "Swipe two", await title());
+await swipe(-600, 0, 8, 0);
+const overTable = await cue();
+await pause(320);
+check("swiping over a wide table scrolls the table only", (await title()) === "Swipe two" && !overTable.on, await title());
 await page.mouse.move(...(await notePoint(".doc p")));
-await swipe(-260, 0, 16);
-check("swiping right goes back, one step", (await title()) === "Swipe one", await title());
+await swipe(-130, 0, 8, 0);
+const committed = await cue();
+check("crossing the threshold fills the cue", committed.on && committed.ready, JSON.stringify(committed));
+await swipe(-130, 0, 8, 0);
+await pause(400);
+check("it goes back one step however long the momentum runs", (await title()) === "Swipe one", await title());
+check("the filled cue fades once it has stepped", (await cue()).opacity === 0, JSON.stringify(await cue()));
 await page.mouse.move(...(await notePoint(".doc p")));
 await swipe(260, 0, 16);
 check("swiping left goes forward", (await title()) === "Swipe two", await title());
@@ -152,10 +213,28 @@ await swipe(-260, 0, 16);
 check(
   "swiping on the graph does not navigate",
   (await page.evaluate(() => window.waymark.reader.workspace.active.trail.size)) === graphBefore &&
-    (await page.locator(".graph-view").isVisible()),
+    (await page.locator(".graph-view").isVisible()) &&
+    !(await cue()).on,
 );
 await page.keyboard.press("Meta+g");
 await pause(400);
+await page.emulateMedia({ reducedMotion: "reduce" });
+await page.mouse.move(...(await notePoint(".doc p")));
+await swipe(-50, 0, 6, 0);
+const still = await page.evaluate(() => {
+  const el = document.querySelector(".swipe-cue");
+  return { on: el.classList.contains("is-on"), translate: getComputedStyle(el).translate };
+});
+await pause(400);
+const settled = await cue();
+check(
+  "under Reduce Motion the cue appears whole without following the fingers",
+  still.on && still.translate === "none" && settled.opacity === 0,
+  `${JSON.stringify(still)} ${JSON.stringify(settled)}`,
+);
+await swipe(-260, 0, 16);
+check("under Reduce Motion a swipe still steps", (await title()) === "Swipe one", await title());
+await page.emulateMedia({ reducedMotion: "no-preference" });
 
 /* Undo a delete */
 const inVault = (name) => `${app.vault}/${name}`;

@@ -164,7 +164,7 @@ The window comes back where it was and the size it was, placed before it is show
 
 ## Swiping back
 
-A two-finger swipe across the note goes back or forward by the same path as ⌘[ and ⌘]. One swipe is one step, however long its momentum lasts. A swipe that starts over something that scrolls sideways, such as a wide table, stays with that thing. Mouse buttons 4 and 5 do the same where the system delivers them.
+A two-finger swipe across the note goes back or forward by the same path as ⌘[ and ⌘]. One swipe is one step, however long its momentum lasts. A swipe that starts over something that scrolls sideways, such as a wide table, stays with that thing. While the fingers move, an arrow slides in from the edge the swipe leads to and follows them one to one; it fills with the accent at the point where the step happens, then fades. Stopping or reversing short of that point slides it back out, and with nothing in that direction it never appears. It rests in the note's outer gutter, takes no clicks and moves nothing. Under Reduce Motion it fades in where it rests and does not track. Mouse buttons 4 and 5 do the same where the system delivers them.
 
 ## Undoing a delete
 

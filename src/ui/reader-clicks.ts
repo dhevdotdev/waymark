@@ -123,5 +123,12 @@ export function bindReaderClicks(shell: HTMLElement, reader: Reader): void {
     e.preventDefault();
     reader.commands.run(e.button === MOUSE_BACK ? "back" : "forward", "click");
   });
-  bindSwipeNavigation(reader.els.scroller, (step) => reader.commands.run(step < 0 ? "back" : "forward", "click"));
+  bindSwipeNavigation(reader.els.scroller, {
+    can: (step) => {
+      if (reader.workspace.isEmpty || reader.onBlank) return false;
+      const { trail } = reader.workspace.active;
+      return step < 0 ? trail.canBack : trail.canForward;
+    },
+    go: (step) => reader.commands.run(step < 0 ? "back" : "forward", "click"),
+  });
 }
