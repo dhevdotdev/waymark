@@ -21,31 +21,67 @@ const pause = (ms) => page.waitForTimeout(ms);
 const count = (selector) => page.locator(selector).count();
 const IN_MOTION = (series) => series.some((v) => v > 0.02 && v < 0.98);
 
-/** Records one computed property on every frame, starting before `act` runs. */
-const sampleDuring = (selector, property, act, { pseudo, ms = 320 } = {}) =>
+/**
+ * Every animation of one property that the element starts once `act` runs, or once a click or key press arrives when
+ * there is no `act`, resolving when they have all finished. Each is read from the animation itself as it starts: a slow
+ * machine can paint its next frame after a short transition has already ended, so sampled frames can miss the motion.
+ */
+const motionDuring = (selector, property, act, { pseudo = null } = {}) =>
   page.evaluate(
-    async ({ selector, property, pseudo, ms, act }) => {
-      const seen = [];
-      const started = performance.now();
-      const read = () => {
+    async ({ selector, property, pseudo, act }) => {
+      const seen = new Map();
+      const mine = () => {
         const el = document.querySelector(selector);
-        if (el) seen.push(getComputedStyle(el, pseudo)[property]);
+        if (!el) return [];
+        getComputedStyle(el, pseudo)[property];
+        return el
+          .getAnimations({ subtree: true })
+          .filter((a) => a.effect.target === el && (a.effect.pseudoElement ?? null) === pseudo)
+          .filter((a) => a.effect.getKeyframes().some((k) => property in k));
       };
+      const read = () => {
+        for (const a of mine()) {
+          if (seen.has(a)) continue;
+          const frames = a.effect.getKeyframes().filter((k) => property in k);
+          seen.set(a, { from: frames[0][property], to: frames.at(-1)[property], ms: a.effect.getComputedTiming().duration });
+        }
+      };
+      let triggered = false;
+      let still = 0;
+      const trigger = () => {
+        triggered = true;
+        still = 0;
+        read();
+      };
+      const observer = new MutationObserver(read);
+      observer.observe(document, { attributes: true, childList: true, subtree: true });
+      const triggers = ["click", "keydown", "keyup", "change"];
+      for (const type of triggers) window.addEventListener(type, trigger);
+      const started = performance.now();
       const done = new Promise((resolve) => {
         const frame = () => {
           read();
-          if (performance.now() - started < ms) requestAnimationFrame(frame);
-          else resolve();
+          if (triggered) still = mine().some((a) => a.playState === "running") ? 0 : still + 1;
+          if (still >= 2 || performance.now() - started > 5000) resolve();
+          else requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
       });
-      if (act) await new Function(`return (${act})()`)();
+      if (act) {
+        await new Function(`return (${act})()`)();
+        trigger();
+      }
       await done;
-      return seen;
+      observer.disconnect();
+      for (const type of triggers) window.removeEventListener(type, trigger);
+      return [...seen.values()];
     },
-    { selector, property, pseudo, ms, act: act?.toString() },
+    { selector, property, pseudo, act: act?.toString() },
   );
-const numbers = (series) => series.map(Number);
+/** Whether any of them moves the property over time, rather than setting it at once. */
+const MOVES = (motions) => motions.some((m) => m.ms > 0 && m.from !== m.to);
+const FADES_IN = (motions) => motions.some((m) => m.ms > 0 && Number(m.from) <= 0.02 && Number(m.to) >= 0.98);
+const shown = (motions) => JSON.stringify(motions);
 
 try {
   await writeFile(path.join(app.vault, "Checklist.md"), "- [ ] First thing\n- [ ] Second thing\n");
@@ -108,8 +144,7 @@ try {
 
   /* Settings */
   await pause(100);
-  const pointerSettings = await sampleDuring(".popover.settings", "opacity", null, { ms: 0 });
-  check("settings is closed to begin with", pointerSettings.length === 0);
+  check("settings is closed to begin with", (await count(".popover.settings")) === 0);
   await page.locator('[data-act="settings"]').click();
   await pause(260);
   await page.locator('[data-act="settings"]').click();
@@ -135,23 +170,23 @@ try {
   const keyKnob = await toggle.locator("i").evaluate((i) => getComputedStyle(i, "::after").translate);
   const keyAtEnd = wasOn ? keyKnob === "none" || keyKnob === "0px" : keyKnob === "12px";
   check("the switch jumps when pressed with Space", keyAtEnd && (await toggle.locator("input").isChecked()) !== wasOn, keyKnob);
-  const knob = sampleDuring('.toggle:has(input[data-pref="sound"]) i', "translate", null, { pseudo: "::after", ms: 300 });
+  const knob = motionDuring('.toggle:has(input[data-pref="sound"]) i', "translate", null, { pseudo: "::after" });
   await toggle.click();
-  const travel = [...new Set((await knob).filter((v) => v !== "none"))];
+  const travel = await knob;
   check(
     reduced ? "the switch does not travel under Reduce Motion" : "the knob travels when clicked",
-    reduced ? travel.length <= 1 : travel.length > 2,
-    travel.slice(0, 4).join(" | "),
+    reduced ? !MOVES(travel) : MOVES(travel),
+    shown(travel),
   );
   await page.keyboard.press("Escape");
   check("Escape closes settings at once", (await count(".popover.settings")) === 0);
 
   /* Sheets */
   await page.mouse.click(600, 500);
-  const sheetOpacity = await sampleDuring(".sheet-overlay", "opacity", () =>
+  const sheetOpacity = await motionDuring(".sheet-overlay", "opacity", () =>
     window.parts.openSheet("One", "first", window.sheetBody("a")),
   );
-  check("a sheet opened with the pointer fades in", IN_MOTION(numbers(sheetOpacity)));
+  check("a sheet opened with the pointer fades in", FADES_IN(sheetOpacity), shown(sheetOpacity));
   await page.evaluate(() => window.parts.openSheet("Two", "second", window.sheetBody("b")));
   check("a sheet opened from a sheet does not stack", (await count(".sheet-overlay")) === 1);
   check("it shows the new content", (await page.locator(".sheet-title").textContent()) === "Two");
@@ -170,8 +205,8 @@ try {
   /* The lightbox */
   const enlarge = () => window.overlays.lightbox(Object.assign(document.createElement("div"), { textContent: "Large" }));
   await page.mouse.click(600, 500);
-  const lightboxOpacity = await sampleDuring(".lightbox", "opacity", enlarge);
-  check("the lightbox fades in from the pointer", IN_MOTION(numbers(lightboxOpacity)));
+  const lightboxOpacity = await motionDuring(".lightbox", "opacity", enlarge);
+  check("the lightbox fades in from the pointer", FADES_IN(lightboxOpacity), shown(lightboxOpacity));
   const left = await page.evaluate(() => {
     const box = document.querySelector(".lightbox");
     box.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
@@ -186,8 +221,8 @@ try {
 
   /* Toasts */
   await page.mouse.click(600, 500);
-  const toastOpacity = await sampleDuring(".toast", "opacity", () => window.overlays.toast("First"), { ms: 500 });
-  check("a toast from a pointer action fades in", IN_MOTION(numbers(toastOpacity)));
+  const toastOpacity = await motionDuring(".toast:not(.is-leaving)", "opacity", () => window.overlays.toast("First"));
+  check("a toast from a pointer action fades in", FADES_IN(toastOpacity), shown(toastOpacity));
   const toastTravel = await page.evaluate(() => getComputedStyle(document.querySelector(".toast")).translate);
   check("it rests at its anchor", toastTravel.endsWith(" 0px") || !toastTravel.includes(" "), toastTravel);
   await page.evaluate(() => window.overlays.toast("Second", { label: "Undo", run: () => (window.undone = true) }));
@@ -261,31 +296,21 @@ try {
   await page.mouse.click(600, 500);
   await pause(120);
   const taskBox = '.task-box[data-task-line="0"]';
-  const clicked = sampleDuring(taskBox, "opacity", null, { pseudo: "::after", ms: 500 });
+  const clicked = motionDuring(taskBox, "opacity", null, { pseudo: "::after" });
   await page.locator(taskBox).click();
-  const tick = numbers(await clicked);
+  const tick = await clicked;
   check(
     reduced ? "the check is static under Reduce Motion" : "the check fades in after a click",
-    reduced ? !IN_MOTION(tick) : IN_MOTION(tick),
-    tick
-      .slice(0, 8)
-      .map((v) => v.toFixed(2))
-      .join(" "),
+    reduced ? !MOVES(tick) : FADES_IN(tick),
+    shown(tick),
   );
   check("the task is saved", (await page.locator(taskBox).getAttribute("aria-checked")) === "true");
   const second = '.task-box[data-task-line="1"]';
   await page.locator(second).focus();
-  const keyed = sampleDuring(second, "opacity", null, { pseudo: "::after", ms: 400 });
+  const keyed = motionDuring(second, "opacity", null, { pseudo: "::after" });
   await page.keyboard.press("Space");
-  const keyTick = numbers(await keyed);
-  check(
-    "the check is immediate from the keyboard",
-    !IN_MOTION(keyTick),
-    keyTick
-      .slice(0, 8)
-      .map((v) => v.toFixed(2))
-      .join(" "),
-  );
+  const keyTick = await keyed;
+  check("the check is immediate from the keyboard", !MOVES(keyTick), shown(keyTick));
   check("that task is saved too", (await page.locator(second).getAttribute("aria-checked")) === "true");
 
   await page.keyboard.press("Meta+e");
