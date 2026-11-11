@@ -309,6 +309,95 @@ const ring = await page.evaluate((path) => {
   return style.outlineOffset;
 }, lastRow);
 check("the focus ring is drawn inside the row", ring === "-2px", ring);
+/* The file list after a click. WebKit on macOS leaves a pressed button unfocused; Playwright's WebKit focuses it, so the
+ * Mac behaviour is reproduced by holding focus where it was. */
+await page.evaluate(() =>
+  document.addEventListener(
+    "mousedown",
+    (e) => {
+      if (e.target.closest("button")) e.preventDefault();
+    },
+    true,
+  ),
+);
+await page.evaluate(() => window.waymark.reader.sidebar.tree.collapseAll());
+await pause(300);
+await page
+  .locator(".doc")
+  .first()
+  .click({ position: { x: 5, y: 5 } });
+const rootNotes = await page.$$eval(".sidebar-inner .tree > .nav-item[data-path]", (r) => r.map((x) => x.dataset.path));
+const rowFill = (path) =>
+  page.evaluate((p) => getComputedStyle(document.querySelector(`.nav-item[data-path="${CSS.escape(p)}"]`)).backgroundColor, path);
+const clickRow = async (path) => {
+  const box = await page.locator(`.sidebar-inner .nav-item[data-path="${path}"]`).boundingBox();
+  await page.mouse.click(box.x + 40, box.y + box.height / 2);
+  await pause(450);
+};
+const plainFill = await rowFill(rootNotes[1]);
+await clickRow(rootNotes[0]);
+check("a click opens the row", (await page.evaluate(() => window.waymark.reader.notePath)) === rootNotes[0]);
+check("a click hands the arrows to the list", (await focused()) === rootNotes[0], await focused());
+const clickRing = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
+check("a click draws no focus ring", clickRing === "none", clickRing);
+await page.mouse.move(1000, 400);
+await page.keyboard.press("ArrowDown");
+await pause(60);
+check("Down after a click moves the selection", (await focused()) === rootNotes[1], await focused());
+check(
+  "Down selects without opening",
+  (await page.evaluate(() => window.waymark.reader.notePath)) === rootNotes[0],
+  await page.evaluate(() => window.waymark.reader.notePath),
+);
+for (const scheme of ["light", "dark"]) {
+  await page.emulateMedia({ colorScheme: scheme });
+  await pause(100);
+  const selected = await rowFill(rootNotes[1]);
+  const current = await rowFill(rootNotes[0]);
+  const plain = await rowFill(rootNotes[2]);
+  check(
+    `the selected row is filled, apart from the open note, in ${scheme}`,
+    selected !== plain && selected !== current && !selected.endsWith(", 0)") && selected !== "rgba(0, 0, 0, 0)",
+    `${selected} / ${current} / ${plain}`,
+  );
+}
+await page.emulateMedia({ colorScheme: null });
+const transitionNow = await page.evaluate(
+  (p) => getComputedStyle(document.querySelector(`.nav-item[data-path="${CSS.escape(p)}"]`)).transitionDuration,
+  rootNotes[1],
+);
+check("the selection moves without a fade from the keyboard", /^0s(, 0s)*$/.test(transitionNow), transitionNow);
+await page.keyboard.press("Enter");
+await pause(450);
+check(
+  "Enter opens the selected note",
+  (await page.evaluate(() => window.waymark.reader.notePath)) === rootNotes[1],
+  await page.evaluate(() => window.waymark.reader.notePath),
+);
+check("leaving the row clears its selection", (await rowFill(rootNotes[0])) === plainFill, await rowFill(rootNotes[0]));
+const panel = await page.locator(".sidebar-inner").boundingBox();
+await page
+  .locator(".doc")
+  .first()
+  .click({ position: { x: 5, y: 5 } });
+await page.mouse.click(panel.x + panel.width / 2, panel.y + panel.height - 12);
+await pause(150);
+check("a click on empty space hands the arrows to the list", (await focused()) === rootNotes[1], await focused());
+await page.keyboard.press("ArrowUp");
+await pause(60);
+check("Up then moves from the open note", (await focused()) === rootNotes[0], await focused());
+await page
+  .locator(".doc")
+  .first()
+  .click({ position: { x: 5, y: 5 } });
+await pause(100);
+await page.keyboard.press("ArrowDown");
+await pause(100);
+check(
+  "arrows outside the list leave it alone",
+  !(await page.evaluate(() => document.activeElement?.closest(".sidebar-inner"))),
+  await focused(),
+);
 await page.locator(`.nav-item[data-path="${lastRow}"]`).click({ button: "right" });
 await pause(150);
 await page.locator(".context-item", { hasText: "Rename" }).click();

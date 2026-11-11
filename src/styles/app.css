@@ -687,6 +687,14 @@ kbd {
 .nav-item.is-current .tree-icon {
   color: var(--accent);
 }
+/* The row the arrows act on, shown whichever way the list took focus. The open note keeps its own mark. */
+.sidebar-inner :is(.tree-head, .nav-item):focus:not(.is-current) {
+  --row-ink: var(--ink);
+  background: var(--selected);
+}
+:root[data-input="keyboard"] .sidebar-inner :is(.tree-head, .nav-item) {
+  transition: none;
+}
 .tree-head.has-actions {
   --row-ink: var(--ink);
 }
