@@ -36,6 +36,8 @@ const untilPageStopsRedrawing = () =>
 const openNote = async (name) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForSelector(".doc-title");
+  /* Start-up draws the note again once the vault is indexed, which a slow machine can finish after a quiet second. */
+  await page.waitForFunction(() => window.waymark?.metrics.startMs > 0);
   await untilPageStopsRedrawing();
 };
 const moving = (selector) => page.evaluate((s) => document.querySelector(s).getAnimations().length > 0, selector);
