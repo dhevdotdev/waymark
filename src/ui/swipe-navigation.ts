@@ -30,7 +30,7 @@ function afterPaint(act: () => void): void {
   setTimeout(once, UNPAINTED_MS);
 }
 
-/** A two-finger swipe across `area` goes back or forward, once per gesture, with a cue drawn beside it. */
+/** A two-finger swipe across `area` goes back or forward, once per gesture, with a cue drawn beside it. `data-gesture` on `area` marks a swipe that has not ended yet. */
 export function bindSwipeNavigation(area: HTMLElement, target: SwipeTarget): void {
   const cue = new SwipeCue(area.parentElement ?? area);
   let sideways = 0;
@@ -48,6 +48,7 @@ export function bindSwipeNavigation(area: HTMLElement, target: SwipeTarget): voi
         return;
       }
       between = true;
+      delete area.dataset.gesture;
       if (!spent) cue.cancel();
     }, GESTURE_GAP_MS);
   };
@@ -56,6 +57,7 @@ export function bindSwipeNavigation(area: HTMLElement, target: SwipeTarget): voi
     (e) => {
       if (between) {
         between = false;
+        area.dataset.gesture = "open";
         sideways = 0;
         upright = 0;
         spent = e.ctrlKey || nearest(e.target as Element, "x") !== null;

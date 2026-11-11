@@ -212,10 +212,15 @@ check("the filled cue fades once it has stepped", (await cue()).opacity === 0, J
  * Dispatches wheel events in the page at chosen gaps and samples both cues on every frame until
  * `tail` ms after the last one, so timing is the page's own and not the runner's.
  */
-const sampleSwipe = (events, tail) =>
-  page.evaluate(
-    async ([script, after]) => {
-      const p = document.querySelector(".doc p");
+const sampleSwipe = async (events, tail) => {
+  await gestureOver();
+  await page.waitForFunction(
+    () => [...document.querySelectorAll(".swipe-cue")].every((c) => getComputedStyle(c).opacity === "0"),
+    null,
+    { polling: 20 },
+  );
+  return page.evaluate(
+    async ([script, tail]) => {
       const read = (side) => {
         const el = document.querySelector(`.swipe-cue[data-side="${side}"]`);
         const style = getComputedStyle(el);
@@ -229,24 +234,41 @@ const sampleSwipe = (events, tail) =>
       const samples = [];
       let sent = 0;
       let running = true;
+      /* Read after the frame's own work, the cue's spring included, so each value belongs to its frame's time; a read that misses its frame is dropped. */
+      const after = new MessageChannel();
+      let frames = 0;
       const frame = (t) => {
-        samples.push({ t, sent, back: read("back"), forward: read("forward") });
+        frames += 1;
+        const at = frames;
+        after.port1.onmessage = () => {
+          if (at === frames) samples.push({ t, sent, back: read("back"), forward: read("forward") });
+        };
+        after.port2.postMessage(null);
         if (running) requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
       for (const [gap, dx, dy] of script) {
         await new Promise((r) => setTimeout(r, gap));
-        p.dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy ?? 0, bubbles: true }));
+        /* Looked up per event: a note that finishes rendering replaces the whole article. */
+        document.querySelector(".doc p").dispatchEvent(new WheelEvent("wheel", { deltaX: dx, deltaY: dy ?? 0, bubbles: true }));
         sent += 1;
       }
       const last = performance.now();
-      await new Promise((r) => setTimeout(r, after));
+      await new Promise((r) => setTimeout(r, tail));
       running = false;
       return { samples, last };
     },
     [events, tail],
   );
-const steps = (samples, side, key) => samples.slice(1).map((s, i) => Math.abs(s[side][key] - samples[i][side][key]));
+};
+/** Waits for the page to treat the last swipe as over, which can take longer than its gap while the page is busy. */
+const gestureOver = () =>
+  page.waitForFunction(() => document.querySelector(".scroller").dataset.gesture === undefined, null, { polling: 20 });
+/** Change between samples per 60 Hz frame, so a slow frame does not read as a jump. */
+const steps = (samples, side, key) =>
+  samples
+    .slice(1)
+    .map((s, i) => (Math.abs(s[side][key] - samples[i][side][key]) * (1000 / 60)) / Math.max(1, s.t - samples[i].t));
 await page.mouse.move(...(await notePoint(".doc p")));
 const uneven = await sampleSwipe(
   [
@@ -261,30 +283,34 @@ const uneven = await sampleSwipe(
   150,
 );
 const during = uneven.samples.filter((s) => s.sent > 0 && s.t <= uneven.last);
-const easedFrames = during.filter((s, i) => i > 0 && s.sent === during[i - 1].sent && s.back.x !== during[i - 1].back.x);
 const unevenEnd = uneven.samples.at(-1).back;
 /** Where the cue rests for a progress: 30px of travel from outside the edge, slowing towards the threshold. */
-const restingX = -(1 - (1 - (1 - unevenEnd.progress) ** 2)) * 30;
+const restAt = (progress) => -(1 - (1 - (1 - progress) ** 2)) * 30;
+const restingX = restAt(unevenEnd.progress);
+/* Frames where the cue has not yet reached the place its latest event points to; counted per frame, not per gap, so slow frames do not thin it out. */
+const shown = during.filter((s) => s.back.o > 0);
+const lagging = shown.filter((s) => Math.abs(s.back.x - restAt(s.back.progress)) > 0.5);
 const xs = uneven.samples.filter((s) => s.back.o > 0).map((s) => s.back.x);
 check(
   "the cue eases between uneven events and settles where the fingers are",
-  easedFrames.length >= 3 &&
+  lagging.length >= 2 &&
+    lagging.length * 2 >= shown.length &&
     xs.every((x, i) => i === 0 || x >= xs[i - 1] - 0.01) &&
     Math.abs(unevenEnd.x - restingX) < 0.1 &&
     Math.abs(xs.at(-1) - during.at(-1).back.x) > 0.5,
-  `eased frames ${easedFrames.length}, rests at ${unevenEnd.x.toFixed(2)} for ${restingX.toFixed(2)}`,
+  `${lagging.length} of ${shown.length} frames behind the fingers, rests at ${unevenEnd.x.toFixed(2)} for ${restingX.toFixed(2)}`,
 );
 await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
-await pause(250);
+await gestureOver();
 const nearSlack = await sampleSwipe([[0, -30], ...Array.from({ length: 10 }, (_, i) => [16, 0, i % 2 === 0 ? 16 : -16])], 60);
 const flicker = Math.max(...steps(nearSlack.samples, "back", "o"));
 check(
   "a swipe that hovers near the slack or turns vertical does not flicker",
   flicker < 0.15 && nearSlack.samples.some((s) => s.back.o > 0),
-  `largest change in one frame ${flicker.toFixed(3)}`,
+  `largest change per frame at 60 Hz ${flicker.toFixed(3)}`,
 );
 await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
-await pause(250);
+await gestureOver();
 const bothWays = await page.evaluate(() => {
   const { trail } = window.waymark.reader.workspace.active;
   return trail.canBack && trail.canForward;
@@ -321,7 +347,7 @@ check(
   `back peak ${backPeak.toFixed(2)}, ends ${ends.back.o.toFixed(2)} / ${ends.forward.o.toFixed(2)}`,
 );
 await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
-await pause(250);
+await gestureOver();
 check("neither half of that swipe navigated", (await title()) === "Swipe one", await title());
 await page.evaluate(() => {
   const commands = window.waymark.reader.commands;
@@ -340,11 +366,12 @@ const jumps = { o: Math.max(...steps(afterCommit, "back", "o")), x: Math.max(...
 check(
   "a swipe during the exit picks the cue up where it was",
   afterCommit.length > 5 && jumps.o < 0.25 && jumps.x < 8 && regrab.samples.at(-1).back.progress > 0,
-  `largest change in one frame: opacity ${jumps.o.toFixed(3)}, ${jumps.x.toFixed(1)} px`,
+  `largest change per frame at 60 Hz: opacity ${jumps.o.toFixed(3)}, ${jumps.x.toFixed(1)} px`,
 );
 await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
-await pause(250);
+await gestureOver();
 await page.mouse.move(...(await notePoint(".doc p")));
+await gestureOver();
 await swipe(260, 0, 16);
 check("swiping left goes forward", (await title()) === "Swipe two", await title());
 await page.evaluate(() => {
@@ -368,8 +395,9 @@ await page.evaluate(() => {
     return run(id, how);
   };
 });
+await gestureOver();
 await swipe(-260, 0, 16, 0);
-await page.waitForFunction(() => window.__afterBusy !== undefined, null, { timeout: 5000 });
+await page.waitForFunction(() => window.__afterBusy !== undefined, null, { timeout: 5000 }).catch(() => {});
 const busy = await page.evaluate(() => {
   window.waymark.reader.commands.run = window.__run;
   return { running: window.__afterBusy, wait: Math.round(window.__goAt - window.__readyAt) };
@@ -381,6 +409,7 @@ check(
 );
 await pause(320);
 check("that swipe went back", (await title()) === "Swipe one", await title());
+await gestureOver();
 await swipe(260, 0, 16);
 check("and the next goes forward again", (await title()) === "Swipe two", await title());
 const mouseButton = (button) =>
@@ -442,17 +471,26 @@ await writeFile(inVault("Doomed.md"), "# Doomed\n\nExact   bytes  \n");
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
 await pause(250);
 await open("Doomed.md");
+await page.waitForFunction(() => document.querySelector(".tab.is-active .tab-title")?.textContent === "Doomed");
 const tabsBefore = await page.$$eval(".tab", (t) => t.length);
 await moreAction('.nav-item[data-path="Doomed.md"]', "Move to Trash");
 check("the note left the vault", !existsSync(inVault("Doomed.md")));
 check("the toast offers Undo", (await undoButton.count()) === 1);
 await undoButton.click();
-await pause(500);
+await page
+  .waitForFunction(
+    (count) =>
+      document.querySelector(".tab.is-active .tab-title")?.textContent === "Doomed" &&
+      document.querySelectorAll(".tab").length === count,
+    tabsBefore,
+    { timeout: 5000 },
+  )
+  .catch(() => {});
 check("Undo restores the exact bytes", (await readFile(inVault("Doomed.md"), "utf8")) === "# Doomed\n\nExact   bytes  \n");
 check(
   "its tab is back",
   (await title()) === "Doomed" && (await page.$$eval(".tab", (t) => t.length)) === tabsBefore,
-  await title(),
+  `${await title()}, ${await page.$$eval(".tab", (t) => t.length)} of ${tabsBefore} tabs`,
 );
 check("it says so", (await toastText()).includes("Put back"), await toastText());
 await moreAction('.nav-item[data-path="Doomed.md"]', "Move to Trash");
