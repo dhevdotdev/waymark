@@ -102,9 +102,6 @@ kbd {
 .shell.rail-closed {
   --col-right: 0px;
 }
-:root[data-input="keyboard"] :is(.sidebar-inner, .sidebar-search, .files-actions) {
-  transition: none;
-}
 
 .titlebar {
   grid-column: 1 / -1;
@@ -133,20 +130,41 @@ kbd {
 .titlebar .tab {
   -webkit-app-region: no-drag;
 }
-/* The lead fills the sidebar column, so tabs start exactly where the note does. */
+/* The lead fills the sidebar column, so tabs start exactly where the note does. With the sidebar closed it holds only what it shows. */
 .titlebar-lead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   flex: none;
   width: var(--col-left);
-  min-width: 160px;
   height: 100%;
   padding: 0 8px 0 84px;
-  box-shadow: inset -1px 0 var(--rule);
 }
 .shell.sidebar-closed .titlebar-lead {
-  box-shadow: none;
+  width: auto;
+}
+/* A sidebar dragged narrower than the whole lead drops the name before anything collides. */
+@media (min-width: 901px) {
+  .shell:not(.sidebar-closed) .titlebar-lead {
+    container: lead / inline-size;
+  }
+}
+@container lead (width < 175px) {
+  .wordmark {
+    display: none;
+  }
+}
+.wordmark {
+  padding-inline-end: 4px;
+  font-family: var(--font-read);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.titlebar-nav {
+  margin-inline-start: auto;
 }
 .titlebar-nav,
 .titlebar-trail {
@@ -161,10 +179,26 @@ kbd {
   min-width: 36px;
   height: 100%;
   padding-right: 8px;
-  box-shadow: inset 1px 0 var(--rule);
 }
-.shell:is(.rail-closed, .is-graph, .is-blank, .is-base, :has(.empty-state.is-page)) .titlebar-trail {
-  box-shadow: none;
+/* The inspector's tabs slide out under the toggle, never over it, so a second click always reaches it. */
+@media (min-width: 1241px) {
+  .titlebar-trail {
+    position: relative;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .titlebar-trail > * {
+    pointer-events: auto;
+  }
+  .titlebar-trail::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset-block: 0;
+    inset-inline-end: 0;
+    inline-size: 44px;
+    background: var(--chrome);
+  }
 }
 
 /*
@@ -428,6 +462,58 @@ kbd {
   flex-direction: column;
   box-shadow: inset -1px 0 var(--rule);
 }
+/*
+ * A docked panel keeps its width as its column closes, so a click slides it over the page while panel-glide.ts carries
+ * the page across. It draws its own edge up through the title bar, so the hairline travels and hides with it.
+ */
+@media (min-width: 901px) {
+  .sidebar {
+    z-index: 4;
+    overflow: visible;
+    inline-size: var(--sidebar-w);
+    background: var(--chrome);
+    transition: translate var(--t-slide) var(--ease-in-out);
+  }
+  .sidebar::after {
+    content: "";
+    position: absolute;
+    inset-block-start: calc(-1 * var(--chrome-h));
+    inset-inline-end: 0;
+    block-size: var(--chrome-h);
+    inline-size: 1px;
+    background: var(--rule);
+  }
+  .shell.sidebar-closed .sidebar {
+    translate: -100% 0;
+    visibility: hidden;
+    transition:
+      translate var(--t-slide) var(--ease-in-out),
+      visibility 0s linear var(--t-slide);
+  }
+}
+@media (prefers-reduced-motion: reduce) and (min-width: 901px) {
+  .sidebar {
+    transition: opacity var(--t-exit) ease;
+  }
+  .shell.sidebar-closed .sidebar {
+    translate: none;
+    opacity: 0;
+    transition:
+      opacity var(--t-exit) ease,
+      visibility 0s linear var(--t-exit);
+  }
+}
+:root[data-input="keyboard"] .shell .sidebar {
+  transition: none;
+}
+/* While the page glides, it may still be where the reader no longer reaches. The room outside is padding, so no line re-wraps. */
+.shell.is-gliding .reader {
+  overflow: visible;
+}
+.shell.is-gliding .scroller {
+  margin-inline: -100vw;
+  padding-inline: 100vw;
+}
 .files-actions {
   flex: none;
   display: flex;
@@ -435,9 +521,6 @@ kbd {
   gap: 2px;
   inline-size: var(--sidebar-w);
   padding: 0 8px 6px 11px;
-  transition:
-    opacity var(--t-slide) ease,
-    translate var(--t-slide) var(--ease-in-out);
 }
 .files-actions[hidden],
 .row-actions[hidden] {
@@ -524,14 +607,6 @@ kbd {
   overflow: clip auto;
   padding: 0 10px 32px;
   mask-image: linear-gradient(to bottom, black, black calc(100% - 28px), transparent);
-  transition:
-    opacity var(--t-slide) ease,
-    translate var(--t-slide) var(--ease-in-out);
-}
-.shell.sidebar-closed :is(.sidebar-inner, .sidebar-search, .files-actions) {
-  opacity: 0;
-  translate: -12px 0;
-  pointer-events: none;
 }
 .sidebar-resize,
 .rail-resize {
@@ -756,9 +831,6 @@ kbd {
   display: flex;
   flex-direction: column;
 }
-.search-field:has(input:placeholder-shown) .icon-btn {
-  visibility: hidden;
-}
 .search-head {
   padding: 2px 10px 8px;
 }
@@ -896,6 +968,7 @@ kbd {
 }
 .shell:is(.is-graph, .is-blank, .is-base, :has(.empty-state.is-page)) .rail {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 /* Hidden, not removed: a removed box forgets how far it was scrolled, and the note must be where it was left. */
@@ -1214,9 +1287,47 @@ kbd {
   overflow: clip;
   box-shadow: inset 1px 0 var(--rule);
 }
-.shell.rail-closed .rail {
-  opacity: 0;
-  pointer-events: none;
+@media (min-width: 1241px) {
+  /* Visible, so its tabs and edge can sit up in the title bar and travel with it. */
+  .rail {
+    z-index: 4;
+    overflow: visible;
+    inline-size: var(--rail-w);
+    margin-inline-start: calc(var(--col-right) - var(--rail-w));
+    background: var(--chrome);
+    transition: translate var(--t-slide) var(--ease-in-out);
+  }
+  .rail::after {
+    content: "";
+    position: absolute;
+    inset-block-start: calc(-1 * var(--chrome-h));
+    inset-inline-start: 0;
+    block-size: var(--chrome-h);
+    inline-size: 1px;
+    background: var(--rule);
+  }
+  .shell.rail-closed .rail {
+    translate: 100% 0;
+    visibility: hidden;
+    transition:
+      translate var(--t-slide) var(--ease-in-out),
+      visibility 0s linear var(--t-slide);
+  }
+}
+@media (prefers-reduced-motion: reduce) and (min-width: 1241px) {
+  .rail {
+    transition: opacity var(--t-exit) ease;
+  }
+  .shell.rail-closed .rail {
+    translate: none;
+    opacity: 0;
+    transition:
+      opacity var(--t-exit) ease,
+      visibility 0s linear var(--t-exit);
+  }
+}
+:root[data-input="keyboard"] .shell .rail {
+  transition: none;
 }
 .rail-inner {
   width: var(--rail-w);
@@ -1831,7 +1942,6 @@ kbd {
     --col-right: 0px;
   }
   .titlebar-trail {
-    box-shadow: none;
     width: auto;
   }
   .rail,
@@ -1873,7 +1983,6 @@ kbd {
   }
   .titlebar-lead {
     width: auto;
-    box-shadow: none;
   }
   .sidebar {
     box-shadow: none;
@@ -1915,11 +2024,6 @@ kbd {
     .reader::after {
       transition-duration: var(--t-exit);
     }
-  }
-  .shell :is(.sidebar-inner, .sidebar-search) {
-    opacity: 1;
-    translate: 0 0;
-    pointer-events: auto;
   }
   .sidebar-resize {
     display: none;

@@ -586,10 +586,10 @@ check(
 );
 await page.keyboard.type("declination");
 await pause(200);
-await page.click('[data-side="search"]');
+await page.keyboard.press("Escape");
 await pause(120);
 check(
-  "Files tab returns to the tree",
+  "Escape returns to the tree",
   (await page.locator(".tree").isVisible()) && !(await page.locator(".search-field input").isVisible()),
 );
 await page.click('[data-side="search"]');

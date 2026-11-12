@@ -11,6 +11,7 @@ import { MorphArrows } from "./morph-arrows";
 import type { NoteEditing } from "./note-editing";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
 import { toast } from "./overlays";
+import { glidePanel } from "./panel-glide";
 import { bindEdgeDrag } from "./panel-resize";
 import { PanelSections, type RailSection } from "./panel-sections";
 import type { PropertyEditor } from "./property-editor";
@@ -109,7 +110,8 @@ export class Inspector {
       shell.classList.toggle("rail-peek");
       return;
     }
-    const closed = shell.classList.toggle("rail-closed");
+    const closed = !shell.classList.contains("rail-closed");
+    glidePanel(shell, () => shell.classList.toggle("rail-closed", closed));
     this.host.prefs.update((p) => {
       p.rail = !closed;
     });

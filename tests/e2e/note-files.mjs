@@ -84,10 +84,10 @@ try {
   check("the tabs still work up there", await page.locator('[data-rail="info"].is-on').isVisible());
   await page.click('[data-side="search"]');
   await pause(200);
-  check("the toolbar search opens Search", await page.locator(".sidebar-search").isVisible());
-  await page.click('[data-side="search"]');
+  check("the file tools' search opens Search", await page.locator(".sidebar-search").isVisible());
+  await page.click('[data-act="search-clear"]');
   await pause(200);
-  check("pressing it again returns to Files", await page.locator(".sidebar-inner").isVisible());
+  check("the X on an empty field returns to Files", await page.locator(".sidebar-inner").isVisible());
   check(
     "the reading status bar counts words",
     /^\d+ words$/.test(await page.textContent(".status-stats")),
@@ -413,8 +413,8 @@ try {
   };
   const strip = () => page.locator(".row-actions:not([hidden]) .row-action");
   check(
-    "the file-actions row has new note, new folder, sort and collapse",
-    (await page.locator(".files-actions .icon-btn").count()) === 4,
+    "the file-actions row has new note, new folder, sort, search and collapse",
+    (await page.locator(".files-actions .icon-btn").count()) === 5,
   );
   check("new note left the title bar", (await page.locator('.titlebar [data-act="new-note"]').count()) === 0);
   const moreMenu = async (selector, item) => {
@@ -512,16 +512,26 @@ try {
   const headerLine = await page.evaluate(() => {
     const centre = (r) => r.left + r.width / 2;
     const first = document.querySelector(".files-actions .icon-btn svg").getBoundingClientRect();
-    const end = document.querySelector(".files-actions-end svg").getBoundingClientRect();
+    const end = document.querySelector('.files-actions [data-act="collapse-folders"] svg').getBoundingClientRect();
+    const search = document.querySelector('.files-actions [data-side="search"] svg').getBoundingClientRect();
     const forward = document.querySelector('.titlebar [data-act="forward"] svg').getBoundingClientRect();
+    const back = document.querySelector('.titlebar [data-act="back"] svg').getBoundingClientRect();
     const rowIcon = [...document.querySelectorAll(".nav-item .tree-icon")]
       .map((icon) => icon.getBoundingClientRect())
       .sort((a, b) => a.left - b.left)[0];
-    return { left: first.left - rowIcon.left, right: centre(end) - centre(forward), size: first.width - rowIcon.width };
+    return {
+      left: first.left - rowIcon.left,
+      right: centre(end) - centre(forward),
+      search: centre(search) - centre(back),
+      size: first.width - rowIcon.width,
+    };
   });
   check(
     "the top row lines up with the tree and the bar above",
-    Math.abs(headerLine.left) <= 0.5 && Math.abs(headerLine.right) <= 0.5 && headerLine.size === 0,
+    Math.abs(headerLine.left) <= 0.5 &&
+      Math.abs(headerLine.right) <= 0.5 &&
+      Math.abs(headerLine.search) <= 0.5 &&
+      headerLine.size === 0,
     JSON.stringify(headerLine),
   );
   await page.mouse.move(0, 0);
@@ -613,15 +623,21 @@ try {
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" ") === "0/2 2/3",
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" "),
   );
+  /* The docked inspector draws its own edge up through the title bar, so the edge shows exactly when the inspector does. */
   const inspectorEdge = () =>
-    page.evaluate(() => ({
-      rail: document.querySelector(".rail").getBoundingClientRect().width,
-      edge: getComputedStyle(document.querySelector(".titlebar-trail")).boxShadow !== "none",
-    }));
+    page.evaluate(() => {
+      const rail = document.querySelector(".rail");
+      const shown = getComputedStyle(rail).visibility === "visible" && getComputedStyle(rail).opacity === "1";
+      return {
+        room: window.innerWidth - document.querySelector(".reader").getBoundingClientRect().right,
+        shown,
+        edge: shown && getComputedStyle(rail, "::after").content !== "none",
+      };
+    });
   const onBlank = await inspectorEdge();
   check(
     "a blank tab hides the inspector's edge in the title bar along with the inspector",
-    onBlank.rail === 0 && !onBlank.edge,
+    onBlank.room === 0 && !onBlank.shown && !onBlank.edge,
     JSON.stringify(onBlank),
   );
   await page.keyboard.press("Meta+n");
@@ -630,7 +646,7 @@ try {
   const onNew = await inspectorEdge();
   check(
     "a new note from a blank tab brings the inspector back whole",
-    onNew.rail > 0 && onNew.edge && (await page.locator(".rail-tabs").isVisible()),
+    onNew.room > 0 && onNew.shown && onNew.edge && (await page.locator(".rail-tabs").isVisible()),
     JSON.stringify(onNew),
   );
 
@@ -729,7 +745,7 @@ try {
   await page.keyboard.press("Backspace");
   await pause(80);
   check("editing the search clears the old marks at once", (await searchMarks()) === 0, String(await searchMarks()));
-  await page.click('[data-side="search"]');
+  await page.keyboard.press("Escape");
   await pause(150);
 
   const outside = (paths) => page.evaluate((p) => window.waymark.reader.onVaultChanged(p), paths);
