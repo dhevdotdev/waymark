@@ -51,6 +51,36 @@ const rect = (selector) =>
     return { x: r.x, y: r.y, w: r.width, h: r.height };
   }, selector);
 const near = (a, b, tolerance = 0.6) => Math.abs(a - b) <= tolerance;
+/**
+ * Starts a motion and, on the first frame the field's width is strictly between the bounds, clicks the control inside that
+ * frame's callback, so the width read and the click share one moment of the transition. A slow machine can draw no frame
+ * mid-way, so a missed motion is started again.
+ */
+const clickMidway = async (start, selector, [low, high]) => {
+  for (let attempt = 1; ; attempt++) {
+    await start();
+    const handle = await page
+      .waitForFunction(
+        ([selector, low, high]) => {
+          const width = () => document.querySelector(".search-field").getBoundingClientRect().width;
+          const before = width();
+          if (before <= low || before >= high) return false;
+          const control = document.querySelector(selector);
+          const box = control.getBoundingClientRect();
+          const reachable = control.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+          control.click();
+          return { before, after: width(), reachable };
+        },
+        [selector, low, high],
+        { polling: "raf", timeout: 1000 },
+      )
+      .catch((error) => {
+        if (attempt === 5) throw error;
+      });
+    if (handle) return handle.jsonValue();
+    await settled();
+  }
+};
 const travels = (motion) => motion.some((m) => m.property.startsWith("margin") && m.ms > 0);
 const fades = (motion) => motion.some((m) => m.property === "opacity" && m.ms > 0);
 
@@ -100,40 +130,46 @@ try {
   );
 
   if (!reduced) {
-    await motionAfter("open");
-    await pause(60);
-    const growing = await page.evaluate(() => document.querySelector(".search-field").getBoundingClientRect().width);
-    const atClose = await page.evaluate(() => {
-      document.querySelector('[data-act="search-clear"]').click();
-      return document.querySelector(".search-field").getBoundingClientRect().width;
-    });
+    const closing = await clickMidway(
+      async () => {
+        if (await page.locator(".sidebar.is-searching").count()) {
+          await page.fill(".sidebar-search input", "");
+          await motionAfter("close");
+        }
+        await settled();
+        await motionAfter("open");
+      },
+      '[data-act="search-clear"]',
+      [icon.w + 4, open.w - 4],
+    );
     await pause(40);
-    const after = await page.evaluate(() => document.querySelector(".search-field").getBoundingClientRect().width);
+    const after = await page.evaluate(
+      () =>
+        new Promise((done) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => done(document.querySelector(".search-field").getBoundingClientRect().width)),
+          ),
+        ),
+    );
     check(
       "an X mid-open shrinks the field from where it had got to",
-      growing > icon.w + 4 && growing < open.w - 4 && Math.abs(atClose - growing) < 30 && after < atClose,
-      `${growing} -> ${atClose} -> ${after}`,
+      Math.abs(closing.after - closing.before) < 30 && after < closing.after,
+      `${closing.before} -> ${closing.after} -> ${after}`,
     );
     await settled();
-    await motionAfter("open");
-    await settled();
-    await motionAfter("close");
-    await pause(50);
-    const reopen = await page.evaluate(() => {
-      const button = document.querySelector('.files-actions [data-side="search"]');
-      const box = button.getBoundingClientRect();
-      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-      const shrinking = document.querySelector(".search-field").getBoundingClientRect().width;
-      button.click();
-      return {
-        reachable: button.contains(hit),
-        shrinking,
-        regrow: document.querySelector(".search-field").getBoundingClientRect().width,
-      };
-    });
+    const reopen = await clickMidway(
+      async () => {
+        if (!(await page.locator(".sidebar.is-searching").count())) await motionAfter("open");
+        await settled();
+        await page.fill(".sidebar-search input", "");
+        await motionAfter("close");
+      },
+      '.files-actions [data-side="search"]',
+      [icon.w + 4, open.w - 4],
+    );
     check(
       "the search button mid-close takes the click and grows the field again from where it was",
-      reopen.reachable && reopen.shrinking < open.w - 4 && Math.abs(reopen.regrow - reopen.shrinking) < 30,
+      reopen.reachable && Math.abs(reopen.after - reopen.before) < 30,
       JSON.stringify(reopen),
     );
     await settled();
