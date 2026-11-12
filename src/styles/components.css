@@ -1975,6 +1975,52 @@
     background: var(--row-hover);
   }
 }
+/* A labelled section above the folders, set like the inspector's section labels, so it reads as a place of its own and not one more folder. */
+.bookmarks {
+  margin-block-end: 10px;
+  padding-block-end: 10px;
+  border-block-end: 1px solid var(--rule);
+}
+.bookmarks > .tree-head {
+  gap: 4px;
+  color: var(--chrome-ink-3);
+}
+.bookmarks > .tree-head .tree-name {
+  flex: none;
+}
+.bookmarks > .tree-head :is(.tree-name, .tree-count) {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.bookmarks > .tree-head .tree-count:not(:empty)::before {
+  content: "· ";
+}
+.bookmarks > .tree-body > .tree-inner::before {
+  display: none;
+}
+.nav-item.is-bookmark.is-here .tree-icon {
+  color: var(--accent);
+}
+.bookmarks-empty {
+  margin: 0;
+  padding-block: 4px 2px;
+  padding-inline: calc(8px + 14px + 7px) 8px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--chrome-ink-3);
+  text-wrap: pretty;
+}
+.bookmarks-empty svg {
+  inline-size: 11px;
+  block-size: 11px;
+  vertical-align: -1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
 .nav-item.is-bookmark.is-missing .nav-text {
   color: var(--ink-3);
   text-decoration: line-through;

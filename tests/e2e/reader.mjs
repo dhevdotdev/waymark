@@ -109,7 +109,7 @@ const treeFolders = await page.evaluate(() => {
         .map((_, i, a) => a.slice(0, i + 1).join("/")),
     ),
   );
-  const shown = [...document.querySelectorAll(".tree-head")].map((h) => h.dataset.folder);
+  const shown = [...document.querySelectorAll(".tree-head[data-folder]")].map((h) => h.dataset.folder);
   return { same: shown.length === onDisk.size && shown.every((f) => onDisk.has(f)), shown: shown.length };
 });
 check("the tree shows exactly the folders on disk", treeFolders.same, `${treeFolders.shown} folders`);

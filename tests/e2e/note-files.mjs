@@ -661,7 +661,7 @@ try {
 
   await page.click('[data-act="collapse-folders"]');
   await pause(350);
-  check("collapse closes every folder", (await page.locator(".tree-folder.is-open").count()) === 0);
+  check("collapse closes every folder", (await page.locator(".tree-folder:not(.bookmarks).is-open").count()) === 0);
 
   await writeFile(file("Plans.md"), "## One\n- [ ] a\n- [ ] b\n\n## Two\n- [x] c\n- [ ] d\n- [x] e\n");
   await openNote("Plans");

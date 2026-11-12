@@ -1279,8 +1279,9 @@ kbd {
 .pane-head.is-scrolled {
   box-shadow: 0 1px 0 var(--rule);
 }
+/* The path takes only its own width, so the bookmark toggle reads as part of it and everything after stays at the right end. */
 .crumbs {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1309,6 +1310,27 @@ kbd {
   button.crumb:hover {
     color: var(--ink);
   }
+}
+/* Measured from the ink: the glyph's notched foot is light, so it sits 1px low to centre on the path's capitals. */
+.pane-bookmark {
+  inline-size: 24px;
+  block-size: 24px;
+  margin-inline: -10px auto;
+  translate: 0 1px;
+}
+.pane-bookmark svg {
+  inline-size: 15px;
+  block-size: 15px;
+}
+.pane-bookmark[aria-pressed="true"] {
+  color: var(--accent-ink);
+}
+.pane-bookmark[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+/* A base cannot be bookmarked; the toggle keeps its room so the path's end does not move. */
+.shell.is-base .pane-bookmark {
+  visibility: hidden;
 }
 /* Read time and save state swap in one fixed cell, so nothing beside them moves between Read and Edit. */
 .pane-meta {

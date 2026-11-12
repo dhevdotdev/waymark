@@ -638,7 +638,7 @@
   color: var(--ink);
   font-size: 0.8125rem;
 }
-.pane-head:has(.edit-banner:not([hidden])) :is(.crumbs, .edit-state) {
+.pane-head:has(.edit-banner:not([hidden])) :is(.crumbs, .pane-bookmark, .edit-state) {
   display: none;
 }
 .edit-banner[hidden] {
