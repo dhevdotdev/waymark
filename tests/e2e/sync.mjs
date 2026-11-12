@@ -335,6 +335,61 @@ try {
     check("the spinner still spins", spinning === "spin", spinning);
     await labelEdge("ok");
   }
+  {
+    /* Each pulse is read from the options it starts with, so a slow machine cannot miss a short one. */
+    const pulsesDuring = async (act) => {
+      await page.evaluate(() => {
+        window.pulses = [];
+        window.realAnimate ??= Element.prototype.animate;
+        Element.prototype.animate = function (keyframes, options) {
+          const animation = window.realAnimate.call(this, keyframes, options);
+          if (options?.id === "sync-pulse") {
+            const frames = animation.effect.getKeyframes();
+            window.pulses.push({
+              on: options.pseudoElement ?? "dot",
+              scale: frames.map((k) => k.scale).join(">"),
+              ms: options.duration,
+            });
+          }
+          return animation;
+        };
+      });
+      await act();
+      await page.waitForFunction(() => !window.waymark.reader.sync.busy);
+      await pause(100);
+      return page.evaluate(() => {
+        Element.prototype.animate = window.realAnimate;
+        return window.pulses;
+      });
+    };
+    await stage("incoming");
+    const clicked = await pulsesDuring(() => page.locator(".sync-actions .btn-primary").click());
+    check(
+      "a clicked sync lands with a pulse on the status dot",
+      clicked.some((p) => p.on === "dot" && p.scale === "0.4>1" && p.ms === 200) &&
+        clicked.some((p) => p.on === "::after" && p.scale === "1>2.6" && p.ms === 400),
+      JSON.stringify(clicked),
+    );
+    await stage("outgoing");
+    const pushed = await pulsesDuring(() => page.locator('.sync-actions .btn-primary:has-text("Push")').click());
+    check("a clicked push lands with a pulse", pushed.length === 2, JSON.stringify(pushed));
+    await stage("clean");
+    await closeAll();
+    const fetchesBefore = await page.evaluate(() => window.__fetches);
+    const keyed = await pulsesDuring(() => page.keyboard.press("Meta+Shift+s"));
+    const fetched = (await page.evaluate(() => window.__fetches)) - fetchesBefore;
+    check(
+      "a sync from the keyboard lands without a pulse",
+      fetched === 1 && keyed.length === 0,
+      `${fetched} ${JSON.stringify(keyed)}`,
+    );
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await stage("incoming");
+    const still = await pulsesDuring(() => page.locator(".sync-actions .btn-primary").click());
+    check("Reduce Motion keeps the dot still when a sync lands", still.length === 0, JSON.stringify(still));
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await closeAll();
+  }
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, String(error).split("\n")[0]);

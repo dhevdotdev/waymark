@@ -3,10 +3,14 @@ import type { PrefStore } from "../prefs";
 import { Backup } from "./backup";
 import { type GitHost, GitPanel, type SyncState } from "./git-panel";
 import type { ShellElements } from "./shell";
+import type { Cue } from "./sound";
+import { pulseLanded } from "./sync-pulse";
 import { describeSync } from "./sync-status";
 
 const REFRESH_DEBOUNCE_MS = 400;
 const FOCUS_CHECK_AFTER_MS = 2 * 60_000;
+/* The cues a deliberate sync, update or push plays when it succeeds. */
+const LANDED = new Set<Cue>(["synced", "pushed", "incoming"]);
 
 export interface SyncControllerDeps {
   els: Pick<ShellElements, "sync" | "branch">;
@@ -34,6 +38,10 @@ export class SyncController {
     const { els, prefs, root, panelHost } = deps;
     this.panel = new GitPanel({
       ...panelHost,
+      play: (cue) => {
+        panelHost.play(cue);
+        if (LANDED.has(cue) && this.panel.startedByPointer) pulseLanded(els.sync);
+      },
       prefs,
       lastSync: () => prefs.value.vaults[root]?.lastSync ?? null,
       setLastSync: (at) =>

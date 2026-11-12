@@ -4,6 +4,7 @@ import { commitBox } from "./commit-box";
 import { GitDetail } from "./git-detail";
 import { gitNotice } from "./git-notices";
 import { EXPLAIN, el, relative, remoteName, WorkIndicator } from "./git-panel-parts";
+import { isPointerAction } from "./input-origin";
 import { keepPlace } from "./keep-place";
 import { fadeOut } from "./overlays";
 import { plural } from "./plural";
@@ -53,6 +54,8 @@ export class GitPanel {
   private readonly work = new WorkIndicator();
   /** Outlives routine background checks, which would otherwise wipe it from the indicator. A manual action clears it. */
   private backupProblem: GitError | null = null;
+  /** Whether the last sync, commit or push was started with the pointer, read when it lands. */
+  startedByPointer = false;
 
   constructor(private host: GitHost) {
     this.detail = new GitDetail(
@@ -140,6 +143,7 @@ export class GitPanel {
 
   /** The deliberate sync: fetch, then fast-forward if that is safe. */
   async sync(): Promise<void> {
+    this.startedByPointer = isPointerAction();
     this.backupProblem = null;
     if (!(await this.readyForGit())) return;
     const fetched = await this.fetch(true);
@@ -189,6 +193,7 @@ export class GitPanel {
    * anything that would need a merge stops here with nothing committed.
    */
   async commitAndSync(message: string, publish = true): Promise<void> {
+    this.startedByPointer = isPointerAction();
     this.backupProblem = null;
     if (!(await this.readyForGit())) return;
     const hasRemote = Boolean(this.status?.upstream);
@@ -432,7 +437,10 @@ export class GitPanel {
       `Push${st.ahead ? ` ${st.ahead}` : ""}`,
       leads && st.ahead > 0 && st.behind === 0,
       st.ahead > 0 && st.behind === 0,
-      () => void this.push(),
+      () => {
+        this.startedByPointer = isPointerAction();
+        void this.push();
+      },
       st.behind ? "Sync first" : undefined,
     );
     terminal();

@@ -353,6 +353,7 @@ kbd {
 }
 .sync-dot {
   --d: var(--ok);
+  position: relative;
   flex: none;
   width: 7px;
   height: 7px;
@@ -362,6 +363,16 @@ kbd {
   transition:
     background-color var(--t-menu) ease,
     box-shadow var(--t-menu) ease;
+}
+/* sync-pulse.ts spreads this out once when a sync lands. */
+.sync-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--d);
+  opacity: 0;
+  pointer-events: none;
 }
 .sync-btn[data-tone="off"] .sync-dot {
   --d: var(--idle);
