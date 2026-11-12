@@ -17,6 +17,7 @@ import { NoteEditing } from "./note-editing";
 import { NoteFiles } from "./note-files";
 import { NoteView } from "./note-view";
 import { ESCAPE_IS_TAKEN, toast } from "./overlays";
+import { entranceFor, slideFor } from "./page-motion";
 import { Palette } from "./palette";
 import { bindReaderClicks } from "./reader-clicks";
 import { paletteItems, paletteRecent, readerCommands } from "./reader-commands";
@@ -286,7 +287,7 @@ export class Reader {
       await this.show({
         anchor: opts.anchor,
         find: opts.find,
-        followed: opts.via === "link",
+        entrance: entranceFor(opts.via),
       });
       return;
     }
@@ -298,13 +299,13 @@ export class Reader {
     this.saveScroll();
     if (opts.via === "link") this.tab.trail.follow(view);
     else this.tab.trail.jump(view);
-    await this.show({ anchor: opts.anchor, find: opts.find, followed: opts.via === "link" });
+    await this.show({ anchor: opts.anchor, find: opts.find, entrance: entranceFor(opts.via, opts.from) });
   }
 
   async go(delta: -1 | 1): Promise<void> {
     this.saveScroll();
     const moved = delta < 0 ? this.tab.trail.back() : this.tab.trail.forward();
-    if (moved) await this.show();
+    if (moved) await this.show({ entrance: slideFor(delta) });
   }
 
   /** A new tab starts blank with the palette open. A blank tab that is already open is reused. */
@@ -518,12 +519,13 @@ export class Reader {
     metrics.lastRenderMs = rendered.ms;
     metrics.lastGrammarMs = rendered.grammarMs;
 
-    const doc = this.noteView.mount(path, rendered.fragment, changedNote && opts.followed === true);
+    const doc = this.noteView.mount(path, rendered.fragment, changedNote ? opts.entrance : undefined);
     this.els.scroller.scrollTop = opts.keepScroll ? prevScroll : entry.scroll;
     if (!opts.keepScroll && !opts.anchor && !opts.find && (!entry.scroll || opts.restoring)) this.spots.restore(path);
     if (opts.anchor) this.noteView.scrollToAnchor(opts.anchor);
     if (opts.find) this.noteView.jumpToText(opts.find);
     else if (changedNote) paint("search", []);
+    this.noteView.enter(doc);
     metrics.paintMs = performance.now() - metrics.navStart;
     opts.onPainted?.();
 

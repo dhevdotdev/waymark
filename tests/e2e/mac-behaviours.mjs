@@ -372,8 +372,29 @@ await page.waitForFunction(() => !document.querySelector(".swipe-cue.is-on"));
 await gestureOver();
 await page.mouse.move(...(await notePoint(".doc p")));
 await gestureOver();
+await page.keyboard.press("Escape");
+await page.evaluate(() => {
+  window.__slides = [];
+  const scroller = document.querySelector(".scroller");
+  window.__slideWatch = new MutationObserver(() => {
+    for (const a of scroller.querySelector(":scope > .doc")?.getAnimations() ?? []) {
+      const from = a.effect.getKeyframes()[0]?.translate;
+      if (from !== undefined && !window.__slides.includes(from)) window.__slides.push(from);
+    }
+  });
+  window.__slideWatch.observe(scroller, { childList: true });
+});
 await swipe(260, 0, 16);
 check("swiping left goes forward", (await title()) === "Swipe two", await title());
+const slides = await page.evaluate(() => {
+  window.__slideWatch.disconnect();
+  return window.__slides;
+});
+check(
+  "its page slides in from the side the cue showed, even after a key press",
+  slides.length === 1 && Number.parseFloat(slides[0]) === 28,
+  JSON.stringify(slides),
+);
 await page.evaluate(() => {
   const commands = window.waymark.reader.commands;
   const run = commands.run.bind(commands);

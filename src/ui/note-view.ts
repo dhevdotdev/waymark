@@ -6,6 +6,7 @@ import { findRanges, paint, scrollToRange } from "./find";
 import { isPointerAction } from "./input-origin";
 import { ringMatch } from "./match-ring";
 import { reducedMotion } from "./media";
+import { type Entrance, PageMotion } from "./page-motion";
 import type { ShellElements } from "./shell";
 import { watchTableFit } from "./table-fit";
 import { watchTableSelection } from "./table-selection";
@@ -34,28 +35,35 @@ export function markTarget(target: HTMLElement, delay = 0): void {
 
 /** The reading column: the rendered note, its header and its backlinks. */
 export class NoteView {
+  private readonly motion: PageMotion;
+
   constructor(
     private readonly els: ShellElements,
     private readonly vault: VaultStore,
     private readonly vaultName: string,
     private readonly toast: (message: string) => void,
   ) {
+    this.motion = new PageMotion(els.scroller);
     watchTableFit(els.scroller);
     watchTableSelection(els.scroller);
   }
 
-  /** Replaces the column with a rendered note and returns its article element. */
-  mount(path: string, body: DocumentFragment, followed: boolean): HTMLElement {
+  /** Replaces the column with a rendered note and returns its article element. Call `enter` once it is scrolled to where it opens. */
+  mount(path: string, body: DocumentFragment, entrance: Entrance | undefined): HTMLElement {
     const doc = document.createElement("article");
     doc.className = "doc";
     /* A second link followed during the fade must not dip the page again. */
     const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
-    if (followed && isPointerAction() && !midFade) doc.classList.add("doc-enter");
+    if (this.motion.leave(entrance) && !midFade) doc.classList.add("doc-enter");
     doc.append(this.heading(path), body);
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);
     this.showPaneHead(path, `${Math.max(1, Math.round(this.vault.wordCount(path) / WORDS_PER_MINUTE))} min read`);
     return doc;
+  }
+
+  enter(doc: HTMLElement): void {
+    this.motion.enter(doc);
   }
 
   showMissing(path: string): void {

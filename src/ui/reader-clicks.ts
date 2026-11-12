@@ -1,5 +1,5 @@
 import { isDesktop, native } from "../platform";
-import { isPointerAction } from "./input-origin";
+import { isPointerAction, markPointerOrigin } from "./input-origin";
 import type { RailPane } from "./inspector";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
 import { markTarget } from "./note-view";
@@ -37,6 +37,7 @@ function followLink(r: Reader, shell: HTMLElement, link: HTMLElement, e: MouseEv
     newTab,
     focus: newTab ? e.shiftKey : true,
     via: link.classList.contains("nav-item") ? "jump" : "link",
+    from: link,
   });
 }
 
@@ -124,6 +125,7 @@ export function bindReaderClicks(shell: HTMLElement, reader: Reader): void {
   shell.addEventListener("mouseup", (e) => {
     if (e.button !== MOUSE_BACK && e.button !== MOUSE_FORWARD) return;
     e.preventDefault();
+    markPointerOrigin();
     reader.commands.run(e.button === MOUSE_BACK ? "back" : "forward", "click");
   });
   yieldGlideTo(reader.els.scroller);
@@ -133,6 +135,9 @@ export function bindReaderClicks(shell: HTMLElement, reader: Reader): void {
       const { trail } = reader.workspace.active;
       return step < 0 ? trail.canBack : trail.canForward;
     },
-    go: (step) => reader.commands.run(step < 0 ? "back" : "forward", "click"),
+    go: (step) => {
+      markPointerOrigin();
+      reader.commands.run(step < 0 ? "back" : "forward", "click");
+    },
   });
 }
