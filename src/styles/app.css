@@ -991,6 +991,8 @@ kbd {
 .search-field .icon-btn {
   width: 24px;
   height: 24px;
+  /* Concentric with the field: its radius less the 4px inset. */
+  border-radius: calc(var(--r-control) - 4px);
 }
 .search-results {
   flex: 1;
