@@ -270,9 +270,8 @@ export class Reader {
     return view.kind === "note" ? view.path : "";
   }
 
-  // Navigation
-
   async open(path: string, opts: OpenOptions = {}): Promise<void> {
+    this.palette.close(false);
     const view: View = isBaseFile(path) ? { kind: "base", path } : { kind: "note", path };
     if (opts.newTab && (opts.focus === false || !this.onBlank)) {
       this.workspace.addBeside(view);

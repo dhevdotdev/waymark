@@ -724,8 +724,10 @@ try {
   );
   const linesOpen = await titlebarLines();
   check("with the panel open no column line crosses the title bar", linesOpen.length === 0, linesOpen.join(","));
-  await page.locator(".palette-overlay").click({ position: { x: 4, y: 450 } });
-  await page.waitForSelector(".palette-overlay", { state: "detached" });
+  await page.waitForSelector(".palette-overlay", { state: "detached", timeout: 3000 }).catch(() => {});
+  check("a note made past a blank tab's palette closes the palette", (await page.locator(".palette-overlay").count()) === 0);
+  const focusedOn = await page.evaluate(() => document.activeElement?.closest(".palette, .doc, .cm-editor")?.className ?? "");
+  check("and the new note keeps the focus", focusedOn !== "" && !focusedOn.includes("palette"), focusedOn);
   await page.click('[data-rail="links"]');
   const linesClosed = await titlebarLines();
   check("with the panel closed no column line crosses the title bar", linesClosed.length === 0, linesClosed.join(","));

@@ -102,13 +102,14 @@ export class Palette {
     return typed && !typed.startsWith(">") ? typed : undefined;
   }
 
-  close(): void {
+  /** `restoreFocus` is false when whatever replaces the palette takes focus itself. */
+  close(restoreFocus = true): void {
     if (!this.root) return;
     const root = this.root;
     this.root = null;
     root.classList.add("is-leaving");
     setTimeout(() => root.remove(), 200);
-    if (this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
+    if (restoreFocus && this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
   }
 
   private update(): void {
