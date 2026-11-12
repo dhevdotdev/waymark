@@ -83,6 +83,32 @@ const motionDuring = (selector, property, act, { pseudo = null } = {}) =>
 const MOVES = (motions) => motions.some((m) => m.ms > 0 && m.from !== m.to);
 const FADES_IN = (motions) => motions.some((m) => m.ms > 0 && Number(m.from) <= 0.02 && Number(m.to) >= 0.98);
 const shown = (motions) => JSON.stringify(motions);
+/** Every animation started through `Element.animate` with this id while `act` runs, read from its own options. */
+const startedDuring = async (id, act) => {
+  await page.evaluate((id) => {
+    window.started = [];
+    window.realAnimate ??= Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      const animation = window.realAnimate.call(this, keyframes, options);
+      if (options?.id === id) {
+        const frames = animation.effect.getKeyframes();
+        const { duration, delay } = animation.effect.getComputedTiming();
+        window.started.push({
+          target: this.className,
+          frames: frames.map((k) => ({ o: k.opacity, t: k.translate, at: k.computedOffset })),
+          ms: duration,
+          delay,
+        });
+      }
+      return animation;
+    };
+  }, id);
+  await act();
+  return page.evaluate(() => {
+    Element.prototype.animate = window.realAnimate;
+    return window.started;
+  });
+};
 const FADES_STRIKE = (motions) => motions.some((m) => m.ms === 140 && m.from !== m.to);
 
 try {
@@ -358,6 +384,52 @@ try {
     "a task box in the editor keeps its element, so its check can fade",
     kept.same && kept.checked !== before,
     JSON.stringify(kept),
+  );
+
+  /* Folders */
+  await page.keyboard.press("Meta+e");
+  await pause(300);
+  const folderHead = page.locator('.tree-head[data-folder="Apiary"]');
+  await folderHead.scrollIntoViewIfNeeded();
+  const folderOpened = await startedDuring("folder-motion", () => folderHead.click());
+  const rowsMoved = folderOpened.filter((m) => m.target !== "tree-inner");
+  const delays = rowsMoved.map((m) => m.delay).join(",");
+  if (reduced) {
+    check(
+      "folder rows fade in place under Reduce Motion",
+      rowsMoved.length > 1 && rowsMoved.every((m) => m.ms === 140 && m.delay === 0 && m.frames[0].o === "0" && !m.frames[0].t),
+      shown(rowsMoved.slice(0, 2)),
+    );
+  } else {
+    check(
+      "a clicked folder drops its rows into place",
+      rowsMoved.length > 1 && rowsMoved.every((m) => m.ms === 200 && m.frames[0].o === "0" && m.frames[0].t === "0px -6px"),
+      shown(rowsMoved.slice(0, 2)),
+    );
+    check(
+      "one after another, 18ms apart and capped at the sixth",
+      delays === rowsMoved.map((_, i) => Math.min(i, 6) * 18).join(","),
+      delays,
+    );
+  }
+  const shut = await startedDuring("folder-motion", () => folderHead.click());
+  check(
+    reduced ? "a folder closes at once under Reduce Motion" : "a clicked folder fades its rows as it closes",
+    reduced
+      ? shut.length === 0
+      : shut.length === 1 && shut[0].ms === 200 && shut[0].frames.map((k) => `${k.o}@${k.at}`).join(" ") === "1@0 0@0.7 0@1",
+    shown(shut),
+  );
+  await folderHead.focus();
+  const keyedFolder = await startedDuring("folder-motion", async () => {
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowLeft");
+  });
+  const keyedOpen = await folderHead.getAttribute("aria-expanded");
+  check(
+    "folders open and close at once from the keyboard",
+    keyedFolder.length === 0 && keyedOpen === "false",
+    shown(keyedFolder),
   );
 
   check("no page errors", errors.length === 0, errors.slice(0, 2).join(" ; "));

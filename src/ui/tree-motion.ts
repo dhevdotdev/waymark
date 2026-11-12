@@ -65,3 +65,39 @@ export function settleTree(box: HTMLElement, before: TreeBefore): void {
   }
   holdClassWhile(tree, "is-settling", glide(now, before.places, box, timing("--t-menu", "--ease-in-out")));
 }
+
+const FOLDER_MOTION = "folder-motion";
+const STAGGER_MS = 18;
+const STAGGER_CAP = 6;
+/* More rows than a tall sidebar shows; the rest are out of sight while the folder opens. */
+const MOVING_ROWS = 60;
+
+/** A folder clicked open drops its rows into place one after another; one clicked shut fades them as it closes. */
+export function moveFolderContents(folder: HTMLElement, opening: boolean): void {
+  const inner = folder.querySelector<HTMLElement>(":scope > .tree-body > .tree-inner");
+  if (!inner) return;
+  for (const animation of inner.getAnimations({ subtree: true })) if (animation.id === FOLDER_MOTION) animation.cancel();
+  const menu = timing("--t-menu", "--ease-out");
+  const fade = timing("--t-exit", "--ease-out");
+  const still = reducedMotion();
+  if (!opening) {
+    /* Under Reduce Motion the height closes at once, so there is nothing to fade. */
+    if (still) return;
+    /* Gone by the exit time, and held at nothing until the height has closed and the rows are hidden. */
+    const out = Number(fade.duration) / Number(menu.duration);
+    inner.animate([{ opacity: 1, easing: fade.easing }, { opacity: 0, offset: out }, { opacity: 0 }], {
+      duration: menu.duration,
+      id: FOLDER_MOTION,
+    });
+    return;
+  }
+  const rise = tokenPx("--rise");
+  [...inner.children].slice(0, MOVING_ROWS).forEach((row, i) => {
+    row.animate(still ? { opacity: [0, 1] } : { opacity: [0, 1], translate: [`0 ${-rise}px`, "0 0"] }, {
+      ...(still ? fade : menu),
+      delay: still ? 0 : Math.min(i, STAGGER_CAP) * STAGGER_MS,
+      fill: "backwards",
+      id: FOLDER_MOTION,
+    });
+  });
+}

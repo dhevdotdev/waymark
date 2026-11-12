@@ -5,7 +5,7 @@ import { isPointerAction } from "./input-origin";
 import { instantly } from "./instant";
 import { flashLanded } from "./list-motion";
 import { isShown, ROW } from "./tree-keys";
-import { captureTree, settleTree, type TreeBefore } from "./tree-motion";
+import { captureTree, moveFolderContents, settleTree, type TreeBefore } from "./tree-motion";
 
 const CHEVRON = `<svg class="tree-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
@@ -169,7 +169,10 @@ export class FileTree {
   }
 
   toggle(path: string): void {
-    this.setOpen(path, !this.opened.has(path));
+    const opening = !this.opened.has(path);
+    this.setOpen(path, opening);
+    const folder = this.folders.get(path);
+    if (folder && isPointerAction()) moveFolderContents(folder, opening);
     this.onChange();
   }
 
