@@ -198,7 +198,7 @@ Native scrollbars are hidden everywhere and nothing rubber-bands past its edge. 
 The rules come from Emil Kowalski's animation standards, good-css.com, Impeccable and taste-skill. Where those sources disagree, a short distillation records which rule Waymark follows.
 
 - Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
-- Following a note link with the pointer fades the new page in over 180ms, with no movement. Files, search, the palette, tabs, back and forward show the page at once.
+- Following a note link with the pointer fades the new page in over 180ms, with no movement. Files, search, the palette, tabs, back and forward show the page at once. A search jump still scrolls at once, then a 2px accent ring closes onto the match it landed on from 10px out over 240ms, holds 400ms and fades over 400ms. A key press gets the ring at rest, gone without a fade, and Reduce Motion fades it in place.
 - The palette and the menu bar count as the keyboard, even when a choice in them is clicked. A heading reached by the pointer takes a brief tint that holds until the eye can land on it, and a heading reached any other way does not.
 - Popovers and menus grow from the point nearest what opened them, measured after they are pushed back into the window. Sheets and the lightbox stay centred. Entries and exits are transitions, so a reversal starts from where the surface is. A key press shows or removes any of them at once.
 - A sheet opened from a sheet changes the open sheet's content, so two never overlap.

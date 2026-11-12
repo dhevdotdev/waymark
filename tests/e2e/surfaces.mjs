@@ -95,7 +95,7 @@ const startedDuring = async (id, act) => {
         const { duration, delay } = animation.effect.getComputedTiming();
         window.started.push({
           target: this.className,
-          frames: frames.map((k) => ({ o: k.opacity, t: k.translate, at: k.computedOffset })),
+          frames: frames.map((k) => ({ o: k.opacity, t: k.translate, s: k.scale, at: k.computedOffset })),
           ms: duration,
           delay,
         });
@@ -430,6 +430,58 @@ try {
     "folders open and close at once from the keyboard",
     keyedFolder.length === 0 && keyedOpen === "false",
     shown(keyedFolder),
+  );
+
+  /* Search jump */
+  await page.keyboard.press("Meta+Shift+f");
+  await page.waitForSelector(".search-field input:visible");
+  await page.keyboard.type("BannetonSeamDriftError");
+  await page.waitForSelector(".search-hit");
+  const rang = await startedDuring("match-ring", async () => {
+    await page.locator(".search-hit").first().click();
+    await page.waitForSelector(".match-ring");
+  });
+  const enter = rang.find((m) => m.frames[0].o === "0");
+  const leave = rang.find((m) => m.frames[0].o === "1");
+  if (reduced) {
+    check("the match ring fades in place under Reduce Motion", enter?.ms === 140 && !enter.frames[0].s, shown(rang));
+  } else {
+    check(
+      "a clicked search jump rings the match from further out",
+      enter?.ms === 240 && enter.frames[0].s !== "none" && enter.frames[0].s !== enter.frames[1].s,
+      shown(rang),
+    );
+  }
+  check(
+    "the ring holds, then fades",
+    leave?.ms === 400 && leave.delay === (enter?.ms ?? 0) + 400 && leave.frames[1].o === "0",
+    shown(leave),
+  );
+  const onMatch = await page.evaluate(() => {
+    const ring = document.querySelector(".match-ring");
+    const frame = ring.offsetParent.getBoundingClientRect();
+    const r = [...CSS.highlights.get("search")][0].getClientRects()[0];
+    return [
+      ring.offsetLeft + frame.left - (r.left - 2),
+      ring.offsetTop + frame.top - (r.top - 1),
+      ring.offsetWidth - (r.width + 4),
+    ];
+  });
+  check(
+    "the ring sits on the match",
+    onMatch.every((d) => Math.abs(d) <= 1),
+    onMatch.map((d) => d.toFixed(1)).join(","),
+  );
+  await page.waitForFunction(() => !document.querySelector(".match-ring"), null, { timeout: 4000 });
+  await page.locator(".search-field input").focus();
+  const keyRing = await startedDuring("match-ring", async () => {
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".match-ring");
+  });
+  check(
+    "a search jump from the keyboard rings the match at rest",
+    keyRing.length === 1 && keyRing[0].frames.every((k) => k.o === "1" && !k.s) && keyRing[0].ms === 640,
+    shown(keyRing),
   );
 
   check("no page errors", errors.length === 0, errors.slice(0, 2).join(" ; "));

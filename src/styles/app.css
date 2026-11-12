@@ -1928,6 +1928,13 @@ kbd {
   background-color: color-mix(in oklab, var(--warn) 55%, transparent);
   color: var(--ink);
 }
+/* match-ring.ts: the match a search jump landed on. Moves by transform and opacity only. */
+.match-ring {
+  position: absolute;
+  border-radius: var(--r-chip);
+  box-shadow: 0 0 0 2px var(--accent);
+  pointer-events: none;
+}
 
 .is-recolouring,
 .is-recolouring *,

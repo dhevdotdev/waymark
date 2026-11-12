@@ -4,6 +4,7 @@ import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
 import { isPointerAction } from "./input-origin";
+import { ringMatch } from "./match-ring";
 import { reducedMotion } from "./media";
 import type { ShellElements } from "./shell";
 import { watchTableFit } from "./table-fit";
@@ -93,7 +94,9 @@ export class NoteView {
     if (!doc || !text) return;
     const ranges = findRanges(doc, text, 300).filter((r) => !r.startContainer.parentElement?.closest(".doc-head, .backlinks"));
     paint("search", ranges);
-    if (ranges[0]) scrollToRange(ranges[0], this.els.scroller);
+    if (!ranges[0]) return;
+    scrollToRange(ranges[0], this.els.scroller);
+    ringMatch(ranges[0], this.els.reader, this.els.scroller);
   }
 
   private showMessage(title: string, detail: string): void {
