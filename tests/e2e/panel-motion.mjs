@@ -202,7 +202,7 @@ try {
     check("under Reduce Motion the page does not travel", !travels(motion, "doc") && !travels(motion, "crumbs"), shown(motion));
   } else {
     const slide = slides(motion, "sidebar");
-    check("a clicked sidebar slides out", slide?.from !== slide?.to && slide?.ms === 240, shown(motion));
+    check("a clicked sidebar slides out", slide?.from !== slide?.to && slide?.ms === 260, shown(motion));
     check(
       "the page glides with it",
       travels(motion, "doc") && travels(motion, "crumbs") && travels(motion, "tabs"),
@@ -244,7 +244,7 @@ try {
   if (reduced) {
     check("under Reduce Motion the inspector fades", fades(motion, "rail") && !travels(motion, "rail"), shown(motion));
   } else {
-    check("a clicked inspector slides out", slides(motion, "rail")?.ms === 240, shown(motion));
+    check("a clicked inspector slides out", slides(motion, "rail")?.ms === 260, shown(motion));
     check(
       "the note and the Read/Edit switch glide with it",
       travels(motion, "doc") && travels(motion, "mode-switch"),
@@ -285,6 +285,116 @@ try {
       `${doc?.from} vs ${moved}`,
     );
     await page.click('[data-act="sidebar"]');
+    await settled();
+  }
+
+  /* The whole window moves as one: the panel and everything it pushes share one curve and one timing, and no line re-wraps on the way. */
+  if (!reduced) {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await settled();
+    const frozen = (t) =>
+      page.evaluate((t) => {
+        for (const a of document.getAnimations()) {
+          a.pause();
+          a.currentTime = t;
+        }
+        const doc = document.querySelector(".doc");
+        const lines = [...doc.querySelectorAll(":scope > p")].slice(0, 4).map((p) => {
+          const range = document.createRange();
+          range.selectNodeContents(p);
+          const top = p.getBoundingClientRect().top;
+          return [...new Set([...range.getClientRects()].map((r) => Math.round(r.top - top)))].join();
+        });
+        return { lines: lines.join("|"), ghosts: document.querySelectorAll(".rewrap-ghost").length };
+      }, t);
+    const timings = () =>
+      page.evaluate(() =>
+        document.getAnimations().flatMap((a) => {
+          const el = a.effect.target;
+          const name = ["sidebar", "doc", "crumbs", "tabs"].find((n) => el.classList.contains(n));
+          if (!name || (a.transitionProperty ?? "translate") !== "translate") return [];
+          const t = a.effect.getTiming();
+          const easing = t.easing !== "linear" ? t.easing : a.effect.getKeyframes()[0].easing;
+          return [`${name} ${t.duration} ${easing}`];
+        }),
+      );
+    const finish = () =>
+      page.evaluate(() => {
+        for (const a of document.getAnimations()) a.finish();
+      });
+    for (const dir of ["closes", "opens"]) {
+      await page.click('[data-act="sidebar"]');
+      const shared = await timings();
+      const kinds = new Set(shared.map((t) => t.replace(/^\S+ /, "")));
+      check(
+        `as the sidebar ${dir}, the page moves on the panel's curve and timing`,
+        shared.length >= 3 && kinds.size === 1,
+        shared.join(", "),
+      );
+      const rest = await frozen(1e4);
+      let rewraps = 0;
+      for (const t of [0, 40, 80, 120, 200]) if ((await frozen(t)).lines !== rest.lines) rewraps++;
+      const { ghosts } = await frozen(0);
+      check(
+        `with room for the full measure, no line re-wraps as the sidebar ${dir}`,
+        rewraps === 0 && ghosts === 0,
+        `${rewraps} frames, ${ghosts} ghosts`,
+      );
+      await finish();
+      await settled();
+    }
+
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await settled();
+    await page.click('[data-act="sidebar"]');
+    const fade = await page.evaluate(() => {
+      const of = (el) => el.getAnimations().filter((a) => a.id === "panel-rewrap").length;
+      const doc = document.querySelector(".doc");
+      return {
+        ghosts: document.querySelectorAll(".rewrap-ghost").length,
+        title: of(doc.querySelector(".doc-head")),
+        blocks: [...doc.children].filter(of).length,
+      };
+    });
+    check(
+      "when the measure changes, only the blocks that re-set crossfade, and the title stays solid",
+      fade.ghosts === 1 && fade.blocks > 0 && fade.title === 0,
+      JSON.stringify(fade),
+    );
+    const settledLines = (await frozen(1e4)).lines;
+    let late = 0;
+    for (const t of [0, 60, 120, 200]) if ((await frozen(t)).lines !== settledLines) late++;
+    check("the lines re-set once, at the start, never while travelling", late === 0, `${late} frames`);
+    await finish();
+    await settled();
+    check("the crossfade leaves nothing behind", (await page.locator(".rewrap-ghost").count()) === 0);
+    await page.click('[data-act="sidebar"]');
+    await settled();
+
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await settled();
+    await page.click('[data-act="sidebar"]');
+    await pause(90);
+    /* Read just after a frame is drawn. A reversed CSS transition starts from the last drawn style, so either may be one frame behind. */
+    const caught = await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() =>
+            setTimeout(() => {
+              const left = () => document.querySelector(".doc-title").getBoundingClientRect().left;
+              const edge = () => document.querySelector(".sidebar").getBoundingClientRect().right;
+              const before = { text: left(), edge: edge() };
+              document.querySelector('[data-act="sidebar"]').click();
+              resolve({ before, after: { text: left(), edge: edge() } });
+            }),
+          ),
+        ),
+    );
+    check(
+      "a second click mid-way carries the text and the panel on from where they are, within a drawn frame",
+      Math.abs(caught.before.text - caught.after.text) < 2 && Math.abs(caught.before.edge - caught.after.edge) < 4,
+      JSON.stringify(caught),
+    );
     await settled();
   }
 
