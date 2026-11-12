@@ -15,6 +15,7 @@ export interface SearchPaneHost {
 export class SearchPane {
   private readonly input: HTMLInputElement;
   private readonly results: HTMLElement;
+  private readonly clearButton: HTMLElement;
   private query = "";
   private hits: Hit[] = [];
   private selected = 0;
@@ -25,6 +26,7 @@ export class SearchPane {
   ) {
     this.input = root.querySelector("input")!;
     this.results = root.querySelector(".search-results")!;
+    this.clearButton = root.querySelector('[data-act="search-clear"]')!;
     this.input.addEventListener("input", () => {
       this.query = this.input.value;
       this.host.clearHighlights();
@@ -44,7 +46,12 @@ export class SearchPane {
     this.input.select();
   }
 
+  /** The X empties the field, and with nothing left to empty it returns to Files: the pane covers the button that opened it. */
   clear(): void {
+    if (!this.input.value) {
+      this.host.close();
+      return;
+    }
     this.input.value = "";
     this.query = "";
     this.host.clearHighlights();
@@ -64,6 +71,9 @@ export class SearchPane {
     this.hits = this.host.search(this.query, MAX_HITS);
     this.host.recordSearchMs(performance.now() - t0);
     this.selected = 0;
+    const label = this.query ? "Clear search" : "Back to files";
+    this.clearButton.setAttribute("aria-label", label);
+    this.clearButton.dataset.tip = label;
     this.results.replaceChildren();
     if (!this.query.trim()) {
       this.results.append(this.hint());

@@ -49,10 +49,8 @@ function template(options: ShellOptions): string {
       <header class="titlebar" data-tauri-drag-region>
         ${isDesktop ? "" : `<div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>`}
         <div class="titlebar-lead" data-tauri-drag-region>
-          <div class="titlebar-nav">
-            <button class="icon-btn" data-act="sidebar" data-tip="Sidebar" data-key="⌘\\" aria-label="Toggle sidebar">${icons.sidebar}</button>
-            <button class="icon-btn" data-side="search" data-tip="Search inside notes" data-key="⌘⇧F" aria-label="Search inside notes">${icons.search}</button>
-          </div>
+          <button class="icon-btn" data-act="sidebar" data-tip="Sidebar" data-key="⌘\\" aria-label="Toggle sidebar">${icons.sidebar}</button>
+          <span class="wordmark" data-tauri-drag-region>Waymark</span>
           <div class="titlebar-nav">
             <button class="icon-btn" data-act="back" data-tip="Back" data-key="⌘[" aria-label="Back">${icons.back}</button>
             <button class="icon-btn" data-act="forward" data-tip="Forward" data-key="⌘]" aria-label="Forward">${icons.forward}</button>
@@ -68,7 +66,8 @@ function template(options: ShellOptions): string {
           <button class="icon-btn" data-act="new-note" data-tip="New note" data-key="⌘N" aria-label="New note">${icons.newNote}</button>
           <button class="icon-btn" data-act="new-folder" data-tip="New folder" aria-label="New folder">${icons.newFolder}</button>
           <button class="icon-btn" data-act="sort-files" data-tip="Sort notes" aria-label="Sort notes">${icons.sort}</button>
-          <button class="icon-btn files-actions-end" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
+          <button class="icon-btn files-actions-end" data-side="search" data-tip="Search inside notes" data-key="⌘⇧F" aria-label="Search inside notes">${icons.search}</button>
+          <button class="icon-btn" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
         </div>
         <div class="sidebar-inner" data-side-pane="files"></div>
         <div class="sidebar-search" data-side-pane="search" hidden>

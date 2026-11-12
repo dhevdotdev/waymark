@@ -45,7 +45,7 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
     ['[data-act="search-clear"]', () => r.sidebar.searchPane.clear()],
     ["[data-act]", (el) => r.commands.run(el.dataset.act!, "click")],
     [".tab", (el, e) => (e.button === 1 ? closeTabOf(r, el) : r.switchTab(Number(el.dataset.tab)))],
-    ["[data-side]", () => r.sidebar.toggleSearch()],
+    ["[data-side]", () => r.sidebar.showSearch()],
     [".tree-head", (el) => r.sidebar.tree.toggle(el.dataset.folder!)],
     ["[data-crumb]", (el) => r.sidebar.revealFolder(el.dataset.crumb!)],
     [

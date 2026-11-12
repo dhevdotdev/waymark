@@ -1092,8 +1092,8 @@ button.task-box:focus-visible {
 }
 @media (min-width: 1241px) {
   .rail-tabs {
-    position: fixed;
-    inset-block-start: calc((var(--chrome-h) - 28px) / 2);
+    position: absolute;
+    inset-block-start: calc((var(--chrome-h) - 28px) / 2 - var(--chrome-h));
     inset-inline-end: 44px;
     z-index: 5;
     inline-size: calc(var(--rail-w) - 54px);
