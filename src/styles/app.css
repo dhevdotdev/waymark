@@ -1274,6 +1274,15 @@ kbd {
   user-select: none;
   -webkit-user-select: none;
 }
+/* The lines of a note as they were set before a docked panel changed the measure. panel-glide.ts fades and removes it. */
+.rewrap-ghost {
+  position: absolute;
+  overflow-y: clip;
+  container: reader / inline-size;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .page-carry {
   position: fixed;
   z-index: 40;

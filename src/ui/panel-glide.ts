@@ -1,6 +1,7 @@
 import { isPointerAction } from "./input-origin";
 import { holdClassWhile, timing } from "./list-motion";
 import { reducedMotion } from "./media";
+import { holdLines, rewrap, stopRewrap } from "./panel-rewrap";
 
 const NOTICEABLE_PX = 0.5;
 
@@ -31,8 +32,8 @@ function readingOf(el: HTMLElement): Reading {
 /**
  * Applies a docked panel's open or close at once, then carries what it moved from where it was, on the panel's own
  * curve. Each element travels its own distance, so the pane head stays beside the panel's edge while the centred note
- * moves half as far. When the measure changes, the lines re-set at once and only
- * the ragged right edge differs. A second click picks each element up from
+ * moves half as far. When the window is too narrow for the note's full measure, its lines re-set once, at the start,
+ * under a quick crossfade in panel-rewrap.ts, and never while travelling. A second click picks each element up from
  * where it had got to. Only a pointer gets the motion, and Reduce Motion keeps the panel's own fade without the travel.
  */
 export function glidePanel(shell: HTMLElement, opening: boolean, change: () => void): void {
@@ -42,6 +43,9 @@ export function glidePanel(shell: HTMLElement, opening: boolean, change: () => v
   }
   const followers = [...shell.querySelectorAll<HTMLElement>(FOLLOWERS)].filter((el) => el.offsetParent);
   const was = followers.map(readingOf);
+  const doc = followers.find((el) => el.matches(".scroller > .doc"));
+  if (doc) stopRewrap(doc);
+  const held = doc ? holdLines(doc) : undefined;
   const options = timing(opening ? "--t-panel-open" : "--t-panel-close", "--ease-panel");
   for (const el of followers) for (const animation of el.getAnimations()) if (animation.id === options.id) animation.cancel();
   change();
@@ -50,6 +54,7 @@ export function glidePanel(shell: HTMLElement, opening: boolean, change: () => v
     const now = readingOf(el);
     const dx = was[i].edge - now.edge;
     if (Math.abs(dx) >= NOTICEABLE_PX) started.push(el.animate({ translate: [`${dx}px 0`, "0 0"] }, options));
+    if (el === doc && held && Math.abs(was[i].measure - now.measure) >= NOTICEABLE_PX) rewrap(held, dx, options);
   });
   holdClassWhile(shell, "is-gliding", started);
 }

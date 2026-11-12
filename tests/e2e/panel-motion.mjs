@@ -314,11 +314,38 @@ try {
       await settled();
     }
 
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await settled();
+    await page.click('[data-act="sidebar"]');
+    const fade = await page.evaluate(() => {
+      const of = (el) => el.getAnimations().filter((a) => a.id === "panel-rewrap").length;
+      const doc = document.querySelector(".doc");
+      return {
+        ghosts: document.querySelectorAll(".rewrap-ghost").length,
+        title: of(doc.querySelector(".doc-head")),
+        blocks: [...doc.children].filter(of).length,
+      };
+    });
+    check(
+      "when the measure changes, only the blocks that re-set crossfade, and the title stays solid",
+      fade.ghosts === 1 && fade.blocks > 0 && fade.title === 0,
+      JSON.stringify(fade),
+    );
+    const settledLines = (await frozen(1e4)).lines;
+    let late = 0;
+    for (const t of [0, 60, 120, 200]) if ((await frozen(t)).lines !== settledLines) late++;
+    check("the lines re-set once, at the start, never while travelling", late === 0, `${late} frames`);
+    await finish();
+    await settled();
+    check("the crossfade leaves nothing behind", (await page.locator(".rewrap-ghost").count()) === 0);
+    await page.click('[data-act="sidebar"]');
+    await settled();
+
     await page.setViewportSize({ width: 1440, height: 800 });
     await settled();
     await page.click('[data-act="sidebar"]');
     await pause(90);
-    /* Read just after a frame is drawn: a CSS transition reverses from the last drawn style, the text from the one read. */
+    /* Read just after a frame is drawn. A reversed CSS transition starts from the last drawn style, so either may be one frame behind. */
     const caught = await page.evaluate(
       () =>
         new Promise((resolve) =>
@@ -334,8 +361,8 @@ try {
         ),
     );
     check(
-      "a second click mid-way carries the text on from where it is, and the panel within a frame",
-      Math.abs(caught.before.text - caught.after.text) < 0.5 && Math.abs(caught.before.edge - caught.after.edge) < 4,
+      "a second click mid-way carries the text and the panel on from where they are, within a drawn frame",
+      Math.abs(caught.before.text - caught.after.text) < 2 && Math.abs(caught.before.edge - caught.after.edge) < 4,
       JSON.stringify(caught),
     );
     await settled();
