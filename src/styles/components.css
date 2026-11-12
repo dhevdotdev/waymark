@@ -876,6 +876,11 @@
   min-block-size: 0;
   background: var(--paper);
 }
+/* Leaving, it keeps the box it had over the note, which the rail coming back must not squeeze, and takes no input. */
+.graph-view.is-leaving {
+  position: fixed;
+  pointer-events: none;
+}
 .graph-stage {
   position: absolute;
   inset: 0;

@@ -1,12 +1,12 @@
 import type { Simulation } from "d3-force";
 import { resolveColor } from "./colors";
 import { GraphBloom } from "./graph-bloom";
-import { CameraGlide, type Viewport } from "./graph-camera";
+import { CameraGlide, closeView, fitView, SAFE, type Viewport } from "./graph-camera";
 import { drawLabels } from "./graph-labels";
 import { settleGraph } from "./graph-layout";
 import { arcControls, bezier, groupColor, lightSprite } from "./graph-paint";
 import { describeNote, nextIndex, traversalOrder } from "./graph-traversal";
-import type { Centre, GraphData, GraphGroup, GraphLink, GraphNode, Palette } from "./graph-types";
+import type { Arrival, Centre, GraphData, GraphGroup, GraphLink, GraphNode, Palette } from "./graph-types";
 import { isPointerAction } from "./input-origin";
 import { reducedMotion } from "./media";
 
@@ -24,8 +24,8 @@ interface Drag {
   grabY: number;
 }
 
-/** The margins the toolbar and the community chips cover. */
-const SAFE = { top: 72, bottom: 64, side: 56 };
+/** How close on the current note the camera starts when the graph opens. */
+const PULL_BACK = 2.6;
 
 export class GraphCanvas {
   readonly canvas = document.createElement("canvas");
@@ -73,7 +73,7 @@ export class GraphCanvas {
   }
 
   /** With `keep`, the same graph is being refreshed: the camera, emphasis and any held note stay, and `keep` is the spotlight. */
-  setData(data: GraphData, current: string | null, keep?: number | null, bloom = false): void {
+  setData(data: GraphData, current: string | null, keep?: number | null, arrival: Arrival = {}): void {
     const previous = new Map(this.nodes.map((n) => [n.id, n]));
     const refreshing = keep !== undefined;
     this.current = current;
@@ -91,13 +91,30 @@ export class GraphCanvas {
     }
     this.readPalette();
     this.layout();
-    this.bloom = GraphBloom.on(this.canvas, bloom ? GraphBloom.from(this.nodes, this.links, current) : null);
+    this.bloom = GraphBloom.on(this.canvas, arrival.bloom ? GraphBloom.from(this.nodes, this.links, current) : null);
     this.carryOver(refreshing);
     if (!refreshing) {
       this.camera.stop();
-      this.fit();
+      /* A canvas just mounted is measured here, before its first resize, so the arrival can start from the fitted view. */
+      if (this.size.w) this.fit();
+      else this.measure();
+      if (arrival.pull) this.closeOn(current, PULL_BACK, false);
     }
     this.draw();
+  }
+
+  /**
+   * Glides between the view now and one `factor` times closer with the note `id` in the middle: `inward` toward it,
+   * otherwise out from it. Without that note it closes on the middle. Under Reduce Motion the view stays where it is.
+   */
+  closeOn(id: string | null, factor: number, inward: boolean): void {
+    if (!this.size.w) return;
+    const node = this.nodes.find((d) => d.id === id);
+    const near = closeView(this.view, this.size, node, factor);
+    const [from, to] = inward ? [this.view, near] : [near, this.view];
+    if (!this.camera.start(from, to, "--ease-out")) return;
+    this.view = from;
+    this.wake();
   }
 
   /** Re-points what refers to a note at the new copy of that note, and lets go of anything that has gone. */
@@ -198,45 +215,28 @@ export class GraphCanvas {
     return this.radius(d) * (k > 1 ? k ** -0.65 : 1);
   }
 
-  private fitView(): Viewport {
-    const xs = this.nodes.map((n) => n.x!).sort((a, b) => a - b);
-    const ys = this.nodes.map((n) => n.y!).sort((a, b) => a - b);
-    const cut = this.nodes.length > 40 ? Math.floor(this.nodes.length * 0.01) : 0;
-    const minX = xs[cut],
-      maxX = xs[xs.length - 1 - cut],
-      minY = ys[cut],
-      maxY = ys[ys.length - 1 - cut];
-    const k = Math.max(
-      0.15,
-      Math.min(
-        (this.size.w - SAFE.side * 2) / Math.max(1, maxX - minX),
-        (this.size.h - SAFE.top - SAFE.bottom) / Math.max(1, maxY - minY),
-        2.4,
-      ),
-    );
-    return {
-      k,
-      x: this.size.w / 2 - ((minX + maxX) / 2) * k,
-      y: SAFE.top + (this.size.h - SAFE.top - SAFE.bottom) / 2 - ((minY + maxY) / 2) * k,
-    };
-  }
-
   private fit(): void {
     if (!this.nodes.length || !this.size.w) return;
-    this.view = this.fitView();
+    this.view = fitView(this.nodes, this.size);
+  }
+
+  /** Matches the canvas to its box, fitting the view the first time. Returns false when there is no box or it has not changed. */
+  private measure(): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const [w, h] = [Math.round(rect.width * dpr), Math.round(rect.height * dpr)];
+    if (!w || !h || (this.size.w && w === this.canvas.width && h === this.canvas.height)) return false;
+    const first = !this.size.w;
+    this.size = { w: rect.width, h: rect.height };
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (first) this.fit();
+    return true;
   }
 
   private resize(): void {
-    const rect = this.canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const dpr = window.devicePixelRatio || 1;
-    const first = !this.size.w;
-    this.size = { w: rect.width, h: rect.height };
-    this.canvas.width = Math.round(rect.width * dpr);
-    this.canvas.height = Math.round(rect.height * dpr);
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (first) this.fit();
-    this.draw();
+    if (this.measure()) this.draw();
   }
 
   private readPalette(): void {
@@ -638,6 +638,6 @@ export class GraphCanvas {
   }
 
   recenter(): void {
-    if (this.nodes.length && this.size.w) this.moveCamera(this.fitView());
+    if (this.nodes.length && this.size.w) this.moveCamera(fitView(this.nodes, this.size));
   }
 }
