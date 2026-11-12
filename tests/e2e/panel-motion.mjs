@@ -373,26 +373,43 @@ try {
 
     await page.setViewportSize({ width: 1440, height: 800 });
     await settled();
+    /* The sidebar's translate in each frame drawn from here on. */
+    await page.evaluate(() => {
+      window.sidebarFrames = [];
+      const record = () => {
+        window.sidebarFrames.push(getComputedStyle(document.querySelector(".sidebar")).translate);
+        if (window.sidebarFrames.length < 600) requestAnimationFrame(record);
+      };
+      requestAnimationFrame(record);
+    });
     await page.click('[data-act="sidebar"]');
     await pause(90);
-    /* Read just after a frame is drawn. A reversed CSS transition starts from the last drawn style, so either may be one frame behind. */
+    /*
+     * Clicked just after a frame is drawn. WebKit starts a reversed CSS transition from the style of a frame it drew, the
+     * last or the one before, which on a slow machine can be several pixels back, so the panel is read from the reversed
+     * transition itself.
+     */
     const caught = await page.evaluate(
       () =>
         new Promise((resolve) =>
           requestAnimationFrame(() =>
             setTimeout(() => {
+              const sidebar = document.querySelector(".sidebar");
               const left = () => document.querySelector(".doc-title").getBoundingClientRect().left;
-              const edge = () => document.querySelector(".sidebar").getBoundingClientRect().right;
-              const before = { text: left(), edge: edge() };
+              const before = { text: left(), drawn: window.sidebarFrames.slice(-2) };
               document.querySelector('[data-act="sidebar"]').click();
-              resolve({ before, after: { text: left(), edge: edge() } });
+              const reversed = sidebar.getAnimations().find((a) => a.transitionProperty === "translate");
+              resolve({ before, after: { text: left(), from: reversed?.effect.getKeyframes()[0].translate ?? null } });
             }),
           ),
         ),
     );
+    const percent = (translate) => (translate === "none" ? 0 : Number.parseFloat(translate));
+    const fromDrawn =
+      caught.after.from !== null && caught.before.drawn.some((t) => Math.abs(percent(t) - percent(caught.after.from)) < 1e-3);
     check(
       "a second click mid-way carries the text and the panel on from where they are, within a drawn frame",
-      Math.abs(caught.before.text - caught.after.text) < 2 && Math.abs(caught.before.edge - caught.after.edge) < 4,
+      Math.abs(caught.before.text - caught.after.text) < 2 && fromDrawn,
       JSON.stringify(caught),
     );
     await settled();
