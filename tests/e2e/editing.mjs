@@ -1055,7 +1055,11 @@ try {
   await page.click('[data-act="settings"]');
   await pause(250);
   await page.click('[data-family="rose-pine"]');
-  await pause(700);
+  await page
+    .waitForFunction((before) => document.querySelector(".cm-code-token")?.getAttribute("style") !== before, tokenBefore, {
+      timeout: 5000,
+    })
+    .catch(() => {});
   check("switching theme recolours code while editing", (await firstToken()) !== tokenBefore, await firstToken());
   check("switching theme leaves the editor open", await page.locator(".cm-content").isVisible());
   await page.click('[data-family="catppuccin"]');
