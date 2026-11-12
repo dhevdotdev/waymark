@@ -1,6 +1,5 @@
 import type { PrefStore } from "../prefs";
 import { instantly } from "./instant";
-import { railFloats } from "./media";
 import { bindEdgeDrag } from "./panel-resize";
 
 export type RailSection = "trail" | "graph";
@@ -128,9 +127,7 @@ export class PanelSections {
   private budget(): number {
     const style = getComputedStyle(this.inner);
     const gap = Number.parseFloat(style.rowGap) || 0;
-    const tabs = this.inner.querySelector<HTMLElement>(".rail-tabs");
     let taken = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom) + LINKS_LEAST;
-    if (tabs && railFloats()) taken += tabs.offsetHeight + gap;
     for (const section of SECTIONS) {
       if (this.vacant[section]) continue;
       taken += gap + (this.folded[section] ? FOLDED : 0);

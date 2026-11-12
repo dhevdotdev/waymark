@@ -71,17 +71,66 @@ const line = (text) => page.locator(".cm-line", { hasText: text });
 try {
   await openNote("Writing");
   check("Files and Search no longer take a row", (await page.locator(".sidebar-head").count()) === 0);
-  const tabs = await page.locator(".rail-tabs").boundingBox();
-  const toggle = await page.locator('[data-act="rail"]').boundingBox();
+  const firstLine = await page.evaluate(() => {
+    const mid = (el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const box = range.getBoundingClientRect();
+      return box.top + box.height / 2;
+    };
+    return { head: mid(document.querySelector(".crumbs")), panel: mid(document.querySelector(".rail-links > :first-child")) };
+  });
   check(
-    "the inspector's tabs share the top row with its toggle",
-    Math.abs(tabs.y + tabs.height / 2 - (toggle.y + toggle.height / 2)) <= 3,
-    `${tabs.y} ${toggle.y}`,
+    "the panel's first line sits on the pane head's row",
+    Math.abs(firstLine.head - firstLine.panel) <= 1,
+    JSON.stringify(firstLine),
   );
-  check("they sit clear of the toggle", tabs.x + tabs.width <= toggle.x);
   await page.click('[data-rail="info"]');
   await pause(150);
-  check("the tabs still work up there", await page.locator('[data-rail="info"].is-on').isVisible());
+  check("Info in the title bar switches the panel", await page.locator('[data-rail="info"].is-on').isVisible());
+  const menuItems = () => page.locator(".context-menu:not(.is-leaving) .context-item").allTextContents();
+  await page.locator('.nav-item[data-path="Writing.md"]').click({ button: "right" });
+  await pause(150);
+  const fromList = await menuItems();
+  await page.keyboard.press("Escape");
+  await pause(200);
+  const more = page.locator('[data-act="note-menu"]');
+  await more.click();
+  await pause(150);
+  const menuBox = await page.locator(".context-menu:not(.is-leaving)").boundingBox();
+  const moreBox = await more.boundingBox();
+  check(
+    "the title bar's … offers the file list's actions for the note",
+    JSON.stringify(await menuItems()) === JSON.stringify(fromList),
+    (await menuItems()).join(", "),
+  );
+  check(
+    "it opens under its button, aligned to its end",
+    menuBox.y >= moreBox.y + moreBox.height && Math.abs(menuBox.x + menuBox.width - (moreBox.x + moreBox.width)) <= 1,
+  );
+  check("the button says its menu is open", (await more.getAttribute("aria-expanded")) === "true");
+  await more.click();
+  await pause(200);
+  check(
+    "a second click on … closes its menu",
+    (await page.locator(".context-menu:not(.is-leaving)").count()) === 0 &&
+      (await more.getAttribute("aria-expanded")) === "false",
+  );
+  await more.click();
+  await pause(150);
+  await page.keyboard.press("Escape");
+  await pause(200);
+  check("and closed", (await more.getAttribute("aria-expanded")) === "false");
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await pause(150);
+  check(
+    "from the keyboard the first item takes focus",
+    await page.evaluate(() => document.activeElement?.matches(".context-menu .context-item:first-child")),
+  );
+  await page.keyboard.press("Escape");
+  await pause(200);
+  check("Escape gives focus back to …", await page.evaluate(() => document.activeElement?.dataset.act === "note-menu"));
   await page.click('[data-side="search"]');
   await pause(200);
   check("the file tools' search opens Search", await page.locator(".sidebar-search").isVisible());
@@ -646,7 +695,7 @@ try {
   const onNew = await inspectorEdge();
   check(
     "a new note from a blank tab brings the inspector back whole",
-    onNew.room > 0 && onNew.shown && onNew.edge && (await page.locator(".rail-tabs").isVisible()),
+    onNew.room > 0 && onNew.shown && onNew.edge && (await page.locator('[data-rail="links"]').isVisible()),
     JSON.stringify(onNew),
   );
 

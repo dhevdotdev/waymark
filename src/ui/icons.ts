@@ -7,7 +7,7 @@ export const icons = {
   forward: svg(`<path d="M6 3.5 10.5 8 6 12.5"/>`),
   close: svg(`<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>`),
   search: svg(`<circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>`),
-  inspector: svg(`<rect x="2" y="3" width="12" height="10" rx="2.2"/><path d="M9.5 3v10"/>`),
+  info: svg(`<circle cx="8" cy="8" r="5.75"/><path d="M8 7.3v3.7"/><circle cx="8" cy="5.05" r=".3"/>`),
   branch: svg(
     `<circle cx="5" cy="3.8" r="1.5"/><circle cx="5" cy="12.2" r="1.5"/><circle cx="11" cy="5.5" r="1.5"/><path d="M5 5.3v5.4M11 7c0 2.2-3 2.2-6 3"/>`,
   ),

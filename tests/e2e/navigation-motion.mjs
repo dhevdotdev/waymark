@@ -432,7 +432,7 @@ await settled();
 await page.keyboard.press("Meta+\\");
 await page.setViewportSize({ width: 1100, height: 700 });
 await settled();
-await page.click('[data-act="rail"]');
+await page.click('[data-rail="links"]');
 check("a clicked floating inspector slides", (await moving(".rail")) === !reduced);
 await settled();
 await page.keyboard.press("Meta+Alt+\\");

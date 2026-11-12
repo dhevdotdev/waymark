@@ -1090,18 +1090,6 @@ button.task-box:focus-visible {
 :root[data-scheme="light"] .when-dark {
   display: none;
 }
-@media (min-width: 1241px) {
-  .rail-tabs {
-    position: absolute;
-    inset-block-start: calc((var(--chrome-h) - 28px) / 2 - var(--chrome-h));
-    inset-inline-end: 44px;
-    z-index: 5;
-    inline-size: calc(var(--rail-w) - 54px);
-  }
-  .rail-inner {
-    padding-block-start: 8px;
-  }
-}
 .sidebar-inner {
   padding-block-start: 4px;
 }
