@@ -1,6 +1,7 @@
 import type { VaultStore } from "../vault/store";
 import type { GraphScope, View } from "../vault/trail";
 import { GraphCanvas } from "./graph";
+import { claimBloom } from "./graph-bloom";
 import { tokenEasing, tokenMs } from "./graph-camera";
 import { groupColor } from "./graph-paint";
 import type { GraphData } from "./graph-types";
@@ -58,6 +59,7 @@ export class GraphView {
   private spotlit: number | null = null;
   private shown = "";
   private arrived = false;
+  private blooming = false;
   private readonly leaveArrows = new MorphArrows("apart");
 
   constructor(
@@ -76,12 +78,16 @@ export class GraphView {
     this.bind();
   }
 
-  /** Takes the keyboard unless `keepFocus`. Only a graph just opened with the pointer fades in; a tab switch, Back or a shortcut shows it at once. */
+  /**
+   * Takes the keyboard unless `keepFocus`. Only a graph just opened with the pointer fades in, and the first of those
+   * in a session also blooms out of the current note. A tab switch, Back or a shortcut shows it at once.
+   */
   arrive(opened: boolean, keepFocus = false): void {
     const take = !keepFocus && (!this.arrived || document.activeElement === document.body);
     if (take) this.canvas.canvas.focus({ preventScroll: true });
     this.arrived = true;
     if (!opened || !isPointerAction()) return;
+    this.blooming = claimBloom();
     this.root.animate({ opacity: [0, 1] }, { duration: tokenMs("--t-exit"), easing: tokenEasing("--ease-out") });
   }
 
@@ -102,7 +108,8 @@ export class GraphView {
     const refreshing = shown === this.shown;
     this.shown = shown;
     this.spotlit = refreshing && data.groups.some((g) => g.id === this.spotlit) ? this.spotlit : null;
-    this.canvas.setData(data, note, refreshing ? this.spotlit : undefined);
+    this.canvas.setData(data, note, refreshing ? this.spotlit : undefined, this.blooming);
+    this.blooming = false;
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-gmode]"))
       b.classList.toggle("is-on", b.dataset.gmode === scope);
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-depth]"))
