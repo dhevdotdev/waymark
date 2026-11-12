@@ -18,6 +18,8 @@ export interface BookmarksHost {
   open: (path: string, newTab: boolean, anchor?: string) => void;
   toast: (message: string) => void;
   current: () => string;
+  /** The toggle beside the open note's path. */
+  button: HTMLElement;
 }
 
 const isBookmark = (value: unknown): value is Bookmark => {
@@ -29,7 +31,15 @@ const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
 const CHEVRON = `<svg class="tree-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 const headingOf = (line: string) => /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
 
-/** A saved list of notes and headings, kept per vault in the app's preferences and shown above the folders. */
+/** Says where bookmarks come from, so the list is findable before it has anything in it. */
+function emptyLine(): HTMLElement {
+  const line = document.createElement("p");
+  line.className = "bookmarks-empty";
+  line.innerHTML = `Click ${icons.bookmark.replace('aria-hidden="true"', 'role="img" aria-label="the bookmark button"')} next to a note's path to add it here.`;
+  return line;
+}
+
+/** A saved list of notes and headings, kept per vault in the app's preferences and always shown above the folders. */
 export class Bookmarks {
   readonly element = document.createElement("div");
   private readonly head = document.createElement("button");
@@ -99,17 +109,20 @@ export class Bookmarks {
 
   render(): void {
     const list = this.list;
-    this.element.hidden = list.length === 0;
-    if (!list.length) {
-      this.element.replaceChildren();
-      return;
-    }
     if (this.head.parentElement !== this.element) this.element.replaceChildren(this.head, this.body);
     const closed = this.host.prefs.value.vaults[this.host.root]?.bookmarksClosed === true;
     this.element.classList.toggle("is-open", !closed);
     this.head.setAttribute("aria-expanded", String(!closed));
-    this.head.querySelector(".tree-count")!.textContent = list.length.toLocaleString();
-    this.drawRows(list);
+    this.head.querySelector(".tree-count")!.textContent = list.length ? list.length.toLocaleString() : "";
+    if (list.length) this.drawRows(list);
+    else this.inner.replaceChildren(emptyLine());
+    this.showToggle();
+  }
+
+  private showToggle(): void {
+    const on = this.has({ path: this.host.current() });
+    this.host.button.setAttribute("aria-pressed", String(on));
+    this.host.button.dataset.tip = on ? "Remove bookmark" : "Bookmark this note";
   }
 
   /** The rows are rebuilt on every note change, so a row holding focus hands it to its replacement. */

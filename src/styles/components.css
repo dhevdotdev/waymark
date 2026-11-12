@@ -1975,6 +1975,24 @@
     background: var(--row-hover);
   }
 }
+.bookmarks-empty {
+  margin: 0;
+  padding-block: 4px 8px;
+  padding-inline: calc(8px + 14px + 21px) 8px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--chrome-ink-3);
+  text-wrap: pretty;
+}
+.bookmarks-empty svg {
+  inline-size: 11px;
+  block-size: 11px;
+  vertical-align: -1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
 .nav-item.is-bookmark.is-missing .nav-text {
   color: var(--ink-3);
   text-decoration: line-through;
