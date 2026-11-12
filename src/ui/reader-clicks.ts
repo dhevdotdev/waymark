@@ -1,11 +1,12 @@
 import { isDesktop, native } from "../platform";
 import { isPointerAction } from "./input-origin";
 import type { RailPane } from "./inspector";
-import { reducedMotion } from "./media";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
+import { markTarget } from "./note-view";
 import { lightbox } from "./overlays";
 import type { RailSection } from "./panel-sections";
 import type { Reader } from "./reader";
+import { glideTo, yieldGlideTo } from "./scroll-glide";
 import { bindSwipeNavigation } from "./swipe-navigation";
 
 type Route = [selector: string, handle: (el: HTMLElement, e: MouseEvent) => void];
@@ -69,9 +70,11 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
       ".floating-outline a",
       (el, e) => {
         e.preventDefault();
-        document
-          .getElementById(el.dataset.target!)
-          ?.scrollIntoView({ block: "start", behavior: isPointerAction() && !reducedMotion() ? "smooth" : "auto" });
+        const heading = document.getElementById(el.dataset.target!);
+        if (heading)
+          glideTo(r.els.scroller, heading, (inMs) => {
+            if (isPointerAction()) markTarget(heading, inMs);
+          });
       },
     ],
     ["a.wikilink, a.wikilink-plain, .nav-item[data-path]", (el, e) => followLink(r, shell, el, e)],
@@ -123,6 +126,7 @@ export function bindReaderClicks(shell: HTMLElement, reader: Reader): void {
     e.preventDefault();
     reader.commands.run(e.button === MOUSE_BACK ? "back" : "forward", "click");
   });
+  yieldGlideTo(reader.els.scroller);
   bindSwipeNavigation(reader.els.scroller, {
     can: (step) => {
       if (reader.workspace.isEmpty || reader.onBlank) return false;
