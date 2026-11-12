@@ -1865,7 +1865,7 @@
     .task-box,
     .doc li.task
   ),
-:root[data-input="keyboard"] :is(.toggle i, .task-box)::after,
+:root[data-input="keyboard"] .toggle i::after,
 :root[data-input="keyboard"] .tab + .tab::before {
   transition: none;
 }

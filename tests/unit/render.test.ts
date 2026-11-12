@@ -116,6 +116,16 @@ describe("task lists", () => {
     expect(div.querySelector("li")?.textContent?.trim()).toBe("A then more");
   });
 
+  it("holds the item's own text in one span, wrapped lines included, and leaves nested items out", async () => {
+    const { div } = await render("- [x] first [[A]]\n  second line\n  - [ ] child");
+    const outer = div.querySelector("li")!;
+    const text = outer.querySelector(":scope > .task-text");
+    expect(text?.textContent?.replace(/\s+/g, " ")).toBe("first A second line");
+    expect(text?.querySelector(".wikilink")).not.toBeNull();
+    expect(outer.querySelector(":scope > ul .task-text")?.textContent).toBe("child");
+    expect(outer.querySelector(":scope > .task-box > .task-tick path")?.getAttribute("d")).toBeTruthy();
+  });
+
   it("works in a loose list", async () => {
     const { div } = await render("- [x] first\n\n- [ ] second");
     expect([...div.querySelectorAll("li > p > .task-box")]).toHaveLength(2);

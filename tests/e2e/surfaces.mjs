@@ -43,7 +43,8 @@ const motionDuring = (selector, property, act, { pseudo = null } = {}) =>
         for (const a of mine()) {
           if (seen.has(a)) continue;
           const frames = a.effect.getKeyframes().filter((k) => property in k);
-          seen.set(a, { from: frames[0][property], to: frames.at(-1)[property], ms: a.effect.getComputedTiming().duration });
+          const { duration, delay } = a.effect.getComputedTiming();
+          seen.set(a, { from: frames[0][property], to: frames.at(-1)[property], ms: duration, delay });
         }
       };
       let triggered = false;
@@ -82,6 +83,7 @@ const motionDuring = (selector, property, act, { pseudo = null } = {}) =>
 const MOVES = (motions) => motions.some((m) => m.ms > 0 && m.from !== m.to);
 const FADES_IN = (motions) => motions.some((m) => m.ms > 0 && Number(m.from) <= 0.02 && Number(m.to) >= 0.98);
 const shown = (motions) => JSON.stringify(motions);
+const FADES_STRIKE = (motions) => motions.some((m) => m.ms === 140 && m.from !== m.to);
 
 try {
   await writeFile(path.join(app.vault, "Checklist.md"), "- [ ] First thing\n- [ ] Second thing\n");
@@ -296,21 +298,47 @@ try {
   await page.mouse.click(600, 500);
   await pause(120);
   const taskBox = '.task-box[data-task-line="0"]';
-  const clicked = motionDuring(taskBox, "opacity", null, { pseudo: "::after" });
+  const tickOf = (box) => `${box} .task-tick path`;
+  const strikeOf = (box) => `li:has(> ${box}) > .task-text`;
+  const ARRIVES = (motions, from, to, ms, delay) =>
+    motions.some((m) => m.from === from && m.to === to && m.ms === ms && m.delay === delay);
+  const watchTask = (box) =>
+    Promise.all([
+      motionDuring(tickOf(box), "strokeDashoffset"),
+      motionDuring(tickOf(box), "opacity"),
+      motionDuring(strikeOf(box), "backgroundSize"),
+      motionDuring(strikeOf(box), "--strike"),
+    ]);
+  const checking = watchTask(taskBox);
   await page.locator(taskBox).click();
-  const tick = await clicked;
-  check(
-    reduced ? "the check is static under Reduce Motion" : "the check fades in after a click",
-    reduced ? !MOVES(tick) : FADES_IN(tick),
-    shown(tick),
-  );
+  const [draw, tickFade, sweep, strikeFade] = await checking;
+  if (reduced) {
+    check(
+      "the tick fades in place under Reduce Motion",
+      !MOVES(draw) && ARRIVES(tickFade, "0", "1", 140, 0),
+      shown([draw, tickFade]),
+    );
+    check("the strike fades in place under Reduce Motion", !MOVES(sweep) && FADES_STRIKE(strikeFade), shown([sweep, strikeFade]));
+  } else {
+    check("a clicked tick draws along its path", ARRIVES(draw, "1px", "0px", 200, 40), shown(draw));
+    check("a strike rule sweeps across the text", ARRIVES(sweep, "0% 1.5px", "100% 1.5px", 240, 60), shown(sweep));
+  }
   check("the task is saved", (await page.locator(taskBox).getAttribute("aria-checked")) === "true");
+  const unchecking = watchTask(taskBox);
+  await page.locator(taskBox).click();
+  const [, untick, retract] = await unchecking;
+  check("unchecking fades the tick", ARRIVES(untick, "1", "0", 140, 0), shown(untick));
+  check(
+    reduced ? "unchecking does not retract under Reduce Motion" : "unchecking retracts the strike",
+    reduced ? !MOVES(retract) : ARRIVES(retract, "100% 1.5px", "0% 1.5px", 140, 0),
+    shown(retract),
+  );
   const second = '.task-box[data-task-line="1"]';
   await page.locator(second).focus();
-  const keyed = motionDuring(second, "opacity", null, { pseudo: "::after" });
+  const keyed = watchTask(second);
   await page.keyboard.press("Space");
-  const keyTick = await keyed;
-  check("the check is immediate from the keyboard", !MOVES(keyTick), shown(keyTick));
+  const keyMotion = (await keyed).flat();
+  check("the tick and strike are immediate from the keyboard", !MOVES(keyMotion), shown(keyMotion));
   check("that task is saved too", (await page.locator(second).getAttribute("aria-checked")) === "true");
 
   await page.keyboard.press("Meta+e");

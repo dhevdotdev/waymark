@@ -4,7 +4,7 @@ import { Decoration, type DecorationSet, type EditorView, ViewPlugin, type ViewU
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import type { CodeToken } from "../render/highlight";
 import { applyImageSize, knownImageSize } from "../render/image-sizes";
-import { CALLOUT_ALIASES } from "../render/markdown";
+import { CALLOUT_ALIASES, TASK_TICK } from "../render/markdown";
 import { MathWidget } from "./editor-blocks";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
@@ -101,6 +101,7 @@ class TaskWidget extends WidgetType {
     box.className = "task-box cm-task";
     box.setAttribute("role", "checkbox");
     box.setAttribute("aria-checked", String(this.done));
+    box.innerHTML = TASK_TICK;
     return box;
   }
   updateDOM(box: HTMLElement): boolean {

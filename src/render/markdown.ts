@@ -40,6 +40,9 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
 export const KATEX_OPTIONS = { throwOnError: false, output: "htmlAndMathml", trust: false } as const;
 
+/** Drawn along its length when a task is checked. Added after sanitising, which drops SVG geometry. */
+export const TASK_TICK = `<svg class="task-tick" viewBox="0 0 16 16" aria-hidden="true"><path pathLength="1" d="M4.2 8.3l2.5 2.5 5.1-5.4"/></svg>`;
+
 export function createMarkdown(): MarkdownIt {
   const md = markdownit({ html: true, linkify: true, typographer: false });
   md.use(mark);
@@ -60,6 +63,8 @@ export function createMarkdown(): MarkdownIt {
     if (offset === null) return `<span class="task-box" role="checkbox" aria-checked="${done}" aria-disabled="true"></span>`;
     return `<button class="task-box" type="button" role="checkbox" aria-checked="${done}" aria-label="Task" data-task-line="${(env as unknown as RenderEnv).taskNonce}:${line + offset}"></button>`;
   };
+  md.renderer.rules.task_text_open = () => `<span class="task-text">`;
+  md.renderer.rules.task_text_close = () => "</span>";
   md.renderer.rules.softbreak = (_tokens, _i, _opts, env) => ((env as unknown as RenderEnv).strictLineBreaks ? "\n" : "<br>\n");
   md.renderer.rules.wikilink = (tokens, i, _opts, env) => renderWikilink(md, tokens[i], env as unknown as RenderEnv);
   md.renderer.rules.fence = (tokens, i, _opts, env) => renderFence(md, tokens[i], env as unknown as RenderEnv);
@@ -165,7 +170,9 @@ function taskListRule(state: StateCore): void {
     first.content = first.content.slice(marker[0].length);
     const box = new state.Token("task_box", "", 0);
     box.meta = { done, line: item.map?.[0] ?? 0 };
-    children.unshift(box);
+    /* The text is one inline span, so a strike drawn as its background follows every wrapped line. */
+    children.unshift(box, new state.Token("task_text_open", "span", 1));
+    children.push(new state.Token("task_text_close", "span", -1));
     item.attrJoin("class", done ? "task is-done" : "task");
   });
 }

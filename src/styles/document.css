@@ -171,26 +171,70 @@
   background: var(--accent);
   box-shadow: none;
 }
-.task-box::after {
-  content: "";
+.task-tick {
   position: absolute;
-  inset-block-start: 0.12em;
-  inset-inline-start: 0.29em;
-  inline-size: 0.24em;
-  block-size: 0.46em;
-  border: solid var(--paper);
-  border-width: 0 1.6px 1.6px 0;
-  rotate: 45deg;
-  opacity: 0;
-  transition: opacity var(--t-press) var(--ease-out);
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.task-box[aria-checked="true"]::after {
+/* The tick draws along its length. Unchecking fades it, then rewinds it unseen. A gap twice the dash keeps the round cap from showing at the far end. */
+.task-tick path {
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition:
+    opacity var(--t-exit) ease,
+    stroke-dashoffset 0s linear var(--t-exit);
+}
+.task-box[aria-checked="true"] .task-tick path {
+  stroke-dashoffset: 0;
   opacity: 1;
+  transition:
+    opacity 0s,
+    stroke-dashoffset var(--t-menu) var(--ease-out) 40ms;
+}
+@property --strike {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+/* A background rule rather than line-through, so it can sweep. Cloned per line box, so each wrapped line gets its own. */
+.task-text {
+  --strike: var(--ink-3);
+  background: linear-gradient(var(--strike), var(--strike)) no-repeat 0 55% / 0% 1.5px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size var(--t-exit) var(--ease-out);
+}
+.doc li.task.is-done > .task-text,
+.doc li.task.is-done > p > .task-text {
+  background-size: 100% 1.5px;
+  transition: background-size var(--t-slide) var(--ease-out) 60ms;
 }
 @media (prefers-reduced-motion: reduce) {
-  .task-box::after {
-    transition: none;
+  :is(.task-tick path, .task-box[aria-checked="true"] .task-tick path) {
+    stroke-dashoffset: 0;
+    transition: opacity var(--t-exit) ease;
   }
+  .task-text {
+    --strike: transparent;
+    background-size: 100% 1.5px;
+    transition: --strike var(--t-exit) ease;
+  }
+  .doc li.task.is-done > .task-text,
+  .doc li.task.is-done > p > .task-text {
+    --strike: var(--ink-3);
+    transition: --strike var(--t-exit) ease;
+  }
+}
+:root[data-input="keyboard"] .task-box .task-tick path,
+:root[data-input="keyboard"] .doc li.task .task-text {
+  transition: none;
 }
 .doc li.task {
   transition: color var(--t-hover) ease;
