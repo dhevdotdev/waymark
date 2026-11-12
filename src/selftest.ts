@@ -19,7 +19,8 @@ async function runShow(ctx: SelfTestContext, mode: string): Promise<void> {
   check("shown", true);
 }
 
-async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
+async function checkDockIcons(ctx: SelfTestContext): Promise<void> {
+  const { app, check } = ctx;
   const accepted = (family: string) =>
     native.setDockIcon(family).then(
       () => true,
@@ -33,7 +34,10 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
   );
   check("the window colour can follow the theme", colourSet);
   check("the key sounds load under the content policy", await app.sound.keys.load("tactile"));
-  check("the web view runs View Transitions, which a picked theme spreads through", await spreadFrom(0, 0, () => {}));
+  const transitions = "the web view runs View Transitions, which a picked theme spreads through";
+  if (typeof document.startViewTransition !== "function") check(transitions, false, "missing");
+  else if (ctx.drawn) check(transitions, await spreadFrom(0, 0, () => {}));
+  else ctx.inconclusive(transitions, NEEDS_FRAMES);
   const edges = getComputedStyle(document.querySelector(".scroller")!);
   check(
     "the web view honours the scroll rules",
