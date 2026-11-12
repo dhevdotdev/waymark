@@ -1,5 +1,6 @@
 import type { Simulation } from "d3-force";
 import { resolveColor } from "./colors";
+import { GraphBloom } from "./graph-bloom";
 import { CameraGlide, type Viewport } from "./graph-camera";
 import { drawLabels } from "./graph-labels";
 import { settleGraph } from "./graph-layout";
@@ -40,6 +41,7 @@ export class GraphCanvas {
   private neighbours = new Map<string, Set<string>>();
   private view: Viewport = { x: 0, y: 0, k: 1 };
   private readonly camera = new CameraGlide();
+  private bloom: GraphBloom | null = null;
   private hover: GraphNode | null = null;
   /** The emphasised note came from the arrow keys, so it is drawn still. */
   private keyed = false;
@@ -71,7 +73,7 @@ export class GraphCanvas {
   }
 
   /** With `keep`, the same graph is being refreshed: the camera, emphasis and any held note stay, and `keep` is the spotlight. */
-  setData(data: GraphData, current: string | null, keep?: number | null): void {
+  setData(data: GraphData, current: string | null, keep?: number | null, bloom = false): void {
     const previous = new Map(this.nodes.map((n) => [n.id, n]));
     const refreshing = keep !== undefined;
     this.current = current;
@@ -89,6 +91,7 @@ export class GraphCanvas {
     }
     this.readPalette();
     this.layout();
+    this.bloom = GraphBloom.on(this.canvas, bloom ? GraphBloom.from(this.nodes, this.links, current) : null);
     this.carryOver(refreshing);
     if (!refreshing) {
       this.camera.stop();
@@ -316,6 +319,7 @@ export class GraphCanvas {
   private draw(): void {
     const { ctx, palette: p } = this;
     if (!this.size.w || !p) return;
+    const blooming = this.bloom?.place(performance.now()) ?? false;
     const k = this.view.k;
     ctx.clearRect(0, 0, this.size.w, this.size.h);
     ctx.save();
@@ -352,8 +356,10 @@ export class GraphCanvas {
     });
     ctx.restore();
     ctx.globalAlpha = 1;
+    this.bloom?.restore();
+    if (this.bloom && !blooming) this.bloom = GraphBloom.on(this.canvas, null);
 
-    if (this.camera.destination || this.settling || this.pulsing) this.wake();
+    if (blooming || this.camera.destination || this.settling || this.pulsing) this.wake();
   }
 
   private get pulsing(): boolean {
@@ -476,6 +482,7 @@ export class GraphCanvas {
       (e) => {
         e.preventDefault();
         this.camera.stop();
+        this.bloom = GraphBloom.on(this.canvas, null);
         const rect = c.getBoundingClientRect();
         const mx = e.clientX - rect.left,
           my = e.clientY - rect.top;
@@ -494,6 +501,7 @@ export class GraphCanvas {
     if (e.button !== 0 || this.drag) return;
     this.canvas.setPointerCapture(e.pointerId);
     this.camera.stop();
+    this.bloom = GraphBloom.on(this.canvas, null);
     this.sim?.alpha(0);
     const node = this.pick(e.clientX, e.clientY);
     const [x, y] = this.toWorld(e.clientX, e.clientY);

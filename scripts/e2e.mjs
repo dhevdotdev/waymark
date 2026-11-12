@@ -17,7 +17,7 @@ const SHARDS = [
     ["graph"],
     ["graph", "reduced"],
   ],
-  [["editing"], ["caret"], ["organize"], ["properties"], ["list-motion"]],
+  [["editing"], ["caret"], ["organize"], ["properties"], ["list-motion"], ["spatial-motion"], ["spatial-motion", "reduced"]],
   [["note-files"], ["recovery"], ["backup"], ["library"], ["sync"], ["mac-behaviours"]],
 ];
 

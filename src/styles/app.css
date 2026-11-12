@@ -1954,6 +1954,13 @@ kbd {
   transition: none !important;
 }
 
+/* A theme picked with the pointer: `spreadFrom` animates the new view itself, so the stock crossfade is off. */
+:root[data-theme-spread]::view-transition-old(root),
+:root[data-theme-spread]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* Moving notes and tabs. Only marks change until the drop, so nothing shifts under the pointer. */
 .sidebar-inner.is-dragging-note,
 .sidebar-inner.is-dragging-note * {

@@ -13,8 +13,9 @@ import { watchTableSelection } from "./table-selection";
 const WORDS_PER_MINUTE = 230;
 const TARGET_HOLD = 0.45;
 
-/** Tints a heading just reached, holding long enough for the eye to land before it clears. */
-function markTarget(target: HTMLElement): void {
+/** Tints a heading just reached, holding long enough for the eye to land before it clears. `delay` is how long until the scroll arrives. */
+export function markTarget(target: HTMLElement, delay = 0): void {
+  target.closest(".scroller")?.querySelector(".is-target")?.classList.remove("is-target");
   target.classList.add("is-target");
   if (reducedMotion()) return;
   for (const running of target.getAnimations()) running.cancel();
@@ -27,7 +28,7 @@ function markTarget(target: HTMLElement): void {
       { ...tint, offset: TARGET_HOLD, easing: style.getPropertyValue("--ease-out").trim() },
       { ...clear, offset: 1 },
     ],
-    Number.parseFloat(style.getPropertyValue("--t-toast")),
+    { duration: Number.parseFloat(style.getPropertyValue("--t-toast")), delay, fill: "backwards" },
   );
 }
 

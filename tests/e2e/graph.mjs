@@ -54,6 +54,10 @@ await page.addInitScript(() => {
       window.__entrances.push({ duration: options.duration, properties: Object.keys(keyframes) });
     return animate.call(this, keyframes, options);
   };
+  window.__blooms = [];
+  new MutationObserver((records) => {
+    for (const r of records) if (r.target.dataset?.bloom) window.__blooms.push(Number(r.target.dataset.bloom));
+  }).observe(document, { attributes: true, attributeFilter: ["data-bloom"], subtree: true });
   window.__pointerIds = [];
   window.addEventListener("pointerdown", (e) => window.__pointerIds.push(e.pointerId), true);
 });
@@ -145,12 +149,44 @@ check(
   JSON.stringify(fade),
 );
 await pause(reduced ? 300 : 500);
+await untilDrawingStops();
 drawn = await frames();
+const blooms = await page.evaluate(() => window.__blooms);
 check("a pointer open has labels on its first frame too", drawn[0]?.labels > 0, drawn[0]?.labels);
+const bloomed = drawn.at(-1);
+if (reduced) {
+  check("under Reduce Motion the first pointer open does not bloom", blooms.length === 0, JSON.stringify(blooms));
+  check(
+    "the pointer open moves no note either",
+    drawn.every((f) => sameDots(f, drawn[0])),
+  );
+} else {
+  const spread = (f) => Math.max(...f.dots.map(([x, y]) => Math.hypot(x - f.dots[0][0], y - f.dots[0][1])));
+  check(
+    "the first pointer open in a session blooms for 360ms, each ring of links 40ms later",
+    blooms.length === 1 && blooms[0] >= 400 && blooms[0] <= 480,
+    JSON.stringify(blooms),
+  );
+  check("every note starts on the current one", spread(drawn[0]) === 0, spread(drawn[0]));
+  const between = drawn.filter((f) => spread(f) > 0 && spread(f) < spread(drawn.at(-1)) * 0.9).length;
+  check("and travels out through the frames between", between > 0, `${between} of ${drawn.length} frames`);
+}
+await closeGraph();
+
+await clearFrames();
+await clearEntrances();
+await page.evaluate(() => (window.__blooms = []));
+await page.click('[data-act="graph"]');
+await page.waitForSelector(".graph-view");
+check("a later pointer open fades in", (await entrance()).length === 1, JSON.stringify(await entrance()));
+await pause(reduced ? 300 : 500);
+drawn = await frames();
+check("a later pointer open does not bloom", (await page.evaluate(() => window.__blooms)).length === 0);
 check(
-  "the pointer open moves no note either",
+  "and moves no note",
   drawn.every((f) => sameDots(f, drawn[0])),
 );
+check("the first open came to rest where this one shows the notes", sameDots(bloomed, drawn[0]));
 
 const noteTab = page.locator(".tab:not(.is-graph-tab)").first();
 await noteTab.click();
