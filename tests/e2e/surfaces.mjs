@@ -139,11 +139,17 @@ try {
       requestAnimationFrame(frame);
     });
   });
+  await page.evaluate(() =>
+    addEventListener("contextmenu", (e) => (window.menuPointer = { x: e.clientX, y: e.clientY }), { once: true }),
+  );
   await page.mouse.click(rowBox.x + 40, rowBox.y + 8, { button: "right" });
   check("a menu opened with the pointer fades in", IN_MOTION(await opened));
   await pause(260);
-  const origin = await page.locator(".context-menu").evaluate((m) => m.style.transformOrigin);
-  check("a menu grows from the point that opened it", origin === "0px 0px", origin);
+  const [origin, expected] = await page.locator(".context-menu").evaluate((m) => {
+    const p = window.menuPointer;
+    return [m.style.transformOrigin, `${p.x - Number.parseFloat(m.style.left)}px ${p.y - Number.parseFloat(m.style.top)}px`];
+  });
+  check("a menu grows from the point that opened it", origin === expected, `${origin} vs ${expected}`);
   await page.keyboard.press("Escape");
   check("Escape removes a menu at once", (await count(".context-menu")) === 0);
 
