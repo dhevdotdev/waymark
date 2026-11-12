@@ -42,10 +42,12 @@ await page.addInitScript(() => {
 
 const pause = (ms) => page.waitForTimeout(ms);
 const hold = () => page.evaluate(() => (window.heldMotion = true));
+/** Ends held motion. A finished animation's event, which removes a ghost, arrives with the next frame, so this waits for it. */
 const release = async () => {
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.heldMotion = false;
     for (const animation of document.getAnimations()) if (animation.id === "list-motion") animation.finish();
+    await new Promise(requestAnimationFrame);
   });
   await pause(30);
 };
