@@ -400,9 +400,18 @@ await page.evaluate(() => {
   const run = commands.run.bind(commands);
   window.__run = run;
   const back = document.querySelector('.swipe-cue[data-side="back"]');
+  window.__goAt = undefined;
+  window.__framesBeforeGo = 0;
+  /* Counts the frames drawn between the cue filling and the step, however long a slow machine takes over each. */
+  const count = () => {
+    if (window.__goAt !== undefined) return;
+    window.__framesBeforeGo++;
+    requestAnimationFrame(count);
+  };
   new MutationObserver((_, observer) => {
     if (!back.classList.contains("is-ready")) return;
     window.__readyAt = performance.now();
+    requestAnimationFrame(count);
     observer.disconnect();
   }).observe(back, { attributes: true, attributeFilter: ["class"] });
   commands.run = (id, how) => {
@@ -421,11 +430,15 @@ await swipe(-260, 0, 16, 0);
 await page.waitForFunction(() => window.__afterBusy !== undefined, null, { timeout: 5000 }).catch(() => {});
 const busy = await page.evaluate(() => {
   window.waymark.reader.commands.run = window.__run;
-  return { running: window.__afterBusy, wait: Math.round(window.__goAt - window.__readyAt) };
+  return {
+    running: window.__afterBusy,
+    frames: window.__framesBeforeGo,
+    wait: Math.round(window.__goAt - window.__readyAt),
+  };
 });
 check(
-  "the exit runs while the next note holds the page, and the step waits at most a frame for it",
-  busy.running === 0 && busy.wait >= 0 && busy.wait < 120,
+  "the exit runs while the next note holds the page, and the step waits for the next frame and no longer",
+  busy.running === 0 && busy.frames === 1 && busy.wait >= 0,
   JSON.stringify(busy),
 );
 await pause(320);

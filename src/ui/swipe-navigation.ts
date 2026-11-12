@@ -6,8 +6,11 @@ const NEEDED = 110;
 const SLACK = 12;
 /** Longer than the gap between momentum events, so a flick stays one gesture. */
 const GESTURE_GAP_MS = 180;
-/** Fallback for a window whose frames are paused, so the step is never lost. */
-const UNPAINTED_MS = 100;
+/**
+ * Fallback for a window whose frames are paused, so the step is never lost. A busy machine can take longer than a
+ * frame to paint, and the step should still wait for that paint, so this is well past any frame a visible window draws.
+ */
+const UNPAINTED_MS = 500;
 
 export interface SwipeTarget {
   can: (step: Step) => boolean;
