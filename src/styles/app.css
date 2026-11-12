@@ -1309,10 +1309,12 @@ kbd {
     color: var(--ink);
   }
 }
+/* Measured from the ink: the glyph's notched foot is light, so it sits 1px low to centre on the path's capitals. */
 .pane-bookmark {
   inline-size: 24px;
   block-size: 24px;
   margin-inline: -10px auto;
+  translate: 0 1px;
 }
 .pane-bookmark svg {
   inline-size: 15px;

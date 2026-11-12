@@ -232,6 +232,11 @@ try {
     "the toggle shows it is on",
     (await pressed()) === "true" && (await toggle.getAttribute("data-tip")) === "Remove bookmark",
   );
+  check(
+    "the open note is highlighted once, its bookmark only tinted",
+    (await page.locator(".nav-item.is-current").count()) === 1 &&
+      (await page.locator(".bookmarks .nav-item.is-here").count()) === 1,
+  );
   check("the empty line goes once there is a bookmark", (await page.locator(".bookmarks-empty").count()) === 0);
   await toggle.click();
   await pause(350);

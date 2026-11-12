@@ -50,7 +50,7 @@ export class Bookmarks {
     this.element.className = "tree-folder bookmarks";
     this.head.className = "tree-head";
     this.head.dataset.bookmarksHead = "";
-    this.head.innerHTML = `${CHEVRON}${treeIcon(icons.bookmark)}<span class="tree-name">Bookmarks</span><span class="tree-count"></span>`;
+    this.head.innerHTML = `${CHEVRON}<span class="tree-name">Bookmarks</span><span class="tree-count"></span>`;
     this.inner.className = "tree-inner";
     this.body.className = "tree-body";
     this.body.append(this.inner);
@@ -140,10 +140,10 @@ export class Bookmarks {
     const missing = this.isMissing(bookmark);
     const row = document.createElement("button");
     row.className = `nav-item is-bookmark${missing ? " is-missing" : ""}`;
-    row.style.setProperty("--d", "1");
     row.dataset.bookmark = String(index);
     row.dataset.tip = missing ? `${label} is no longer in the vault` : label;
-    row.classList.toggle("is-current", !bookmark.heading && bookmark.path === this.host.current());
+    /* The tree row carries the open note's highlight; here it is only a tinted icon, so the note is not marked twice. */
+    row.classList.toggle("is-here", !bookmark.heading && bookmark.path === this.host.current());
     row.innerHTML = treeIcon(icons.bookmark);
     const text = document.createElement("span");
     text.className = "nav-text";
