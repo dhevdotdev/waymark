@@ -16,6 +16,8 @@ const SHARDS = [
     ["surfaces", "reduced"],
     ["panel-motion"],
     ["panel-motion", "reduced"],
+    ["search-motion"],
+    ["search-motion", "reduced"],
     ["graph"],
     ["graph", "reduced"],
   ],

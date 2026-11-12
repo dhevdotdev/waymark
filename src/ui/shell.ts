@@ -74,7 +74,7 @@ function template(options: ShellOptions): string {
           <button class="icon-btn" data-act="collapse-folders" data-tip="Collapse all folders" aria-label="Collapse all folders">${icons.collapse}</button>
         </div>
         <div class="sidebar-inner" data-side-pane="files"></div>
-        <div class="sidebar-search" data-side-pane="search" hidden>
+        <div class="sidebar-search" data-side-pane="search" inert>
           <div class="search-head">
             <div class="search-field">${icons.search}<input type="text" spellcheck="false" autocomplete="off" placeholder="Search inside notes" aria-label="Search inside notes" /><button class="icon-btn" data-act="search-clear" aria-label="Clear search">${icons.close}</button></div>
           </div>

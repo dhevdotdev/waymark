@@ -825,20 +825,133 @@ kbd {
   transition: none;
 }
 
-/* Search mode */
-.sidebar-inner[hidden],
-.sidebar-search[hidden] {
-  display: none;
+/*
+ * Search mode. Search lies over Files and both stay laid out, so a click grows the field out of the search button and
+ * the X shrinks it back in, while the tree and the results cross. CSS transitions reverse from wherever they are.
+ */
+.sidebar {
+  --t-search-close: calc(var(--t-slide) * 0.8);
+  --t-search-overlap: 60ms;
+  --t-search-out: 100ms;
+  --ease-search: var(--ease-panel);
 }
 .sidebar-search {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
 }
+.sidebar:not(.is-searching) .sidebar-search,
+.sidebar.is-searching :is(.files-actions, .sidebar-inner) {
+  visibility: hidden;
+  pointer-events: none;
+}
+.sidebar.is-searching :is(.files-actions, .sidebar-inner) {
+  opacity: 0;
+  transition:
+    opacity var(--t-search-out) var(--ease-out),
+    visibility 0s linear var(--t-search-out);
+}
+.sidebar:not(.is-searching) .sidebar-search {
+  transition: visibility 0s linear var(--t-search-close);
+}
+.files-actions,
+.sidebar-inner {
+  transition: opacity var(--t-search-close) var(--ease-out) var(--t-search-overlap);
+}
+.sidebar:not(.is-searching) .search-results {
+  opacity: 0;
+  translate: 0 var(--rise);
+  transition:
+    opacity var(--t-search-out) var(--ease-out),
+    translate 0s linear var(--t-search-out);
+}
+/* The results start once the tree is mostly gone, so two sets of words never sit on top of each other. */
+.search-results {
+  transition:
+    opacity var(--t-menu) var(--ease-out) var(--t-search-overlap),
+    translate var(--t-slide) var(--ease-out) var(--t-search-overlap);
+}
 .search-head {
+  block-size: 42px;
   padding: 2px 10px 8px;
+}
+/* The field folded away is the search button: the same box and glyph, two buttons in from the row's end. */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar.is-searching [data-side="search"] {
+    opacity: 0;
+  }
+  .files-actions [data-side="search"] {
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
+      scale var(--t-press) var(--ease-out),
+      opacity 0s linear var(--t-search-close);
+  }
+  .sidebar.is-searching .files-actions [data-side="search"] {
+    transition: none;
+  }
+  .sidebar:not(.is-searching) .search-field {
+    block-size: 28px;
+    margin: -2px 28px 0 calc(100% - 56px);
+    padding-inline-start: 7px;
+    background-color: transparent;
+    box-shadow:
+      0 0 0 1px transparent,
+      0 0 0 4px transparent;
+  }
+  .sidebar:not(.is-searching) .search-field > svg {
+    stroke: var(--chrome-ink);
+    stroke-width: 1.5;
+  }
+  .sidebar:not(.is-searching) .search-field .icon-btn {
+    opacity: 0;
+    transition: opacity var(--t-exit) var(--ease-out);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-search,
+  .files-actions,
+  .sidebar-inner {
+    transition: opacity var(--t-exit) ease var(--t-search-overlap);
+  }
+  .sidebar:not(.is-searching) .sidebar-search {
+    opacity: 0;
+    transition:
+      opacity var(--t-search-out) ease,
+      visibility 0s linear var(--t-search-out);
+  }
+}
+.search-field {
+  overflow: clip;
+  transition:
+    margin var(--t-search-close) var(--ease-search),
+    block-size var(--t-search-close) var(--ease-search),
+    padding var(--t-search-close) var(--ease-search),
+    background-color var(--t-search-close) var(--ease-search),
+    box-shadow var(--t-hover) ease;
+}
+.sidebar.is-searching .search-field {
+  transition-duration: var(--t-slide), var(--t-slide), var(--t-slide), var(--t-slide), var(--t-hover);
+}
+.search-field > svg {
+  transition:
+    stroke var(--t-slide) var(--ease-search),
+    stroke-width var(--t-slide) var(--ease-search);
+}
+.sidebar.is-searching .search-field .icon-btn {
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    opacity var(--t-menu) var(--ease-out) calc(var(--t-slide) / 3);
+}
+:root[data-input="keyboard"]
+  .sidebar
+  :is(.files-actions, .files-actions *, .sidebar-inner, .sidebar-search, .search-results, .search-field, .search-field > *),
+.sidebar.is-instant
+  :is(.files-actions, .files-actions *, .sidebar-inner, .sidebar-search, .search-results, .search-field, .search-field > *) {
+  transition: none;
 }
 .search-field {
   display: flex;
