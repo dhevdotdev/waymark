@@ -455,6 +455,148 @@ try {
     await settled();
   }
 
+  /*
+   * Nothing on the page changes in one frame. Every animation is paused as the click lands and stepped a frame at a
+   * time, at a width where the diagram's wide track grows and shrinks with the sidebar.
+   */
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await settled();
+  const PANEL = { sidebar: '[data-act="sidebar"]', rail: '[data-rail="links"]' };
+  const scene = () =>
+    page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const fill = (sel) => {
+        const shape = document.querySelector(sel);
+        return shape ? getComputedStyle(shape).fill : null;
+      };
+      return {
+        text: box(".doc-title").left,
+        diagram: ["left", "top", "width", "height"].map((k) => box(".doc .diagram")[k]),
+        outline: box(".floating-outline").left,
+        rail: box(".rail").left,
+        moving: document
+          .getAnimations()
+          .filter((a) => a.effect.getComputedTiming().duration > 0)
+          .map(
+            (a) => `${a.effect.target.className}:${a.transitionProperty ?? Object.keys(a.effect.getKeyframes()[0]).join("+")}`,
+          ),
+        ghostFill: fill(".rewrap-ghost .diagram-svg svg .node :is(rect, polygon)"),
+        liveFill: fill(".doc .diagram-svg svg .node :is(rect, polygon)"),
+      };
+    });
+  /** Clicks a panel button and holds every animation it starts at frame 0. */
+  const clickHeld = async (sel) => {
+    await page.evaluate(() => {
+      window.heldAnimations = null;
+      const hold = () =>
+        setTimeout(() => {
+          window.heldAnimations = document.getAnimations();
+          for (const a of window.heldAnimations) a.pause();
+          for (const a of window.heldAnimations) a.currentTime = 0;
+        });
+      window.addEventListener("click", hold, { capture: true, once: true });
+    });
+    await page.click(sel);
+    await page.waitForFunction(() => window.heldAnimations);
+  };
+  const frame = async (n) => {
+    await page.evaluate(
+      (ms) => {
+        for (const a of window.heldAnimations) a.currentTime = Math.min(ms, a.effect.getComputedTiming().endTime);
+      },
+      n * (1000 / 60),
+    );
+    return scene();
+  };
+  const release = async () => {
+    await page.evaluate(() => {
+      for (const a of document.getAnimations()) a.finish();
+    });
+    await settled();
+  };
+  const same = (a, b) =>
+    Math.abs(a.text - b.text) < 0.5 &&
+    Math.abs(a.outline - b.outline) < 0.5 &&
+    a.diagram.every((v, i) => Math.abs(v - b.diagram[i]) < 0.5);
+  await page.evaluate(() => document.querySelector(".doc > .diagram").scrollIntoView({ block: "center" }));
+  await settled();
+
+  if (reduced) {
+    await page.click(PANEL.sidebar);
+    const { moving } = await scene();
+    check(
+      "under Reduce Motion nothing in the note travels or scales",
+      !moving.some((m) => /translate|transform/.test(m) && !m.startsWith("sidebar")),
+      moving.join(", "),
+    );
+    await settled();
+    await page.click(PANEL.sidebar);
+    await settled();
+  } else {
+    for (const [panel, dir] of [
+      ["sidebar", "closes"],
+      ["sidebar", "opens"],
+      ["rail", "closes"],
+      ["rail", "opens"],
+    ]) {
+      const before = await scene();
+      await clickHeld(PANEL[panel]);
+      const first = await frame(0);
+      check(
+        `frame 0 looks as it did before the click, as the ${panel} ${dir}`,
+        same(before, first),
+        JSON.stringify({ before, first }),
+      );
+      const frames = [];
+      for (let n = 1; n <= 14; n++) frames.push(await frame(n));
+      if (panel === "sidebar") {
+        const widths = [first, ...frames].map((f) => f.diagram[2]);
+        check(
+          `the diagram's size changes on every frame as the sidebar ${dir}`,
+          widths.every((w, i) => i === 0 || Math.abs(w - widths[i - 1]) > 0.1),
+          widths.map(Math.round).join(" "),
+        );
+      } else {
+        const gaps = [first, ...frames].map((f) => f.rail - f.outline);
+        check(
+          `the outline keeps to the panel's edge as the inspector ${dir}`,
+          Math.max(...gaps) - Math.min(...gaps) < 1,
+          gaps.map(Math.round).join(" "),
+        );
+      }
+      await release();
+    }
+
+    const before = await scene();
+    await page.keyboard.press("Meta+\\");
+    const { moving } = await scene();
+    check("⌘\\ starts no animation at all", moving.length === 0, moving.join(", "));
+    await page.keyboard.press("Meta+\\");
+    await settled();
+    check("and ⌘\\ twice lands where it began", same(before, await scene()));
+
+    /* A diagram inside a block that re-wraps is crossfaded with that block, and its copy keeps the diagram's colours. */
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await page.evaluate(() => {
+      const diagram = document.querySelector(".doc > .diagram");
+      const quote = document.createElement("blockquote");
+      diagram.replaceWith(quote);
+      quote.append(diagram);
+      quote.scrollIntoView({ block: "center" });
+    });
+    await settled();
+    await clickHeld(PANEL.sidebar);
+    const fading = await frame(3);
+    check(
+      "a diagram's copy in the crossfade keeps its colours",
+      fading.ghostFill !== null && fading.ghostFill === fading.liveFill,
+      `${fading.ghostFill} vs ${fading.liveFill}`,
+    );
+    await release();
+    await page.click(PANEL.sidebar);
+    await settled();
+  }
+
   check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 } finally {
   await browser.close();
