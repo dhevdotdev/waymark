@@ -2,6 +2,7 @@ import type { PrefStore } from "../prefs";
 import type { VaultIndex } from "../vault/index";
 import { FileTree } from "./file-tree";
 import { paint } from "./find";
+import { instantly } from "./instant";
 import { isNarrow } from "./media";
 import { glidePanel } from "./panel-glide";
 import { bindEdgeDrag } from "./panel-resize";
@@ -69,15 +70,18 @@ export class Sidebar {
     this.host.focusReader();
   }
 
+  /** A panel that was hidden arrives already showing Search, so only one thing moves. */
   showSearch(prefill?: string): void {
     this.host.searchOpened();
+    const shown = this.isShown();
     this.ensureVisible();
-    this.setMode("search");
+    if (shown) this.setMode("search");
+    else instantly(this.nav, () => this.setMode("search"));
     this.searchPane.focus(prefill);
   }
 
   revealFolder(path: string): void {
-    this.setMode("files");
+    instantly(this.nav, () => this.setMode("files"));
     this.ensureVisible();
     this.tree.focusFolder(path);
   }
@@ -97,6 +101,15 @@ export class Sidebar {
     });
   }
 
+  private get nav(): HTMLElement {
+    return this.els.searchPane.parentElement!;
+  }
+
+  private isShown(): boolean {
+    const { shell } = this.els;
+    return isNarrow() ? shell.classList.contains("sidebar-peek") : !shell.classList.contains("sidebar-closed");
+  }
+
   private ensureVisible(): void {
     if (isNarrow()) this.els.shell.classList.add("sidebar-peek");
     else if (this.els.shell.classList.contains("sidebar-closed")) this.toggle(true);
@@ -108,8 +121,10 @@ export class Sidebar {
     if (mode === "files") paint("search", []);
   }
 
+  /** Both modes stay laid out, Search over Files, so the field can grow out of the button that opened it and back. */
   private syncMode(): void {
-    const { shell } = this.els;
-    for (const pane of shell.querySelectorAll<HTMLElement>("[data-side-pane]")) pane.hidden = pane.dataset.sidePane !== this.mode;
+    this.nav.classList.toggle("is-searching", this.mode === "search");
+    for (const pane of this.nav.querySelectorAll<HTMLElement>("[data-side-pane]"))
+      pane.inert = pane.dataset.sidePane !== this.mode;
   }
 }
