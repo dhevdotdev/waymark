@@ -362,13 +362,13 @@ export class Reader {
   }
 
   toggleGraph(): void {
-    if (this.onGraph) this.leaveGraph();
-    else this.openGraph("vault");
+    this.onGraph ? this.leaveGraph() : this.openGraph("vault");
   }
 
   /** Leaves the graph: back along the trail if there is somewhere to go, otherwise closes its tab. */
   leaveGraph(): void {
     if (!this.onGraph) return;
+    this.graph?.leaving();
     if (this.tab.trail.canBack) void this.go(-1);
     else this.closeTab(this.workspace.activeIndex);
   }
@@ -579,6 +579,7 @@ export class Reader {
   private showGraph(view: GraphTabView, opened: boolean): void {
     if (this.find.isOpen) this.find.close();
     this.current = view.note;
+    this.graph ??= GraphView.resume();
     if (!this.graph) {
       this.graph = new GraphView(this.els.reader, this.vault, {
         open: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
@@ -604,7 +605,7 @@ export class Reader {
   }
 
   private closeGraphView(): void {
-    this.graph?.destroy();
+    this.graph?.depart();
     this.graph = null;
   }
 

@@ -7,12 +7,18 @@ import { groupColor } from "./graph-paint";
 import type { GraphData } from "./graph-types";
 import { icons } from "./icons";
 import { isPointerAction } from "./input-origin";
+import { reducedMotion } from "./media";
 import { MorphArrows } from "./morph-arrows";
 import { plural } from "./plural";
 
 export type GraphTabView = Extract<View, { kind: "graph" }>;
 
 const ZOOM_STEP = 1.3;
+/** How far the camera dives into the note a graph is left for. */
+const DIVE = 2.4;
+
+/** A graph leaving the window, which opening the graph again takes back from where it is. */
+let departing: GraphView | null = null;
 
 const TEMPLATE = `
   <div class="graph-stage"></div>
@@ -60,6 +66,10 @@ export class GraphView {
   private shown = "";
   private arrived = false;
   private blooming = false;
+  private pulling = false;
+  private resumed = false;
+  /** The note the graph is being left for, set by the reader's own way out and by opening a note from the graph. */
+  private exit: string | null = null;
   private readonly leaveArrows = new MorphArrows("apart");
 
   constructor(
@@ -69,7 +79,12 @@ export class GraphView {
   ) {
     this.root.className = "graph-view";
     this.root.innerHTML = TEMPLATE;
-    this.canvas = new GraphCanvas({ onOpen: (id, newTab) => host.open(id, newTab) });
+    this.canvas = new GraphCanvas({
+      onOpen: (id, newTab) => {
+        if (!newTab) this.exit = id;
+        host.open(id, newTab);
+      },
+    });
     this.root.querySelector(".graph-stage")!.append(this.canvas.canvas, this.canvas.announcer);
     this.strip = this.root.querySelector<HTMLElement>(".graph-groups")!;
     parent.append(this.root);
@@ -78,17 +93,87 @@ export class GraphView {
     this.bind();
   }
 
+  /** The graph still leaving the window, taken back to be shown again. */
+  static resume(): GraphView | null {
+    const graph = departing;
+    departing = null;
+    if (!graph) return null;
+    graph.root.classList.remove("is-leaving");
+    graph.root.inert = false;
+    graph.root.removeAttribute("style");
+    graph.resumed = true;
+    return graph;
+  }
+
   /**
-   * Takes the keyboard unless `keepFocus`. Only a graph just opened with the pointer fades in, and the first of those
-   * in a session also blooms out of the current note. A tab switch, Back or a shortcut shows it at once.
+   * Takes the keyboard unless `keepFocus`. Only a graph just opened with the pointer moves: it fades in as the camera
+   * pulls back from the current note, and the first of those in a session also blooms out of it. A tab switch, Back or a
+   * shortcut shows it at once.
    */
   arrive(opened: boolean, keepFocus = false): void {
     const take = !keepFocus && (!this.arrived || document.activeElement === document.body);
     if (take) this.canvas.canvas.focus({ preventScroll: true });
     this.arrived = true;
-    if (!opened || !isPointerAction()) return;
+    const moving = opened && isPointerAction();
+    if (this.resumed) {
+      this.resumed = false;
+      this.comeBack(moving);
+      return;
+    }
+    if (!moving) return;
     this.blooming = claimBloom();
+    this.pulling = true;
     this.root.animate({ opacity: [0, 1] }, { duration: tokenMs("--t-exit"), easing: tokenEasing("--ease-out") });
+  }
+
+  /** A graph taken back mid-departure returns from what is on screen: its fade reverses and the camera heads home. */
+  private comeBack(moving: boolean): void {
+    const opacity = getComputedStyle(this.root).opacity;
+    for (const running of this.root.getAnimations()) running.cancel();
+    this.canvas.recenter();
+    if (moving)
+      this.root.animate({ opacity: [opacity, "1"] }, { duration: tokenMs("--t-exit"), easing: tokenEasing("--ease-out") });
+  }
+
+  /** Marks the current note as the one the graph is being left for. */
+  leaving(): void {
+    this.exit = this.host.currentView()?.note ?? null;
+  }
+
+  /**
+   * Leaves the window. Left for a note with the pointer, it dives into that note's node and fades off the page under it;
+   * under Reduce Motion it only fades. Anything else removes it at once.
+   */
+  depart(): void {
+    const into = this.exit;
+    this.exit = null;
+    if (into === null || !isPointerAction()) {
+      this.destroy();
+      return;
+    }
+    departing?.destroy();
+    departing = this;
+    const box = this.root.getBoundingClientRect();
+    const opacity = getComputedStyle(this.root).opacity;
+    for (const running of this.root.getAnimations()) running.cancel();
+    this.root.classList.add("is-leaving");
+    this.root.inert = true;
+    Object.assign(this.root.style, {
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+    });
+    this.canvas.closeOn(into, DIVE, true);
+    const fade = this.root.animate(
+      { opacity: [opacity, "0"] },
+      { duration: tokenMs(reducedMotion() ? "--t-exit" : "--t-modal"), easing: tokenEasing("--ease-in-out"), fill: "forwards" },
+    );
+    fade.onfinish = () => {
+      if (departing !== this) return;
+      departing = null;
+      this.destroy();
+    };
   }
 
   refreshTheme(): void {
@@ -108,8 +193,9 @@ export class GraphView {
     const refreshing = shown === this.shown;
     this.shown = shown;
     this.spotlit = refreshing && data.groups.some((g) => g.id === this.spotlit) ? this.spotlit : null;
-    this.canvas.setData(data, note, refreshing ? this.spotlit : undefined, this.blooming);
+    this.canvas.setData(data, note, refreshing ? this.spotlit : undefined, { bloom: this.blooming, pull: this.pulling });
     this.blooming = false;
+    this.pulling = false;
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-gmode]"))
       b.classList.toggle("is-on", b.dataset.gmode === scope);
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-depth]"))

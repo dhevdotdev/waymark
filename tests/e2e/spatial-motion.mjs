@@ -1,5 +1,6 @@
 // Pointer motion that shows where a change comes from: a theme spreads from its swatch, an outline click glides to its
-// heading, and the first graph opened blooms from the current note. Keys get the end state at once.
+// heading, the first graph opened blooms from the current note, and the graph opens by pulling back from a note and closes
+// by diving into one. Keys get the end state at once.
 // Each motion is read from what the trigger starts, not from sampled frames, so a slow machine cannot miss it.
 // Usage: node tests/e2e/spatial-motion.mjs [reduced]
 import { webkit } from "playwright";
@@ -56,6 +57,31 @@ await page.addInitScript(() => {
   proto.clearRect = function (...args) {
     if (this.canvas.classList.contains("graph-canvas")) window.__frames.push([]);
     return clear.apply(this, args);
+  };
+  /* The scale of each frame the graph draws, and every fade the graph view starts. */
+  window.__zooms = [];
+  const translate = proto.translate;
+  proto.translate = function (...args) {
+    if (this.canvas.classList.contains("graph-canvas")) window.__shift = args;
+    return translate.apply(this, args);
+  };
+  const scale = proto.scale;
+  proto.scale = function (...args) {
+    if (this.canvas.classList.contains("graph-canvas")) window.__zooms.push(args[0]);
+    return scale.apply(this, args);
+  };
+  window.__graphFades = [];
+  const animateView = Element.prototype.animate;
+  Element.prototype.animate = function (keyframes, options) {
+    const animation = animateView.call(this, keyframes, options);
+    if (this.classList?.contains("graph-view"))
+      window.__graphFades.push({
+        from: Number(keyframes.opacity[0]),
+        to: Number(keyframes.opacity[1]),
+        ms: animation.effect.getComputedTiming().duration,
+        leaving: this.classList.contains("is-leaving"),
+      });
+    return animation;
   };
   const arc = proto.arc;
   proto.arc = function (...args) {
@@ -245,6 +271,154 @@ try {
       `${bloom.after.length} frames, ${new Set(bloom.after).size} distinct`,
     );
   }
+
+  /* Graph: opening pulls back from the current note, and leaving dives into it */
+  const graphMotion = () =>
+    page.evaluate(() => ({
+      fades: window.__graphFades,
+      zooms: window.__zooms,
+      views: document.querySelectorAll(".graph-view").length,
+      leaving: document.querySelectorAll(".graph-view.is-leaving").length,
+    }));
+  const resetGraph = () => page.evaluate(() => Object.assign(window, { __graphFades: [], __zooms: [] }));
+  const grows = (zooms) => zooms.length > 2 && zooms.at(-1) > zooms[0] * 1.5;
+  const shrinks = (zooms) => zooms.length > 2 && zooms[0] > zooms.at(-1) * 1.5;
+  const still = (zooms) => zooms.every((k) => Math.abs(k - zooms[0]) < 1e-9);
+  await pause(400);
+  const graphScale = await page.evaluate(() => window.__zooms.at(-1));
+  await resetGraph();
+  await page.click(".graph-leave");
+  const docEntrance = await page.evaluate(() => {
+    const doc = document.querySelector(".scroller > .doc");
+    return { animations: doc?.getAnimations().length ?? -1, fades: !!doc?.classList.contains("doc-enter") };
+  });
+  await pause(120);
+  let motion = await graphMotion();
+  check(
+    "leaving with the pointer fades the graph off the note",
+    motion.leaving === 1 && motion.fades.length === 1 && motion.fades[0].to === 0 && motion.fades[0].ms === (reduced ? 140 : 250),
+    JSON.stringify(motion.fades),
+  );
+  if (reduced) check("under Reduce Motion leaving only fades", still([graphScale, ...motion.zooms]), motion.zooms.join());
+  else
+    check(
+      "leaving with the pointer dives into the note",
+      grows([graphScale, ...motion.zooms]),
+      `${graphScale}: ${motion.zooms.join()}`,
+    );
+  check(
+    "the note under a leaving graph takes no entrance of its own",
+    docEntrance.animations === 0 && !docEntrance.fades,
+    JSON.stringify(docEntrance),
+  );
+  await pause(400);
+  check("the graph is gone once it has left", (await graphMotion()).views === 0);
+
+  await resetGraph();
+  await page.click('[data-act="graph"]');
+  await page.waitForSelector(".graph-view");
+  await pause(500);
+  motion = await graphMotion();
+  check(
+    "opening with the pointer fades the graph in",
+    motion.fades.length === 1 && motion.fades[0].from === 0 && motion.fades[0].to === 1,
+    JSON.stringify(motion.fades),
+  );
+  if (reduced) check("under Reduce Motion opening only fades", still(motion.zooms), motion.zooms.join());
+  else check("opening with the pointer pulls back from the note", shrinks(motion.zooms), motion.zooms.join());
+
+  /* Interrupted: leaving mid-open starts from the opacity on screen, and opening mid-leave takes the same graph back */
+  await page.click(".graph-leave");
+  await pause(400);
+  await resetGraph();
+  await page.click('[data-act="graph"]');
+  await page.evaluate(() => {
+    for (const a of document.querySelector(".graph-view").getAnimations()) {
+      a.pause();
+      a.currentTime = 40;
+    }
+  });
+  await page.click(".graph-leave");
+  motion = await graphMotion();
+  const midOpen = motion.fades.at(-1);
+  check(
+    "leaving mid-open fades from the opacity on screen",
+    motion.fades.length === 2 && midOpen.leaving && midOpen.from > 0.05 && midOpen.from < 0.95,
+    JSON.stringify(motion.fades),
+  );
+  const departing = await page.evaluate(() => {
+    const view = document.querySelector(".graph-view.is-leaving");
+    view.__mark = true;
+    for (const a of view.getAnimations()) {
+      a.pause();
+      a.currentTime = 60;
+    }
+    return getComputedStyle(view).opacity;
+  });
+  await resetGraph();
+  await page.click('[data-act="graph"]');
+  motion = await graphMotion();
+  const kept = await page.evaluate(() => document.querySelector(".graph-view")?.__mark === true);
+  check(
+    "opening mid-leave takes the leaving graph back",
+    kept && motion.views === 1 && motion.leaving === 0,
+    JSON.stringify({ kept, views: motion.views, leaving: motion.leaving }),
+  );
+  check(
+    "and fades it back in from the opacity on screen",
+    motion.fades.length === 1 && Math.abs(motion.fades[0].from - Number(departing)) < 0.02 && motion.fades[0].to === 1,
+    `${departing} then ${JSON.stringify(motion.fades)}`,
+  );
+  await pause(500);
+
+  /* Opening a note from the graph dives into its node, and the note takes no entrance of its own */
+  const dot = await page.evaluate(() => {
+    const rect = document.querySelector(".graph-canvas").getBoundingClientRect();
+    const [x, y] = window.__shift;
+    const k = window.__zooms.at(-1);
+    const middle = [rect.width / 2, rect.height / 2];
+    const dots = window.__frames.findLast((f) => f.length).map((d) => d.split(",").map(Number));
+    const screen = dots.map(([dx, dy]) => [x + dx * k, y + dy * k]);
+    screen.sort((a, b) => Math.hypot(a[0] - middle[0], a[1] - middle[1]) - Math.hypot(b[0] - middle[0], b[1] - middle[1]));
+    return { x: rect.left + screen[0][0], y: rect.top + screen[0][1], k };
+  });
+  const title = () => page.evaluate(() => document.querySelector(".doc-title")?.textContent);
+  const titleBefore = await title();
+  await resetGraph();
+  await page.mouse.click(dot.x, dot.y);
+  await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent !== t, titleBefore);
+  const opened = await page.evaluate(() => {
+    const doc = document.querySelector(".scroller > .doc");
+    return { animations: doc.getAnimations().length, fades: doc.classList.contains("doc-enter") };
+  });
+  await pause(120);
+  motion = await graphMotion();
+  check(
+    "a note opened from the graph takes no entrance of its own",
+    opened.animations === 0 && !opened.fades,
+    JSON.stringify(opened),
+  );
+  if (reduced) check("under Reduce Motion opening a note from the graph only fades", still([dot.k, ...motion.zooms]));
+  else
+    check(
+      "opening a note from the graph dives into its node",
+      grows([dot.k, ...motion.zooms]),
+      `${dot.k}: ${motion.zooms.join()}`,
+    );
+  await pause(400);
+
+  /* From the keyboard the graph comes and goes at once */
+  await resetGraph();
+  await page.keyboard.press("Meta+g");
+  await page.waitForSelector(".graph-view");
+  await pause(400);
+  motion = await graphMotion();
+  check("a shortcut shows the graph at once", motion.fades.length === 0 && still(motion.zooms), JSON.stringify(motion));
+  await page.locator(".graph-canvas").focus();
+  await resetGraph();
+  await page.keyboard.press("Escape");
+  motion = await graphMotion();
+  check("Escape removes the graph at once", motion.views === 0 && motion.fades.length === 0, JSON.stringify(motion));
 
   check("no page errors", errors.length === 0, errors.slice(0, 2).join(" ; "));
 } catch (error) {

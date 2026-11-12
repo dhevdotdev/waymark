@@ -105,6 +105,8 @@ export class PageMotion {
     this.flying.clear();
     for (const ghost of this.scroller.parentElement?.querySelectorAll(":scope > .page-ghost") ?? []) ghost.remove();
     this.plan = undefined;
+    /* A graph diving into its note fading off the page is that note's entrance already. */
+    if (this.scroller.parentElement?.querySelector(":scope > .graph-view.is-leaving")) return false;
     if (!entrance || entrance.kind === "fade") return entrance !== undefined;
     if (entrance.kind === "slide") {
       this.plan = entrance;

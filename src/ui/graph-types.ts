@@ -39,3 +39,9 @@ export interface GraphData {
   links: { source: string; target: string }[];
   groups: GraphGroup[];
 }
+
+/** How a graph opened with the pointer comes in: blooming out of the current note, pulling back from it, or both. */
+export interface Arrival {
+  bloom?: boolean;
+  pull?: boolean;
+}
