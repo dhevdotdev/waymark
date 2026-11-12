@@ -429,6 +429,20 @@ try {
   await pause(500);
   await page.keyboard.press("Meta+z");
   await pause(300);
+  /* Each ghost is cancelled as soon as it is drawn, so a slow machine cannot let its short fade end first. */
+  await page.evaluate(() => {
+    window.__cancelledGhosts = 0;
+    window.__ghostWatch = new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes)
+          if (node.classList?.contains("cm-table-ghost"))
+            for (const animation of node.getAnimations()) {
+              animation.cancel();
+              window.__cancelledGhosts++;
+            }
+    });
+    window.__ghostWatch.observe(document.body, { childList: true, subtree: true });
+  });
   for (const _ of [1, 2]) {
     await cell(1, 0).hover();
     await pause(120);
@@ -437,12 +451,17 @@ try {
     await page.locator('.context-item:has-text("Delete row")').click();
     await pause(20);
   }
-  await pause(30);
-  await page.evaluate(() => {
-    for (const animation of document.querySelector(".cm-table-widget").getAnimations({ subtree: true })) animation.cancel();
+  /* A cancelled animation's event arrives with the next frame, before that frame is drawn. */
+  const cancelledGhosts = await page.evaluate(async () => {
+    window.__ghostWatch.disconnect();
+    await new Promise(requestAnimationFrame);
+    return { cancelled: window.__cancelledGhosts, left: document.querySelectorAll(".cm-table-ghost").length };
   });
-  await pause(60);
-  check("a cancelled ghost is removed", (await page.locator(".cm-table-ghost").count()) === 0);
+  check(
+    "a cancelled ghost is removed",
+    cancelledGhosts.cancelled === 2 && cancelledGhosts.left === 0,
+    JSON.stringify(cancelledGhosts),
+  );
   check(
     "a cancelled ghost raises no rejection",
     (await page.evaluate(() => window.rejections.length)) === 0,
