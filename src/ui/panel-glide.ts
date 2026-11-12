@@ -7,41 +7,48 @@ const NOTICEABLE_PX = 0.5;
 /* What a docked panel pushes sideways when its column opens or closes. The outline is left out: its own translate centres it. */
 const FOLLOWERS = ".titlebar-lead > *, .tabs, .pane-head > *, .scroller > *";
 
+interface Reading {
+  edge: number;
+  measure: number;
+}
+
 /**
- * Where an element's reading edge is. The note spans the whole pane and centres its text column, so the column's left
- * edge is what the eye follows: it glides even when the measure changes and the lines re-wrap.
+ * Where an element's reading edge is, and how wide its lines are set. The note spans the whole pane and centres its
+ * text column, so the column's left edge is what the eye follows.
  */
-function edgeOf(el: HTMLElement): number {
+function readingOf(el: HTMLElement): Reading {
   const box = el.getBoundingClientRect();
-  if (!el.parentElement?.matches(".scroller")) return box.left;
+  if (!el.parentElement?.matches(".scroller")) return { edge: box.left, measure: box.width };
   const tracks = getComputedStyle(el)
     .gridTemplateColumns.replace(/\[[^\]]*\]/g, " ")
     .trim()
     .split(/\s+/)
     .map(Number.parseFloat);
-  if (tracks.length < 5 || tracks.some(Number.isNaN)) return box.left + box.width / 2;
-  return box.left + tracks[0] + tracks[1];
+  if (tracks.length < 5 || tracks.some(Number.isNaN)) return { edge: box.left + box.width / 2, measure: box.width };
+  return { edge: box.left + tracks[0] + tracks[1], measure: tracks[2] };
 }
 
 /**
- * Applies a docked panel's open or close at once, then carries what it moved from where it was. Each element travels
- * its own distance, so the pane head stays beside the panel's edge while the centred note moves half as far. A second
- * click picks each one up from where it had got to. Only a pointer gets the motion, and Reduce Motion keeps the
- * panel's own fade without the travel.
+ * Applies a docked panel's open or close at once, then carries what it moved from where it was, on the panel's own
+ * curve. Each element travels its own distance, so the pane head stays beside the panel's edge while the centred note
+ * moves half as far. When the measure changes, the lines re-set at once and only
+ * the ragged right edge differs. A second click picks each element up from
+ * where it had got to. Only a pointer gets the motion, and Reduce Motion keeps the panel's own fade without the travel.
  */
-export function glidePanel(shell: HTMLElement, change: () => void): void {
+export function glidePanel(shell: HTMLElement, opening: boolean, change: () => void): void {
   if (!isPointerAction() || reducedMotion()) {
     change();
     return;
   }
   const followers = [...shell.querySelectorAll<HTMLElement>(FOLLOWERS)].filter((el) => el.offsetParent);
-  const was = followers.map(edgeOf);
-  const options = timing("--t-slide", "--ease-in-out");
+  const was = followers.map(readingOf);
+  const options = timing(opening ? "--t-panel-open" : "--t-panel-close", "--ease-panel");
   for (const el of followers) for (const animation of el.getAnimations()) if (animation.id === options.id) animation.cancel();
   change();
   const started: Animation[] = [];
   followers.forEach((el, i) => {
-    const dx = was[i] - edgeOf(el);
+    const now = readingOf(el);
+    const dx = was[i].edge - now.edge;
     if (Math.abs(dx) >= NOTICEABLE_PX) started.push(el.animate({ translate: [`${dx}px 0`, "0 0"] }, options));
   });
   holdClassWhile(shell, "is-gliding", started);

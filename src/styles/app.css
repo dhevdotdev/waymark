@@ -472,7 +472,9 @@ kbd {
     overflow: visible;
     inline-size: var(--sidebar-w);
     background: var(--chrome);
-    transition: translate var(--t-slide) var(--ease-in-out);
+    transition:
+      translate var(--t-panel-open) var(--ease-panel),
+      opacity var(--t-hover) var(--ease-out);
   }
   .sidebar::after {
     content: "";
@@ -485,10 +487,12 @@ kbd {
   }
   .shell.sidebar-closed .sidebar {
     translate: -100% 0;
+    opacity: 0;
     visibility: hidden;
     transition:
-      translate var(--t-slide) var(--ease-in-out),
-      visibility 0s linear var(--t-slide);
+      translate var(--t-panel-close) var(--ease-panel),
+      opacity var(--t-panel-close) linear,
+      visibility 0s linear var(--t-panel-close);
   }
 }
 @media (prefers-reduced-motion: reduce) and (min-width: 901px) {
@@ -1295,7 +1299,9 @@ kbd {
     inline-size: var(--rail-w);
     margin-inline-start: calc(var(--col-right) - var(--rail-w));
     background: var(--chrome);
-    transition: translate var(--t-slide) var(--ease-in-out);
+    transition:
+      translate var(--t-panel-open) var(--ease-panel),
+      opacity var(--t-hover) var(--ease-out);
   }
   .rail::after {
     content: "";
@@ -1308,10 +1314,12 @@ kbd {
   }
   .shell.rail-closed .rail {
     translate: 100% 0;
+    opacity: 0;
     visibility: hidden;
     transition:
-      translate var(--t-slide) var(--ease-in-out),
-      visibility 0s linear var(--t-slide);
+      translate var(--t-panel-close) var(--ease-panel),
+      opacity var(--t-panel-close) linear,
+      visibility 0s linear var(--t-panel-close);
   }
 }
 @media (prefers-reduced-motion: reduce) and (min-width: 1241px) {

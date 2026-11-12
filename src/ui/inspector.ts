@@ -111,7 +111,7 @@ export class Inspector {
       return;
     }
     const closed = !shell.classList.contains("rail-closed");
-    glidePanel(shell, () => shell.classList.toggle("rail-closed", closed));
+    glidePanel(shell, !closed, () => shell.classList.toggle("rail-closed", closed));
     this.host.prefs.update((p) => {
       p.rail = !closed;
     });

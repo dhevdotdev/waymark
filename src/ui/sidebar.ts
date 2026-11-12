@@ -91,7 +91,7 @@ export class Sidebar {
     }
     const closed = force === undefined ? !shell.classList.contains("sidebar-closed") : !force;
     if (closed === shell.classList.contains("sidebar-closed")) return;
-    glidePanel(shell, () => shell.classList.toggle("sidebar-closed", closed));
+    glidePanel(shell, !closed, () => shell.classList.toggle("sidebar-closed", closed));
     this.prefs.update((p) => {
       p.sidebar = !closed;
     });
