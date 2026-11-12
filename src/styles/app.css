@@ -175,8 +175,6 @@ kbd {
 }
 .titlebar-trail {
   justify-content: flex-end;
-  width: var(--col-right);
-  min-width: max-content;
   height: 100%;
   padding-right: 8px;
 }
@@ -184,28 +182,6 @@ kbd {
   display: flex;
   align-items: center;
   gap: 2px;
-}
-/* The panel's edge slides under these buttons, never over them, so a second click always reaches them. */
-@media (min-width: 1241px) {
-  .titlebar-trail {
-    position: relative;
-    z-index: 5;
-    pointer-events: none;
-  }
-  .titlebar-trail > * {
-    pointer-events: auto;
-  }
-  .titlebar-tools {
-    position: relative;
-  }
-  .titlebar-tools::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    inset-block: 0;
-    inset-inline: -4px -8px;
-    background: var(--chrome);
-  }
 }
 /* The Links button carries the note's link count, so it grows to fit. Without links it is a plain icon. */
 .icon-btn.has-count {
@@ -497,7 +473,7 @@ kbd {
 }
 /*
  * A docked panel keeps its width as its column closes, so a click slides it over the page while panel-glide.ts carries
- * the page across. It draws its own edge up through the title bar, so the hairline travels and hides with it.
+ * the page across. Its edge stops at the title bar, which stays one unbroken strip.
  */
 @media (min-width: 901px) {
   .sidebar {
@@ -508,15 +484,6 @@ kbd {
     transition:
       translate var(--t-panel-open) var(--ease-panel),
       opacity var(--t-hover) var(--ease-out);
-  }
-  .sidebar::after {
-    content: "";
-    position: absolute;
-    inset-block-start: calc(-1 * var(--chrome-h));
-    inset-inline-end: 0;
-    block-size: var(--chrome-h);
-    inline-size: 1px;
-    background: var(--rule);
   }
   .shell.sidebar-closed .sidebar {
     translate: -100% 0;
@@ -1334,25 +1301,14 @@ kbd {
   box-shadow: inset 1px 0 var(--rule);
 }
 @media (min-width: 1241px) {
-  /* Visible, so its tabs and edge can sit up in the title bar and travel with it. */
   .rail {
     z-index: 4;
-    overflow: visible;
     inline-size: var(--rail-w);
     margin-inline-start: calc(var(--col-right) - var(--rail-w));
     background: var(--chrome);
     transition:
       translate var(--t-panel-open) var(--ease-panel),
       opacity var(--t-hover) var(--ease-out);
-  }
-  .rail::after {
-    content: "";
-    position: absolute;
-    inset-block-start: calc(-1 * var(--chrome-h));
-    inset-inline-start: 0;
-    block-size: var(--chrome-h);
-    inline-size: 1px;
-    background: var(--rule);
   }
   .shell.rail-closed .rail {
     translate: 100% 0;
@@ -1990,9 +1946,6 @@ kbd {
   .shell,
   .shell.rail-closed {
     --col-right: 0px;
-  }
-  .titlebar-trail {
-    width: auto;
   }
   .rail,
   .shell.rail-closed .rail {

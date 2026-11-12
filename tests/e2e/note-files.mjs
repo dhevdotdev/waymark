@@ -672,32 +672,71 @@ try {
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" ") === "0/2 2/3",
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" "),
   );
-  /* The docked inspector draws its own edge up through the title bar, so the edge shows exactly when the inspector does. */
-  const inspectorEdge = () =>
+  const inspectorShown = () =>
     page.evaluate(() => {
       const rail = document.querySelector(".rail");
-      const shown = getComputedStyle(rail).visibility === "visible" && getComputedStyle(rail).opacity === "1";
       return {
         room: window.innerWidth - document.querySelector(".reader").getBoundingClientRect().right,
-        shown,
-        edge: shown && getComputedStyle(rail, "::after").content !== "none",
+        shown: getComputedStyle(rail).visibility === "visible" && getComputedStyle(rail).opacity === "1",
       };
     });
-  const onBlank = await inspectorEdge();
-  check(
-    "a blank tab hides the inspector's edge in the title bar along with the inspector",
-    onBlank.room === 0 && !onBlank.shown && !onBlank.edge,
-    JSON.stringify(onBlank),
-  );
+  /*
+   * The title bar is one unbroken strip. Its top rows hold no control, so a column line crossing the title bar is any
+   * pixel there that differs from the window's colour. Returns the x positions of such pixels.
+   */
+  const titlebarLines = async () => {
+    await pause(500);
+    const band = (await page.screenshot({ clip: { x: 0, y: 1, width: 1400, height: 6 } })).toString("base64");
+    return page.evaluate(async (data) => {
+      const image = new Image();
+      await new Promise((resolve) => {
+        image.onload = resolve;
+        image.src = `data:image/png;base64,${data}`;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const { data: px, width, height } = context.getImageData(0, 0, image.width, image.height);
+      const xs = new Set();
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          if ([0, 1, 2].some((c) => Math.abs(px[i + c] - px[c]) > 6)) xs.add(x);
+        }
+      }
+      return [...xs];
+    }, band);
+  };
+  const onBlank = await inspectorShown();
+  check("a blank tab hides the inspector", onBlank.room === 0 && !onBlank.shown, JSON.stringify(onBlank));
+  const linesOnBlank = await titlebarLines();
+  check("on a blank tab no column line crosses the title bar", linesOnBlank.length === 0, linesOnBlank.join(","));
   await page.keyboard.press("Meta+n");
   await page.waitForSelector(".cm-content");
   await pause(300);
-  const onNew = await inspectorEdge();
+  const onNew = await inspectorShown();
   check(
     "a new note from a blank tab brings the inspector back whole",
-    onNew.room > 0 && onNew.shown && onNew.edge && (await page.locator('[data-rail="links"]').isVisible()),
+    onNew.room > 0 && onNew.shown && (await page.locator('[data-rail="links"]').isVisible()),
     JSON.stringify(onNew),
   );
+  const linesOpen = await titlebarLines();
+  check("with the panel open no column line crosses the title bar", linesOpen.length === 0, linesOpen.join(","));
+  await page.locator(".palette-overlay").click({ position: { x: 4, y: 450 } });
+  await page.waitForSelector(".palette-overlay", { state: "detached" });
+  await page.click('[data-rail="links"]');
+  const linesClosed = await titlebarLines();
+  check("with the panel closed no column line crosses the title bar", linesClosed.length === 0, linesClosed.join(","));
+  await page.click('[data-rail="links"]');
+  await page.keyboard.press("Meta+g");
+  await page.waitForSelector(".shell.is-graph");
+  const linesOnGraph = await titlebarLines();
+  check("on the graph no column line crosses the title bar", linesOnGraph.length === 0, linesOnGraph.join(","));
+  await page.keyboard.press("Meta+g");
+  await page.waitForSelector(".shell:not(.is-graph)");
+  await pause(300);
 
   const diffGeometry = await page.evaluate(async () => {
     const { renderDiff } = await import(/* @vite-ignore */ `${location.origin}/src/ui/diff.ts`);
