@@ -30,15 +30,14 @@ function edgeOf(el: HTMLElement): number {
  * panel's own fade without the travel.
  */
 export function glidePanel(shell: HTMLElement, change: () => void): void {
-  if (!isPointerAction() || reducedMotion()) {
-    change();
-    return;
-  }
+  const glide = isPointerAction() && !reducedMotion();
   const followers = [...shell.querySelectorAll<HTMLElement>(FOLLOWERS)].filter((el) => el.offsetParent);
-  const was = followers.map(edgeOf);
+  const was = glide ? followers.map(edgeOf) : [];
   const options = timing("--t-slide", "--ease-in-out");
+  /* A key press lands everything at once, so it also ends a glide a click left running. */
   for (const el of followers) for (const animation of el.getAnimations()) if (animation.id === options.id) animation.cancel();
   change();
+  if (!glide) return;
   const started: Animation[] = [];
   followers.forEach((el, i) => {
     const dx = was[i] - edgeOf(el);

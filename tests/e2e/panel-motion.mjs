@@ -18,7 +18,18 @@ watchPageErrors(page, errors);
 const results = [];
 const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail !== "" ? `  (${detail})` : ""}`);
 const pause = (ms) => page.waitForTimeout(ms);
-const settled = () => pause(reduced ? 250 : 450);
+/** Lets a slide finish, waiting on the animations themselves so a slow machine does not start the next step mid-slide. */
+const settled = async () => {
+  await pause(reduced ? 250 : 450);
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document
+        .getAnimations()
+        .filter((a) => Number.isFinite(a.effect.getComputedTiming().endTime))
+        .map((a) => a.finished),
+    ),
+  );
+};
 
 const open = async () => {
   await page.goto(`${app.url}?note=${encodeURIComponent(NOTES.hero)}`);
@@ -80,7 +91,20 @@ const motionOf = () =>
             }),
           );
         };
-        for (const type of ["click", "keydown"]) window.addEventListener(type, read, { once: true });
+        /*
+         * A shortcut's modifier goes down first, before anything has been handled. The app takes its keys while they are
+         * captured at the window and stops them there, so keys are read in that phase, after the app's own handler.
+         */
+        const done = () => {
+          window.removeEventListener("click", done);
+          window.removeEventListener("keydown", onKey, true);
+          read();
+        };
+        const onKey = (e) => {
+          if (!["Meta", "Control", "Alt", "Shift"].includes(e.key)) done();
+        };
+        window.addEventListener("click", done);
+        window.addEventListener("keydown", onKey, true);
       }),
   );
 
@@ -205,6 +229,12 @@ try {
   motion = await during(() => page.keyboard.press("Meta+\\"));
   check("⌘\\ opens it at once", motion.filter((m) => m.target).length === 0, shown(motion));
   await settled();
+  if (!reduced) {
+    await page.click('[data-act="sidebar"]');
+    motion = await during(() => page.keyboard.press("Meta+\\"));
+    check("⌘\\ during a clicked slide lands everything at once", motion.filter((m) => m.target).length === 0, shown(motion));
+    await settled();
+  }
 
   /* The docked inspector */
   const rail = () => page.evaluate(() => document.querySelector(".reader").getBoundingClientRect().right);
