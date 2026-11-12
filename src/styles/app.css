@@ -177,6 +177,8 @@ kbd {
   justify-content: flex-end;
   height: 100%;
   padding-right: 8px;
+  /* Room for the three buttons with a two-digit link count, so the tabs keep their widths from note to note. */
+  min-inline-size: 116px;
 }
 .titlebar-tools {
   display: flex;
