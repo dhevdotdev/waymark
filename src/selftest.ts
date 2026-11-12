@@ -2,6 +2,7 @@ import { git, native } from "./platform";
 import { runEmpty, runOrganize } from "./selftest-organize";
 import { runBackup, runConflict, runLibrary, runQuit, runRelaunch, runRestore, type SelfTestContext } from "./selftest-recovery";
 import type { App } from "./ui/app";
+import { spreadFrom } from "./ui/theme-spread";
 
 async function runShow(ctx: SelfTestContext, mode: string): Promise<void> {
   const { app, reader, vault, panel, check, wait } = ctx;
@@ -32,6 +33,7 @@ async function checkDockIcons({ app, check }: SelfTestContext): Promise<void> {
   );
   check("the window colour can follow the theme", colourSet);
   check("the key sounds load under the content policy", await app.sound.keys.load("tactile"));
+  check("the web view runs View Transitions, which a picked theme spreads through", await spreadFrom(0, 0, () => {}));
   const edges = getComputedStyle(document.querySelector(".scroller")!);
   check(
     "the web view honours the scroll rules",

@@ -3,6 +3,7 @@ import type { PrefStore, Prefs } from "../prefs";
 import { FAMILIES, type Scheme } from "../themes";
 import { dismissOnOutside, fadeOut, toast } from "./overlays";
 import type { Sound } from "./sound";
+import { spreadTheme } from "./theme-spread";
 
 type Appearance = Prefs["appearance"];
 
@@ -114,9 +115,10 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
 
   pop.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
-    const family = target.closest<HTMLElement>("[data-family]")?.dataset.family;
-    if (family) {
-      host.setFamily(family);
+    const swatch = target.closest<HTMLElement>("[data-family]");
+    const family = swatch?.dataset.family;
+    if (swatch && family) {
+      if (family !== host.prefs.value.family) spreadTheme(swatch, () => host.setFamily(family));
       for (const b of pop.querySelectorAll<HTMLElement>("[data-family]")) {
         b.classList.toggle("is-on", b.dataset.family === family);
         b.setAttribute("aria-pressed", String(b.dataset.family === family));
