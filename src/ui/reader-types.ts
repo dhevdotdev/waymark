@@ -2,6 +2,7 @@ import type { PrefStore, Prefs } from "../prefs";
 import type { Highlighter } from "../render/highlight";
 import type { Scheme } from "../themes";
 import type { VaultStore } from "../vault/store";
+import type { Entrance } from "./page-motion";
 import type { Sound } from "./sound";
 
 export type Metrics = Record<string, number>;
@@ -31,12 +32,14 @@ export interface OpenOptions {
   find?: string;
   keyboard?: boolean;
   via?: "link" | "jump";
+  /** What the pointer clicked to open the note, to carry into its title. */
+  from?: HTMLElement;
 }
 
 export interface ShowOptions {
   anchor?: string;
   find?: string;
-  followed?: boolean;
+  entrance?: Entrance;
   keepScroll?: boolean;
   /** A graph tab that has just been opened, so a pointer open may fade it in. */
   openingGraph?: boolean;

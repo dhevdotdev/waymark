@@ -1174,6 +1174,26 @@ kbd {
     opacity: 0.35;
   }
 }
+/* The page just left, over the scroller's area at the scroll it was read at. page-motion.ts fades it and removes it. */
+.page-ghost {
+  position: absolute;
+  grid-column: 1;
+  grid-row: 3;
+  inset: 0;
+  overflow: hidden;
+  container: reader / inline-size;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.page-carry {
+  position: fixed;
+  z-index: 40;
+  margin: 0;
+  overflow: clip;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
 
 .rail {
   position: relative;

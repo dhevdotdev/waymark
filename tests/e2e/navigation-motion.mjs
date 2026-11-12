@@ -1,5 +1,7 @@
 // Motion belongs to the pointer: what moves when a note, folder or panel changes, and that the keyboard always lands at once.
 // Usage: node tests/e2e/navigation-motion.mjs [reduced]
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
 import { serveFixture } from "./serve.mjs";
@@ -19,6 +21,7 @@ const results = [];
 const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`);
 const pause = (ms) => page.waitForTimeout(ms);
 const settled = () => pause(reduced ? 200 : 450);
+const LONG = "A note whose title is long enough that it has to wrap onto a second line in the reading column";
 
 /* The note is drawn again once the code theme has loaded, which would replace a page still fading. */
 const untilPageStopsRedrawing = () =>
@@ -41,12 +44,6 @@ const openNote = async (name) => {
   await untilPageStopsRedrawing();
 };
 const moving = (selector) => page.evaluate((s) => document.querySelector(s).getAnimations().length > 0, selector);
-const fading = () => page.evaluate(() => document.querySelector(".doc").classList.contains("doc-enter"));
-const landed = async (before) => {
-  await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent !== t, before);
-  await pause(30);
-};
-const title = () => page.textContent(".doc-title");
 const scrimMoving = () =>
   page.evaluate(() =>
     document
@@ -56,46 +53,226 @@ const scrimMoving = () =>
   );
 const nextFrames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
-/* The document fade */
+/**
+ * Records every animation the next navigation starts on the page, its ghost, the carried copies, the title and the
+ * body, read from each animation as it starts rather than from sampled frames, until the new page has settled.
+ */
+const watchEntrance = () =>
+  page.evaluate(() => {
+    const before = document.querySelector(".doc-title")?.textContent;
+    const seen = new Map();
+    const stats = { ghosts: 0, layoutMoved: false, wrapMatched: null };
+    const roleOf = (el) => {
+      if (!(el instanceof Element)) return null;
+      if (el.matches(".page-ghost")) return "ghost";
+      if (el.matches(".page-carry")) return "carry";
+      if (el.matches(".scroller > .doc")) return "page";
+      if (el.matches(".scroller > .doc .doc-title")) return "title";
+      if (el.parentElement?.matches(".scroller > .doc")) return "block";
+      return null;
+    };
+    const frameOf = () => {
+      const head = document.querySelector(".pane-head").getBoundingClientRect();
+      return `${head.top},${head.left},${document.querySelector(".scroller").getBoundingClientRect().width}`;
+    };
+    const frame0 = frameOf();
+    const read = () => {
+      stats.ghosts = Math.max(stats.ghosts, document.querySelectorAll(".page-ghost").length);
+      if (frameOf() !== frame0) stats.layoutMoved = true;
+      for (const a of document.getAnimations()) {
+        const role = roleOf(a.effect.target);
+        if (!role || seen.has(a)) continue;
+        const keys = a.effect.getKeyframes();
+        const timing = a.effect.getComputedTiming();
+        const target = a.effect.target;
+        if (role === "carry" && target.style.whiteSpace === "normal") {
+          const t = document.querySelector(".scroller > .doc .doc-title");
+          stats.wrapMatched = Math.abs(target.offsetHeight - t.offsetHeight) < 1 && target.offsetWidth === t.offsetWidth;
+        }
+        seen.set(a, {
+          role,
+          name: a.animationName ?? null,
+          ms: timing.duration,
+          delay: timing.delay,
+          from: { opacity: keys[0]?.opacity, translate: keys[0]?.translate, transform: keys[0]?.transform },
+          to: { opacity: keys.at(-1)?.opacity, translate: keys.at(-1)?.translate },
+        });
+      }
+    };
+    const observer = new MutationObserver(read);
+    observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    const started = performance.now();
+    window.__entrance = new Promise((resolve) => {
+      let still = 0;
+      const tick = () => {
+        read();
+        const arrived = document.querySelector(".doc-title")?.textContent !== before;
+        const running = [...seen.keys()].some((a) => a.playState === "running");
+        still = arrived && !running ? still + 1 : 0;
+        if (still >= 3 || performance.now() - started > 5000) {
+          observer.disconnect();
+          resolve({
+            motions: [...seen.values()],
+            ...stats,
+            leftovers: document.querySelectorAll(".page-ghost, .page-carry").length,
+            titleShown: getComputedStyle(document.querySelector(".scroller > .doc .doc-title")).opacity === "1",
+          });
+        } else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  });
+const entranceOf = async (act) => {
+  await watchEntrance();
+  await act();
+  return page.evaluate(() => window.__entrance);
+};
+const of = (r, role) => r.motions.filter((m) => m.role === role);
+const faded = (r) => r.motions.some((m) => m.name === "doc-enter");
+const still = (r) => r.motions.length === 0;
+const shown = (r) =>
+  JSON.stringify(r.motions.map(({ role, name, ms, delay, from, to }) => ({ role, name, ms, delay, from, to })));
+const px = (t) => Number.parseFloat(String(t ?? "0"));
+/** The new page and the ghost travel opposite ways along x, by the slide's distance, or only fade under Reduce Motion. */
+const slid = (r, step) => {
+  const [enter] = of(r, "page");
+  const [ghost] = of(r, "ghost");
+  if (!enter || !ghost || faded(r) || of(r, "carry").length) return false;
+  const travel = reduced ? 0 : 28;
+  return (
+    px(enter.from.translate) === step * travel &&
+    px(ghost.to.translate) === -step * travel &&
+    enter.ms === (reduced ? 140 : 240) &&
+    ghost.ms === 140 &&
+    Number(enter.from.opacity) === 0 &&
+    Number(ghost.to.opacity) === 0 &&
+    !r.layoutMoved
+  );
+};
+/** The clicked text flies into the title in two crossfading copies while the old page fades in place, then the body rises. */
+const carried = (r) => {
+  if (reduced) return faded(r) && of(r, "carry").length === 0;
+  const blocks = of(r, "block");
+  return (
+    of(r, "carry").length === 2 &&
+    of(r, "carry").every((m) => m.ms === 250) &&
+    of(r, "ghost").every((m) => m.ms === 140 && px(m.to.translate) === 0) &&
+    of(r, "title").some((m) => Number(m.from.opacity) === 0) &&
+    blocks.length > 0 &&
+    blocks.every((m) => m.delay === 60 && m.ms === 200 && m.from.translate?.endsWith("6px")) &&
+    !faded(r) &&
+    !r.layoutMoved
+  );
+};
+const settledClean = (r) => r.leftovers === 0 && r.titleShown;
+
+/* Page entrances */
 const LINK = ".doc > :not(.doc-head) a.wikilink:not([data-anchor])";
+const TREE_ROW = ".tree-folder.is-open > .tree-body > .tree-inner > .nav-item:not(.is-current)";
 await openNote(NOTES.hero);
-let before = await title();
-await page.locator(LINK).first().click();
-await landed(before);
-check("a followed link fades the new page in", await fading());
+let seen = await entranceOf(() => page.locator(LINK).first().click());
+check(
+  reduced ? "a clicked link fades the page in without flying" : "a clicked link carries its text into the title",
+  carried(seen) && settledClean(seen),
+  shown(seen),
+);
+seen = await entranceOf(() => page.click('[data-act="back"]'));
+check("the Back button slides the page in from the left", slid(seen, -1) && settledClean(seen), shown(seen));
+seen = await entranceOf(() => page.click('[data-act="forward"]'));
+check("the Forward button slides the page in from the right", slid(seen, 1) && settledClean(seen), shown(seen));
+await page.keyboard.press("Escape");
+seen = await entranceOf(() =>
+  page.evaluate(() =>
+    document.querySelector(".doc").dispatchEvent(new MouseEvent("mouseup", { button: 3, bubbles: true, cancelable: true })),
+  ),
+);
+check("the mouse's back button slides like the Back button", slid(seen, -1), shown(seen));
 
 await openNote(NOTES.hero);
-before = await title();
 await page.locator(LINK).first().focus();
-await page.keyboard.press("Enter");
-await landed(before);
-check("a link followed with Return does not fade", !(await fading()));
+seen = await entranceOf(() => page.keyboard.press("Enter"));
+check("a link followed with Return lands at once", still(seen), shown(seen));
 
-before = await title();
-await page.keyboard.press("Meta+[");
-await landed(before);
-check("going back does not fade", !(await fading()));
+seen = await entranceOf(() => page.keyboard.press("Meta+["));
+check("going back with ⌘[ lands at once", still(seen), shown(seen));
+seen = await entranceOf(() => page.keyboard.press("Meta+]"));
+check("going forward with ⌘] lands at once", still(seen), shown(seen));
+seen = await entranceOf(() => page.evaluate(() => window.waymark.reader.commands.runFromMenu("back")));
+check("Back from the menu bar lands at once", still(seen), shown(seen));
 
-before = await title();
-await page.locator(".tree-folder.is-open > .tree-body > .tree-inner > .nav-item:not(.is-current)").first().click();
-await landed(before);
-check("a file-list click does not fade", !(await fading()));
+seen = await entranceOf(() => page.locator(TREE_ROW).first().click());
+check(
+  reduced ? "a file-list click fades the page in without flying" : "a file-list click carries the row's name into the title",
+  carried(seen) && settledClean(seen),
+  shown(seen),
+);
 
-before = await title();
-await page.keyboard.press("Meta+k");
-await page.keyboard.type(NOTES.tide);
-await pause(100);
-await page.keyboard.press("Enter");
-await landed(before);
-check("a palette choice does not fade", !(await fading()));
+seen = await entranceOf(async () => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type(NOTES.tide);
+  await pause(100);
+  await page.keyboard.press("Enter");
+});
+check("a palette choice lands at once", still(seen), shown(seen));
 
-before = await title();
-await page.keyboard.press("Meta+Shift+f");
-await page.keyboard.type("declination");
-await pause(200);
-await page.keyboard.press("Enter");
-await landed(before);
-check("a search result opened with Return does not fade", !(await fading()));
+seen = await entranceOf(async () => {
+  await page.keyboard.press("Meta+Shift+f");
+  await page.keyboard.type("declination");
+  await pause(200);
+  await page.keyboard.press("Enter");
+});
+check("a search result opened with Return lands at once", still(seen), shown(seen));
+
+/* Carrying where it cannot be seen, is slow, wraps or is interrupted */
+await writeFile(path.join(app.vault, `${LONG}.md`), `# ${LONG}\n\nA short body.\n`);
+await writeFile(
+  path.join(app.vault, "Wrap source.md"),
+  `# Wrap source\n\nGo to [[${LONG}]] from here.\n\nGo to [[Wrap source]] too.\n`,
+);
+await page.evaluate((files) => window.waymark.reader.vault.applyChanges(files), [`${LONG}.md`, "Wrap source.md"]);
+await openNote("Wrap source");
+seen = await entranceOf(() => page.locator(LINK).first().click());
+check(
+  "a title that wraps is carried by a copy that wraps the same way",
+  reduced ? carried(seen) : carried(seen) && seen.wrapMatched === true,
+  `${seen.wrapMatched} ${shown(seen)}`,
+);
+
+await openNote(NOTES.hero);
+seen = await entranceOf(() =>
+  page.evaluate(() => document.querySelector(".tree-folder:not(.is-open) .nav-item[data-path]").click()),
+);
+check("a row inside a closed folder gets the plain fade", faded(seen) && of(seen, "carry").length === 0, shown(seen));
+
+await openNote(NOTES.hero);
+await page.evaluate(() => {
+  const vault = window.waymark.reader.vault;
+  const read = vault.read.bind(vault);
+  vault.read = (p) => new Promise((done) => setTimeout(() => done(read(p)), 400));
+  window.__restoreRead = () => {
+    vault.read = read;
+  };
+});
+const clickedAt = Date.now();
+seen = await entranceOf(async () => {
+  await page.locator(LINK).first().click();
+  check("a slow note does not hold the click", Date.now() - clickedAt < 300, `${Date.now() - clickedAt}ms`);
+});
+await page.evaluate(() => window.__restoreRead());
+check("a note that arrives late gets the plain fade", faded(seen) && of(seen, "carry").length === 0, shown(seen));
+
+await openNote(NOTES.hero);
+seen = await entranceOf(async () => {
+  await page.locator(LINK).first().click();
+  await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent !== t, NOTES.hero);
+  await pause(60);
+  await page.locator(TREE_ROW).first().click();
+});
+check(
+  "a second click mid-carry starts again from the page on screen and leaves nothing behind",
+  seen.ghosts <= 1 && settledClean(seen) && !seen.layoutMoved,
+  `ghosts ${seen.ghosts}, leftovers ${seen.leftovers}`,
+);
 
 /* Folders */
 await openNote(NOTES.hero);

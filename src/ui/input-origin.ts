@@ -10,6 +10,11 @@ function setOrigin(next: Origin): void {
 
 export const isPointerAction = (): boolean => origin === "pointer";
 
+/** For pointer actions that send no pointer events, such as a swipe or a mouse's side buttons. */
+export function markPointerOrigin(): void {
+  setOrigin("pointer");
+}
+
 /** For actions that arrive without a key press of their own, such as a menu bar command. */
 export function markKeyboardOrigin(): void {
   setOrigin("keyboard");

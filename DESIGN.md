@@ -197,8 +197,10 @@ Native scrollbars are hidden everywhere and nothing rubber-bands past its edge. 
 
 The rules come from Emil Kowalski's animation standards, good-css.com, Impeccable and taste-skill. Where those sources disagree, a short distillation records which rule Waymark follows.
 
-- Nothing triggered from the keyboard animates. The palette, tab switching, back and forward appear instantly, because they happen hundreds of times a day.
-- Following a note link with the pointer fades the new page in over 180ms, with no movement. Files, search, the palette, tabs, back and forward show the page at once.
+- Nothing triggered from the keyboard animates. The palette, tab switching, ⌘[ and ⌘] appear instantly, because they happen hundreds of times a day.
+- Back and Forward from the toolbar, the mouse's side buttons or a swipe slide the new page 28px in from the side travelled toward, fading in over 240ms, while the old page leaves the other way as a ghost over 140ms. A swipe's slide agrees with its arrow. The ghost takes no space and no clicks, and a second step picks up from the page on screen.
+- A wiki link or file-list row clicked with the pointer carries its text into the new title: two copies crossfade as they fly over 250ms ease-in-out, the old page fades in place, and the blocks on screen rise 6px over 200ms, 60ms behind. A source or title that cannot be fully seen, or a note that takes over 250ms to arrive, gets the plain entrance instead, so the motion never lags the click. Other pointer links (graph, inspector, views, new tabs) fade the new page in over 180ms. Search, the palette and tabs show the page at once.
+- Under Reduce Motion the slide becomes a 140ms crossfade in place and the carry becomes the plain fade.
 - The palette and the menu bar count as the keyboard, even when a choice in them is clicked. A heading reached by the pointer takes a brief tint that holds until the eye can land on it, and a heading reached any other way does not.
 - Popovers and menus grow from the point nearest what opened them, measured after they are pushed back into the window. Sheets and the lightbox stay centred. Entries and exits are transitions, so a reversal starts from where the surface is. A key press shows or removes any of them at once.
 - A sheet opened from a sheet changes the open sheet's content, so two never overlap.
