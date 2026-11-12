@@ -8,7 +8,7 @@ const FAR_SCREENS = 3;
 let running: { frame: number; target: HTMLElement; scroller: HTMLElement } | null = null;
 
 /** Leaves the scroll where the glide has it, and drops the tint waiting for its landing. */
-export function stopGlide(): void {
+function stopGlide(): void {
   if (!running) return;
   cancelAnimationFrame(running.frame);
   for (const a of running.target.getAnimations()) a.cancel();
