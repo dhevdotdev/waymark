@@ -154,7 +154,6 @@ export class Reader {
       open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor }),
       toast,
       current: () => (this.onBlank ? "" : this.current),
-      button: els.bookmarkToggle,
     });
     this.sidebar.tree.leading = this.bookmarks.element;
     this.files = new NoteFiles({

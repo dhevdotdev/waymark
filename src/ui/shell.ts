@@ -12,7 +12,6 @@ export interface ShellElements {
   scroller: HTMLElement;
   paneHead: HTMLElement;
   crumbs: HTMLElement;
-  bookmarkToggle: HTMLElement;
   paneMeta: HTMLElement;
   trailPane: HTMLElement;
   editState: HTMLElement;
@@ -84,7 +83,7 @@ function template(options: ShellOptions): string {
         <div class="sidebar-resize" aria-hidden="true"></div>
       </nav>
       <main class="reader">
-        <div class="pane-head"><div class="crumbs"></div><button class="icon-btn pane-bookmark" data-act="bookmark-note" data-tip="Bookmark this note" aria-label="Bookmark this note" aria-pressed="false">${icons.bookmark}</button><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
+        <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
         <div class="scroller" tabindex="-1"><article class="doc"></article></div>
       </main>
       <aside class="rail" id="inspector" aria-label="Inspector">
@@ -134,7 +133,6 @@ export function mountShell(host: HTMLElement, options: ShellOptions): ShellEleme
     scroller: q(".scroller"),
     paneHead: q(".pane-head"),
     crumbs: q(".crumbs"),
-    bookmarkToggle: q(".pane-bookmark"),
     paneMeta: q(".pane-meta"),
     trailPane: q(".rail-trail"),
     editState: q(".edit-state"),

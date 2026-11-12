@@ -18,8 +18,6 @@ export interface BookmarksHost {
   open: (path: string, newTab: boolean, anchor?: string) => void;
   toast: (message: string) => void;
   current: () => string;
-  /** The toggle beside the open note's path. */
-  button: HTMLElement;
 }
 
 const isBookmark = (value: unknown): value is Bookmark => {
@@ -35,7 +33,7 @@ const headingOf = (line: string) => /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
 function emptyLine(): HTMLElement {
   const line = document.createElement("p");
   line.className = "bookmarks-empty";
-  line.innerHTML = `Click ${icons.bookmark.replace('aria-hidden="true"', 'role="img" aria-label="the bookmark button"')} next to a note's path to add it here.`;
+  line.textContent = "Bookmark a note from its … menu or by right-clicking it.";
   return line;
 }
 
@@ -116,13 +114,6 @@ export class Bookmarks {
     this.head.querySelector(".tree-count")!.textContent = list.length ? list.length.toLocaleString() : "";
     if (list.length) this.drawRows(list);
     else this.inner.replaceChildren(emptyLine());
-    this.showToggle();
-  }
-
-  private showToggle(): void {
-    const on = this.has({ path: this.host.current() });
-    this.host.button.setAttribute("aria-pressed", String(on));
-    this.host.button.dataset.tip = on ? "Remove bookmark" : "Bookmark this note";
   }
 
   /** The rows are rebuilt on every note change, so a row holding focus hands it to its replacement. */

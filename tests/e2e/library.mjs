@@ -212,8 +212,6 @@ try {
 
   /* ---- Bookmarks ---- */
   await load("Keep");
-  const toggle = page.locator(".pane-head .pane-bookmark");
-  const pressed = () => toggle.getAttribute("aria-pressed");
   const emptyLine = () =>
     page
       .locator(".bookmarks .bookmarks-empty")
@@ -223,28 +221,23 @@ try {
     "with no bookmarks the section is shown empty",
     (await bookmarkRows()).length === 0 && (await page.locator(".bookmarks > .tree-head").isVisible()),
   );
-  check("the empty section says how to add one", (await emptyLine()).includes("next to a note's path"), await emptyLine());
-  check("the toggle beside the path starts off", (await toggle.isVisible()) && (await pressed()) === "false");
-  await toggle.click();
+  check("the empty section says how to add one", (await emptyLine()).includes("right-clicking"), await emptyLine());
+  check("the path carries no bookmark button", (await page.locator(".pane-head .pane-bookmark").count()) === 0);
+  await runPalette("Bookmark this note");
   await pause(350);
-  check("the toggle bookmarks the note", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
-  check(
-    "the toggle shows it is on",
-    (await pressed()) === "true" && (await toggle.getAttribute("data-tip")) === "Remove bookmark",
-  );
+  check("the palette bookmarks the note", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
   check(
     "the open note is highlighted once, its bookmark only tinted",
     (await page.locator(".nav-item.is-current").count()) === 1 &&
       (await page.locator(".bookmarks .nav-item.is-here").count()) === 1,
   );
   check("the empty line goes once there is a bookmark", (await page.locator(".bookmarks-empty").count()) === 0);
-  await toggle.click();
+  await runPalette("Bookmark this note");
   await pause(350);
-  check("the toggle removes the bookmark", (await bookmarkRows()).length === 0 && (await pressed()) === "false");
+  check("running it again removes the bookmark", (await bookmarkRows()).length === 0);
   check("the empty line comes back", (await page.locator(".bookmarks-empty").count()) === 1);
   await runPalette("Bookmark this note");
-  check("the palette bookmarks a note", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
-  check("the toggle follows a palette bookmark", (await pressed()) === "true");
+  check("the palette bookmarks a note again", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
   await page.evaluate(() => document.querySelector(".scroller").scrollTo({ top: 3400 }));
   await pause(200);
   await runPalette("Bookmark the current heading");
