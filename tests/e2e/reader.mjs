@@ -431,11 +431,14 @@ await page.waitForFunction((t) => document.querySelector(".doc-title")?.textCont
 await pause(300);
 
 // Backlinks and local graph
-await page.click('[data-rail="links"]');
-await pause(120);
+check("the panel shows Links", (await page.getAttribute('[data-rail="links"]', "aria-pressed")) === "true");
 const backlinks = await page.locator(".rail-links .rail-link:visible").count();
 check("the Links pane lists connected notes", backlinks > 0, `${backlinks}`);
-await page.click('[data-rail="links"]');
+check(
+  "the Links button carries the same count in its name",
+  /^Links, \d+$/.test(await page.getAttribute('[data-rail="links"]', "aria-label")),
+  await page.getAttribute('[data-rail="links"]', "aria-label"),
+);
 const railGraph = await page.evaluate(() => document.querySelector(".local-graph canvas")?.getBoundingClientRect().height ?? 0);
 check("local graph renders in the rail", railGraph > 100, `${railGraph}px`);
 const openGraph = page.locator(".rail-graph-open");

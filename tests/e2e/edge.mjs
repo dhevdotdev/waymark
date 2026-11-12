@@ -28,7 +28,8 @@ await withApp({ empty: true }, async (page, app, { errors }) => {
   for (const chord of ["Meta+[", "Meta+]", "Meta+w", "Meta+g", "Meta+f", "Meta+t", "Control+Tab", "Escape"])
     await page.keyboard.press(chord);
   await page.click('[data-act="graph"]');
-  await page.click('[data-act="rail"]');
+  check("an empty vault offers no panel buttons", !(await page.isVisible('[data-rail="links"]')));
+  await page.keyboard.press("Meta+Alt+\\");
   await page.keyboard.press("Meta+k");
   await page.waitForTimeout(150);
   check("the palette still opens in an empty vault", await page.isVisible(".palette"));

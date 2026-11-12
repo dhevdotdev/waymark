@@ -35,6 +35,7 @@ export class Inspector {
   private localGraph: LocalGraph | null = null;
   private rendered: RenderedNote | null = null;
   private current = "";
+  private pane: RailPane = "links";
   private readonly expandArrows = new MorphArrows("apart");
   private readonly propertySlot = document.createElement("div");
   private readonly facts = document.createElement("dl");
@@ -66,6 +67,9 @@ export class Inspector {
       save: () => host.prefs.update(() => undefined),
     });
     this.sections = new PanelSections(els.shell, host.prefs, folded);
+    /* The panel opens and closes from several places, so its buttons read its state rather than each caller setting them. */
+    new MutationObserver(() => this.markButtons()).observe(els.shell, { attributes: true, attributeFilter: ["class"] });
+    matchMedia("(max-width: 1240px)").addEventListener("change", () => this.markButtons());
     this.setPane(pane);
   }
 
@@ -88,14 +92,35 @@ export class Inspector {
 
   setPane(pane: RailPane): void {
     const { shell, railBody } = this.els;
-    for (const button of shell.querySelectorAll<HTMLElement>("[data-rail]")) {
-      const on = button.dataset.rail === pane;
-      button.classList.toggle("is-on", on);
-      button.setAttribute("aria-selected", String(on));
-    }
+    this.pane = pane;
     for (const el of shell.querySelectorAll<HTMLElement>("[data-pane]")) el.hidden = el.dataset.pane !== pane;
     railBody.scrollTop = 0;
+    this.markButtons();
     this.refreshHistory();
+  }
+
+  /** Links and Info are the panel's tabs: one opens the panel on its pane, closes it if already showing, or switches to it. */
+  choose(pane: RailPane): void {
+    if (this.isShowing && pane === this.pane) {
+      this.toggle();
+      return;
+    }
+    if (pane !== this.pane) {
+      this.setPane(pane);
+      this.host.prefs.update((p) => {
+        p.railPane = pane;
+      });
+    }
+    if (!this.isShowing) this.toggle();
+  }
+
+  private markButtons(): void {
+    const showing = this.isShowing;
+    for (const button of this.els.shell.querySelectorAll<HTMLElement>("[data-rail]")) {
+      const on = showing && button.dataset.rail === this.pane;
+      button.classList.toggle("is-on", on);
+      button.setAttribute("aria-pressed", String(on));
+    }
   }
 
   get isShowing(): boolean {
@@ -184,7 +209,9 @@ export class Inspector {
     group("Links to", to, false);
     if (!from.length && !to.length) box.append(this.empty("No links to or from this note."));
     const total = new Set([...from, ...to]).size;
-    shell.querySelector('[data-rail="links"]')!.textContent = total ? `Links ${total}` : "Links";
+    const button = shell.querySelector<HTMLElement>('[data-rail="links"]')!;
+    button.querySelector(".icon-count")!.textContent = total ? String(total) : "";
+    button.setAttribute("aria-label", total ? `Links, ${total}` : "Links");
   }
 
   /** The note's properties, read again from its current text. The editing code loads when first needed. */

@@ -465,7 +465,7 @@ export class NoteFiles {
     ];
   }
 
-  private noteMenu(path: string): MenuItem[] {
+  noteMenu(path: string): MenuItem[] {
     if (isBaseFile(path)) return [{ label: "Open in new tab", run: () => void this.host.open(path, true) }, ...this.reveal(path)];
     const { bookmarks } = this.host;
     return [

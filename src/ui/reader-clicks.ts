@@ -1,6 +1,5 @@
 import { isDesktop, native } from "../platform";
 import { isPointerAction, markPointerOrigin } from "./input-origin";
-import type { RailPane } from "./inspector";
 import { chooseAmbiguous, copyCode, toggleCallout } from "./note-actions";
 import { markTarget } from "./note-view";
 import { lightbox } from "./overlays";
@@ -50,16 +49,6 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
     ["[data-side]", () => r.sidebar.showSearch()],
     [".tree-head", (el) => r.sidebar.tree.toggle(el.dataset.folder!)],
     ["[data-crumb]", (el) => r.sidebar.revealFolder(el.dataset.crumb!)],
-    [
-      "[data-rail]",
-      (el) => {
-        const pane = el.dataset.rail as RailPane;
-        r.deps.prefs.update((p) => {
-          p.railPane = pane;
-        });
-        r.inspector.setPane(pane);
-      },
-    ],
     ["[data-fold-section]", (el) => r.inspector.sections.toggle(el.dataset.foldSection as RailSection)],
     [".search-hit", (el, e) => r.sidebar.searchPane.openHit(Number(el.dataset.hit), e.metaKey)],
     [".doc button.task-box[data-task-line]", (el) => void r.editing.toggleTask(el)],

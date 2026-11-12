@@ -103,7 +103,8 @@ const setStatus = (files) =>
     window.__git.status = { ...window.__git.status, files: list };
   }, files);
 const openHistorySheet = async () => {
-  await page.click('[data-rail="info"]');
+  /* Info is the panel's tab, so pressing it while its pane shows would close the panel. */
+  if ((await page.getAttribute('[data-rail="info"]', "aria-pressed")) !== "true") await page.click('[data-rail="info"]');
   await page.waitForSelector(".rail-commit");
   await page.locator(".rail-commit", { hasText: "An older commit" }).first().click();
   await page.waitForSelector(".sheet");

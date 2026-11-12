@@ -3,6 +3,7 @@ import { ancestors } from "../vault/tree";
 import { type Bookmark, currentHeading } from "./bookmarks";
 import { type Command, labelOf } from "./commands";
 import { showContextMenu } from "./context-menu";
+import { isPointerAction } from "./input-origin";
 import { bindHeadingLinks, copyLink } from "./note-links";
 import { toast } from "./overlays";
 import type { PaletteItem } from "./palette";
@@ -18,6 +19,7 @@ const TEXT_SCALE_MIN = 0.8125;
 const TEXT_SCALE_MAX = 1.375;
 const RECENT_NOTES = 10;
 const RECENT_COMMANDS = 5;
+const NO_FILE_SHOWN = ".is-graph, .is-blank, :has(.empty-state.is-page)";
 
 function scaleText(step: -1 | 0 | 1): void {
   const root = document.documentElement;
@@ -80,6 +82,36 @@ export function readerCommands(r: Reader): Command[] {
       ],
       { alignEnd: true },
     );
+  };
+  /* The title bar's "…" acts on the note or base on show, with the file list's menu for it. */
+  const moreButton = r.els.shell.querySelector<HTMLElement>('[data-act="note-menu"]');
+  let pressedWhileOpen = false;
+  /* Registered before any menu's own outside-press listener, so it sees the menu still open: a second press only closes it. */
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      pressedWhileOpen = !!moreButton?.contains(e.target as Node) && moreButton.getAttribute("aria-expanded") === "true";
+    },
+    true,
+  );
+  const noteMenu = () => {
+    const button = moreButton;
+    if (pressedWhileOpen && isPointerAction()) {
+      pressedWhileOpen = false;
+      return;
+    }
+    if (!button || !r.current || r.els.shell.matches(NO_FILE_SHOWN)) return;
+    const box = button.getBoundingClientRect();
+    const expanded = (open: boolean) => {
+      button.classList.toggle("is-on", open);
+      button.setAttribute("aria-expanded", String(open));
+    };
+    expanded(true);
+    showContextMenu(box.right, box.bottom + 4, r.files.noteMenu(r.current), {
+      alignEnd: true,
+      keyboard: !isPointerAction(),
+      onClose: () => expanded(false),
+    });
   };
   const tabNumbers: Command[] = Array.from({ length: 9 }, (_, i) => ({
     id: `tab-${i + 1}`,
@@ -253,6 +285,9 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "linked notes properties",
       run: () => r.inspector.toggle(),
     },
+    { id: "rail-links", run: () => r.inspector.choose("links") },
+    { id: "rail-info", run: () => r.inspector.choose("info") },
+    { id: "note-menu", run: noteMenu },
     {
       id: "trail",
       label: "Show this tab's trail",

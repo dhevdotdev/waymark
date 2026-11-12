@@ -58,7 +58,11 @@ function template(options: ShellOptions): string {
         </div>
         <div class="tabs" role="tablist" data-tauri-drag-region></div>
         <div class="titlebar-trail">
-          <button class="icon-btn" data-act="rail" data-tip="Inspector" data-key="⌥⌘\\" aria-label="Toggle inspector">${icons.inspector}</button>
+          <div class="titlebar-tools">
+            <button class="icon-btn has-count" data-act="rail-links" data-rail="links" data-tip="Links" aria-label="Links" aria-pressed="false" aria-controls="inspector">${icons.link}<span class="icon-count"></span></button>
+            <button class="icon-btn" data-act="rail-info" data-rail="info" data-tip="Info" aria-label="Info" aria-pressed="false" aria-controls="inspector">${icons.info}</button>
+            <button class="icon-btn" data-act="note-menu" data-tip="More" aria-label="More actions for this note" aria-haspopup="menu" aria-expanded="false">${icons.more}</button>
+          </div>
         </div>
       </header>
       <nav class="sidebar" aria-label="Navigation">
@@ -82,13 +86,9 @@ function template(options: ShellOptions): string {
         <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
         <div class="scroller" tabindex="-1"><article class="doc"></article></div>
       </main>
-      <aside class="rail" aria-label="Inspector">
+      <aside class="rail" id="inspector" aria-label="Inspector">
         <div class="rail-resize" aria-hidden="true"></div>
         <div class="rail-inner">
-          <div class="seg seg-full rail-tabs" role="tablist">
-            <button class="seg-btn" role="tab" data-rail="links">Links</button>
-            <button class="seg-btn" role="tab" data-rail="info">Info</button>
-          </div>
           <div class="rail-body">
             <div class="rail-pane rail-links" data-pane="links"></div>
             <div class="rail-pane rail-info" data-pane="info"></div>

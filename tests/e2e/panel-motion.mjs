@@ -239,8 +239,14 @@ try {
   /* The docked inspector */
   const rail = () => page.evaluate(() => document.querySelector(".reader").getBoundingClientRect().right);
   const railBefore = await rail();
-  motion = await during(() => page.click('[data-act="rail"]'));
-  check("a click closes the inspector's column at once", (await rail()) > railBefore);
+  const pressed = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("[data-rail]")].map((b) => `${b.dataset.rail}:${b.getAttribute("aria-pressed")}`).join(" "),
+    );
+  check("the showing pane's button is pressed", (await pressed()) === "links:true info:false", await pressed());
+  motion = await during(() => page.click('[data-rail="links"]'));
+  check("a click on the showing pane closes the inspector's column at once", (await rail()) > railBefore);
+  check("then neither button is pressed", (await pressed()) === "links:false info:false", await pressed());
   if (reduced) {
     check("under Reduce Motion the inspector fades", fades(motion, "rail") && !travels(motion, "rail"), shown(motion));
   } else {
@@ -252,21 +258,28 @@ try {
     );
   }
   await settled();
-  motion = await during(() => page.click('[data-act="rail"]'));
-  await settled();
-  const tabsAt = await page.evaluate(() => {
-    const tabs = document.querySelector(".rail-tabs").getBoundingClientRect();
-    const toggle = document.querySelector('[data-act="rail"]').getBoundingClientRect();
-    return { top: tabs.top, right: tabs.right, toggle: toggle.left };
-  });
+  motion = await during(() => page.click('[data-rail="info"]'));
   check(
-    "the inspector's tabs return to the title bar beside its toggle",
-    tabsAt.top < 46 && tabsAt.right <= tabsAt.toggle,
-    JSON.stringify(tabsAt),
+    "a click on Info while closed opens the inspector on Info",
+    (await rail()) === railBefore && !(await page.isVisible(".rail-links")),
   );
+  if (!reduced) check("and it slides in", slides(motion, "rail") !== undefined, shown(motion));
+  check("Info is pressed", (await pressed()) === "links:false info:true", await pressed());
+  await settled();
+  motion = await during(() => page.click('[data-rail="links"]'));
+  check(
+    "a click on the other pane switches at once, without moving the panel",
+    (await page.isVisible(".rail-links")) && motion.filter((m) => m.target).length === 0,
+    shown(motion),
+  );
+  check("Links is pressed", (await pressed()) === "links:true info:false", await pressed());
   motion = await during(() => page.keyboard.press("Meta+Alt+\\"));
   check("⌥⌘\\ closes the inspector at once", motion.filter((m) => m.target).length === 0, shown(motion));
+  await page.click('[data-rail="info"]');
   await page.keyboard.press("Meta+Alt+\\");
+  await page.keyboard.press("Meta+Alt+\\");
+  check("⌥⌘\\ reopens it on the last pane", (await pressed()) === "links:false info:true", await pressed());
+  await page.click('[data-rail="links"]');
   await settled();
 
   /* In a window too narrow for the full measure the lines re-wrap, and the text's left edge is what glides. */
