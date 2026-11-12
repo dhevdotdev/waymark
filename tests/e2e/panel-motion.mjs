@@ -373,40 +373,67 @@ try {
 
     await page.setViewportSize({ width: 1440, height: 800 });
     await settled();
-    /* The sidebar's translate in each frame drawn from here on. */
+    /* The sidebar's translate in each frame drawn from here on, and a hook called once each frame is read. */
     await page.evaluate(() => {
       window.sidebarFrames = [];
       const record = () => {
         window.sidebarFrames.push(getComputedStyle(document.querySelector(".sidebar")).translate);
-        if (window.sidebarFrames.length < 600) requestAnimationFrame(record);
+        window.onSidebarFrame?.();
+        if (!window.sidebarFramesDone) requestAnimationFrame(record);
       };
       requestAnimationFrame(record);
     });
-    await page.click('[data-act="sidebar"]');
-    await pause(90);
+    const percent = (translate) => (translate === "none" ? 0 : Number.parseFloat(translate));
+    const atRest = (p) => Math.abs(p) < 1e-3 || Math.abs(p + 100) < 1e-3;
     /*
-     * Clicked just after a frame is drawn. WebKit starts a reversed CSS transition from the style of a frame it drew, the
-     * last or the one before, which on a slow machine can be several pixels back, so the panel is read from the reversed
-     * transition itself.
+     * Clicks again just after the first frame drawn mid-slide at least 90ms in, or once the slide has ended. A slow machine
+     * can draw no frame mid-slide, so the slide is tried again. WebKit starts a reversed CSS transition from a style it
+     * resolved near the last frame drawn, not at the moment of the click, which on a slow machine can be several pixels
+     * away, so the panel is read from the reversed transition itself.
      */
-    const caught = await page.evaluate(
-      () =>
-        new Promise((resolve) =>
-          requestAnimationFrame(() =>
+    let caught = null;
+    for (let tries = 0; tries < 5 && !caught?.midway; tries++) {
+      if (caught) {
+        await page.click('[data-act="sidebar"]');
+        await settled();
+      }
+      await page.click('[data-act="sidebar"]');
+      caught = await page.evaluate(() => {
+        const percent = (translate) => (translate === "none" ? 0 : Number.parseFloat(translate));
+        const atRest = (p) => Math.abs(p) < 1e-3 || Math.abs(p + 100) < 1e-3;
+        const since = performance.now();
+        return new Promise((resolve) => {
+          window.onSidebarFrame = () => {
+            const drawn = percent(window.sidebarFrames.at(-1));
+            const midway = !atRest(drawn);
+            if (window.sidebarFrames.length < 2 || (midway && performance.now() - since < 90)) return;
+            if (midway === false && drawn === 0) return;
+            window.onSidebarFrame = null;
             setTimeout(() => {
               const sidebar = document.querySelector(".sidebar");
+              const doc = document.querySelector(".scroller > .doc");
               const left = () => document.querySelector(".doc-title").getBoundingClientRect().left;
-              const before = { text: left(), drawn: window.sidebarFrames.slice(-2) };
+              const glides = () => doc.getAnimations().map((a) => `${a.id}:${a.playState}:${Math.round(a.currentTime ?? -1)}`);
+              const before = { text: left(), drawn: window.sidebarFrames.slice(-2), doc: glides() };
               document.querySelector('[data-act="sidebar"]').click();
               const reversed = sidebar.getAnimations().find((a) => a.transitionProperty === "translate");
-              resolve({ before, after: { text: left(), from: reversed?.effect.getKeyframes()[0].translate ?? null } });
-            }),
-          ),
-        ),
-    );
-    const percent = (translate) => (translate === "none" ? 0 : Number.parseFloat(translate));
-    const fromDrawn =
-      caught.after.from !== null && caught.before.drawn.some((t) => Math.abs(percent(t) - percent(caught.after.from)) < 1e-3);
+              resolve({
+                midway,
+                before,
+                after: { text: left(), from: reversed?.effect.getKeyframes()[0].translate ?? null, doc: glides() },
+              });
+            });
+          };
+        });
+      });
+    }
+    await page.evaluate(() => {
+      window.sidebarFramesDone = true;
+    });
+    const [previous, drawn] = caught.before.drawn.map(percent);
+    const from = caught.after.from === null ? Number.NaN : percent(caught.after.from);
+    /* Within one drawn frame's travel of the last frame drawn, either side, and never at either end of the slide. */
+    const fromDrawn = caught.midway && Math.abs(from - drawn) <= Math.abs(drawn - previous) + 1e-3 && !atRest(from);
     check(
       "a second click mid-way carries the text and the panel on from where they are, within a drawn frame",
       Math.abs(caught.before.text - caught.after.text) < 2 && fromDrawn,
