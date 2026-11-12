@@ -29,15 +29,15 @@ await page.addInitScript(() => {
   const wrap = (name, record) => {
     const original = proto[name];
     proto[name] = function (...args) {
-      if (isGraph(this)) record(args);
+      if (isGraph(this)) record(args, this);
       return original.apply(this, args);
     };
   };
-  window.addEventListener("click", () => (window.__clickAt = performance.now()), true);
   /* Each frame is stamped with the time its frame was given, which is the time the camera places it for. */
-  wrap("clearRect", () =>
-    window.__frames.push({ t: document.timeline.currentTime, x: 0, y: 0, k: 1, dots: [], fills: [], labels: 0 }),
-  );
+  wrap("clearRect", (_, ctx) => {
+    const blooming = ctx.canvas.dataset.bloom !== undefined;
+    window.__frames.push({ t: document.timeline.currentTime, blooming, x: 0, y: 0, k: 1, dots: [], fills: [], labels: 0 });
+  });
   wrap("translate", ([x, y]) => last() && Object.assign(last(), { x, y }));
   wrap("scale", ([k]) => last() && Object.assign(last(), { k }));
   wrap("arc", ([x, y]) => last()?.dots.push([x, y]));
@@ -168,7 +168,11 @@ if (reduced) {
     JSON.stringify(blooms),
   );
   check("every note starts on the current one", spread(drawn[0]) === 0, spread(drawn[0]));
-  const between = drawn.filter((f) => spread(f) > 0 && spread(f) < spread(drawn.at(-1)) * 0.9).length;
+  /*
+   * A slow machine may draw a single frame between the first and the last, late in the bloom where the eased curve is
+   * nearly home, so any frame drawn during the bloom with the notes visibly short of their places counts.
+   */
+  const between = drawn.filter((f) => f.blooming && spread(f) > 0 && spread(f) < spread(bloomed) - 0.5).length;
   check("and travels out through the frames between", between > 0, `${between} of ${drawn.length} frames`);
 }
 await closeGraph();
@@ -220,33 +224,55 @@ drawn = await frames();
 const ks = drawn.map((f) => f.k);
 const expectedK = restK * 1.3;
 /*
- * How long the glide runs, read from each frame drawn partway: how far its scale has come along the easing curve says
- * how much of the glide had passed since the click. A slow machine can draw the landing frame well after the glide ends,
- * so the time of the last frame overstates it.
+ * How long a glide runs, read from the frames drawn partway: how far each one's scale has come along the easing curve
+ * says how much of the glide had passed at its frame time, so any two of them give the whole. The two furthest apart
+ * are used. The landing frame can come well after the glide ends, and the click a little before it starts, so neither
+ * is used. Returns 0 when too few frames were drawn partway to tell.
  */
-const span = await page.evaluate(
-  async ({ drawn, from, to }) => {
-    const { parseCubicBezier } = await import(/* @vite-ignore */ `${location.origin}/src/ui/cubic-bezier.ts`);
-    const ease = parseCubicBezier(getComputedStyle(document.documentElement).getPropertyValue("--ease-in-out"));
-    const passed = (eased) => {
-      let low = 0;
-      let high = 1;
-      while (high - low > 1e-9) {
-        const mid = (low + high) / 2;
-        if (ease(mid) < eased) low = mid;
-        else high = mid;
-      }
-      return low;
-    };
-    const spans = drawn
-      .map((f) => ({ t: f.t, eased: (f.k - from) / (to - from) }))
-      .filter((f) => f.eased > 0.05 && f.eased < 0.95)
-      .map((f) => (f.t - window.__clickAt) / passed(f.eased))
-      .sort((a, b) => a - b);
-    return spans[Math.floor(spans.length / 2)] ?? 0;
-  },
-  { drawn, from: restK, to: expectedK },
-);
+const glideSpan = (drawn, from, to) =>
+  page.evaluate(
+    async ({ drawn, from, to }) => {
+      const { parseCubicBezier } = await import(/* @vite-ignore */ `${location.origin}/src/ui/cubic-bezier.ts`);
+      const ease = parseCubicBezier(getComputedStyle(document.documentElement).getPropertyValue("--ease-in-out"));
+      const passed = (eased) => {
+        let low = 0;
+        let high = 1;
+        while (high - low > 1e-9) {
+          const mid = (low + high) / 2;
+          if (ease(mid) < eased) low = mid;
+          else high = mid;
+        }
+        return low;
+      };
+      const partway = drawn
+        .map((f) => ({ t: f.t, eased: (f.k - from) / (to - from) }))
+        .filter((f) => f.eased > 1e-6 && f.eased < 1 - 1e-6)
+        .map((f) => ({ t: f.t, passed: passed(f.eased) }));
+      const first = partway[0];
+      const last = partway.at(-1);
+      return partway.length > 1 && last.passed - first.passed > 0.1 ? (last.t - first.t) / (last.passed - first.passed) : 0;
+    },
+    { drawn, from, to },
+  );
+/**
+ * The first glide's span, or, when a slow machine drew it in too few frames to time, that of a later one. The later ones
+ * go out and back in, so the camera ends where the first glide left it.
+ */
+const measuredSpan = async () => {
+  let span = await glideSpan(drawn, restK, expectedK);
+  for (let tries = 0; span === 0 && tries < 4; tries++) {
+    for (const [button, from, to] of [
+      ["out", expectedK, restK],
+      ["in", restK, expectedK],
+    ]) {
+      await clearFrames();
+      await page.click(`[data-gz="${button}"]`);
+      await untilDrawingStops();
+      if (span === 0) span = await glideSpan(await frames(), from, to);
+    }
+  }
+  return span;
+};
 check("a zoom lands exactly on its target", Math.abs(ks.at(-1) - expectedK) < 1e-6, `${ks.at(-1)} for ${expectedK}`);
 if (reduced) {
   check(
@@ -260,11 +286,12 @@ if (reduced) {
     ks.some((k) => k > restK + 1e-6 && k < expectedK - 1e-6),
     `${ks.length} frames`,
   );
-  check("the glide takes about 240ms", span > 170 && span < 320, `${Math.round(span)}ms`);
   check(
     "the glide never reverses",
     ks.every((k, i) => i === 0 || k >= ks[i - 1] - 1e-9),
   );
+  const span = await measuredSpan();
+  check("the glide takes about 240ms", span > 170 && span < 320, `${Math.round(span)}ms`);
 }
 
 await page.locator('[data-gz="out"]').focus();
