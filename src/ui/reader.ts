@@ -540,7 +540,7 @@ export class Reader {
     metrics.diagramsMs = performance.now() - t0;
     if (seq === this.renderSeq) this.spots.settle();
     if (opts.anchor) this.noteView.scrollToAnchor(opts.anchor, true);
-    if (opts.find) this.noteView.jumpToText(opts.find);
+    if (opts.find) this.noteView.jumpToText(opts.find, true);
   }
 
   private async showBase(path: string, opts: ShowOptions, seq: number): Promise<void> {

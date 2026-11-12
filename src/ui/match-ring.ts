@@ -58,12 +58,15 @@ function play(ring: HTMLElement): Animation {
 /**
  * Rings the match a search jump landed on, so the eye finds it among the other marks. The ring follows the match
  * while it lasts, through scrolling and the note settling. Called again for the same match, it keeps its ring.
+ * Called while the note settles, it only follows a ring that is still there.
  */
-export function ringMatch(range: Range, frame: HTMLElement, scroller: HTMLElement): void {
+export function ringMatch(range: Range, frame: HTMLElement, scroller: HTMLElement, settling = false): void {
   if (live && live.range.startContainer === range.startContainer && live.range.startOffset === range.startOffset) {
     live.range = range;
     return;
   }
+  /* The note settling re-finds the match; a ring that already left stays gone. */
+  if (settling) return;
   clear();
   const count = rectsOf(range).length;
   if (!count) return;

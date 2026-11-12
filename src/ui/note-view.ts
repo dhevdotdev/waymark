@@ -98,14 +98,14 @@ export class NoteView {
   }
 
   /** Scrolls to the first occurrence of `text` in the note body and marks every occurrence. */
-  jumpToText(text: string): void {
+  jumpToText(text: string, settling = false): void {
     const doc = this.els.scroller.querySelector(".doc");
     if (!doc || !text) return;
     const ranges = findRanges(doc, text, 300).filter((r) => !r.startContainer.parentElement?.closest(".doc-head, .backlinks"));
     paint("search", ranges);
     if (!ranges[0]) return;
     scrollToRange(ranges[0], this.els.scroller);
-    ringMatch(ranges[0], this.els.reader, this.els.scroller);
+    ringMatch(ranges[0], this.els.reader, this.els.scroller, settling);
   }
 
   private showMessage(title: string, detail: string): void {

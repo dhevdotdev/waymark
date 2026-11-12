@@ -472,10 +472,27 @@ try {
   await page.waitForSelector(".search-field input:visible");
   await page.keyboard.type("BannetonSeamDriftError");
   await page.waitForSelector(".search-hit");
+  await page.evaluate(() => {
+    window.ringOnMatch = [];
+    const seen = new MutationObserver(() => {
+      const ring = document.querySelector(".match-ring");
+      if (!ring) return;
+      seen.disconnect();
+      const frame = ring.offsetParent.getBoundingClientRect();
+      const r = [...CSS.highlights.get("search")][0].getClientRects()[0];
+      window.ringOnMatch = [
+        ring.offsetLeft + frame.left - (r.left - 2),
+        ring.offsetTop + frame.top - (r.top - 1),
+        ring.offsetWidth - (r.width + 4),
+      ];
+    });
+    seen.observe(document.body, { childList: true, subtree: true });
+  });
   const rang = await startedDuring("match-ring", async () => {
     await page.locator(".search-hit").first().click();
-    await page.waitForSelector(".match-ring");
+    await page.waitForFunction(() => window.ringOnMatch.length > 0);
   });
+  const onMatch = await page.evaluate(() => window.ringOnMatch);
   const enter = rang.find((m) => m.frames[0].o === "0");
   const leave = rang.find((m) => m.frames[0].o === "1");
   if (reduced) {
@@ -492,19 +509,9 @@ try {
     leave?.ms === 400 && leave.delay === (enter?.ms ?? 0) + 400 && leave.frames[1].o === "0",
     shown(leave),
   );
-  const onMatch = await page.evaluate(() => {
-    const ring = document.querySelector(".match-ring");
-    const frame = ring.offsetParent.getBoundingClientRect();
-    const r = [...CSS.highlights.get("search")][0].getClientRects()[0];
-    return [
-      ring.offsetLeft + frame.left - (r.left - 2),
-      ring.offsetTop + frame.top - (r.top - 1),
-      ring.offsetWidth - (r.width + 4),
-    ];
-  });
   check(
     "the ring sits on the match",
-    onMatch.every((d) => Math.abs(d) <= 1),
+    onMatch.length === 3 && onMatch.every((d) => Math.abs(d) <= 1),
     onMatch.map((d) => d.toFixed(1)).join(","),
   );
   await page.waitForFunction(() => !document.querySelector(".match-ring"), null, { timeout: 4000 });
