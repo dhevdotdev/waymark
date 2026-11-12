@@ -100,15 +100,20 @@ export class NoteWriter {
     else this.undoStack.length = 0;
   }
 
-  /** Runs in the order pressed, so a quick second task is not lost while the first is saving. */
+  /**
+   * Shows the box's new state at once, then saves in the order pressed, so a quick second task is not lost while the
+   * first is saving. A save that does not happen shows the file again, or turns the box back.
+   */
   toggleTask(path: string, line: number, remember: boolean): Promise<void> {
-    this.tasks = this.tasks.then(() => this.flipTask(path, line, remember));
+    if (!path) return this.tasks;
+    const box = this.host.scroller().querySelector<HTMLElement>(`.task-box[data-task-line="${line}"]`);
+    if (box) showDone(box, box.getAttribute("aria-checked") !== "true");
+    this.tasks = this.tasks.then(() => this.flipTask(path, line, remember, box));
     return this.tasks;
   }
 
-  private async flipTask(path: string, line: number, remember: boolean): Promise<void> {
-    if (!path) return;
-    const { vault, toast, reshow, scroller } = this.host;
+  private async flipTask(path: string, line: number, remember: boolean, box: HTMLElement | null): Promise<void> {
+    const { vault, toast, reshow } = this.host;
     try {
       const before = await vault.read(path);
       const after = toggleTask(before, line);
@@ -126,13 +131,14 @@ export class NoteWriter {
         return;
       }
       if (remember) this.undoStack.push({ path, wrote: after, run: () => this.toggleTask(path, line, false) });
-      const box = scroller().querySelector<HTMLElement>(`.task-box[data-task-line="${line}"]`);
-      if (!box) return;
-      const done = box.getAttribute("aria-checked") !== "true";
-      box.setAttribute("aria-checked", String(done));
-      box.closest("li")?.classList.toggle("is-done", done);
     } catch (error) {
+      if (box?.isConnected) showDone(box, box.getAttribute("aria-checked") !== "true");
       toast(error instanceof Error ? error.message : "The task could not be saved.");
     }
   }
+}
+
+function showDone(box: HTMLElement, done: boolean): void {
+  box.setAttribute("aria-checked", String(done));
+  box.closest("li")?.classList.toggle("is-done", done);
 }

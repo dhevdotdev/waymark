@@ -1,5 +1,5 @@
 // Floating surfaces and small controls: a pointer gets motion, a key press gets the end state, and nothing stacks.
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
 import { watchPageErrors } from "./page-errors.mjs";
@@ -349,10 +349,28 @@ try {
     check("a clicked tick draws along its path", ARRIVES(draw, "1px", "0px", 200, 40), shown(draw));
     check("a strike rule sweeps across the text", ARRIVES(sweep, "0% 1.5px", "100% 1.5px", 240, 60), shown(sweep));
   }
-  check("the task is saved", (await page.locator(taskBox).getAttribute("aria-checked")) === "true");
+  const checklist = () => readFile(path.join(app.vault, "Checklist.md"), "utf8");
+  /** The file's text once it has the given first line, or what it holds after two seconds. */
+  const savedAs = async (first) => {
+    for (let waited = 0; waited < 2000; waited += 50) {
+      const text = await checklist();
+      if (text.startsWith(first)) return text;
+      await pause(50);
+    }
+    return checklist();
+  };
+  const savedChecked = await savedAs("- [x] First thing\n");
+  check(
+    "the task is saved",
+    (await page.locator(taskBox).getAttribute("aria-checked")) === "true" &&
+      savedChecked === "- [x] First thing\n- [ ] Second thing\n",
+    JSON.stringify(savedChecked),
+  );
   const unchecking = watchTask(taskBox);
   await page.locator(taskBox).click();
   const [, untick, retract] = await unchecking;
+  const savedUnchecked = await savedAs("- [ ] First thing\n");
+  check("unchecking is saved", savedUnchecked === "- [ ] First thing\n- [ ] Second thing\n", JSON.stringify(savedUnchecked));
   check("unchecking fades the tick", ARRIVES(untick, "1", "0", 140, 0), shown(untick));
   check(
     reduced ? "unchecking does not retract under Reduce Motion" : "unchecking retracts the strike",
@@ -365,7 +383,24 @@ try {
   await page.keyboard.press("Space");
   const keyMotion = (await keyed).flat();
   check("the tick and strike are immediate from the keyboard", !MOVES(keyMotion), shown(keyMotion));
-  check("that task is saved too", (await page.locator(second).getAttribute("aria-checked")) === "true");
+  const savedSecond = await savedAs("- [ ] First thing\n- [x] Second");
+  check(
+    "that task is saved too",
+    (await page.locator(second).getAttribute("aria-checked")) === "true" &&
+      savedSecond === "- [ ] First thing\n- [x] Second thing\n",
+    JSON.stringify(savedSecond),
+  );
+  const shownAtClick = await page.locator(second).evaluate((box) => {
+    box.click();
+    return box.getAttribute("aria-checked");
+  });
+  check("a task box shows its new state at the click, before the save", shownAtClick === "false", shownAtClick);
+  const savedBoth = await savedAs("- [ ] First thing\n- [ ] Second");
+  check(
+    "the second task is saved unchecked again",
+    savedBoth === "- [ ] First thing\n- [ ] Second thing\n",
+    JSON.stringify(savedBoth),
+  );
 
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-task");
