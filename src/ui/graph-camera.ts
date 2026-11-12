@@ -10,7 +10,8 @@ export interface Viewport {
 interface Glide {
   from: Viewport;
   to: Viewport;
-  start: number;
+  /** The first frame's time, set when that frame is drawn. */
+  start: number | null;
   duration: number;
   ease: Easing;
 }
@@ -73,19 +74,22 @@ export class CameraGlide {
    * so it decelerates only: ease-in-out would stall it at zero speed under each quick click.
    * `ease` names an easing token that overrides that choice.
    * Returns false when motion is off, and the caller places the view directly.
+   * The clock starts on the first frame drawn, as a CSS animation's does, so the work a click sets off before that frame
+   * does not use up the glide, and a fade started with it stays in step.
    */
   start(from: Viewport, to: Viewport, ease?: string): boolean {
     const duration = tokenMs("--t-slide");
     if (duration <= 0) return false;
     const curve = tokenCurve(ease ?? (this.glide ? "--ease-out" : "--ease-in-out"));
-    this.glide = { from: { ...from }, to, start: performance.now(), duration, ease: curve };
+    this.glide = { from: { ...from }, to, start: null, duration, ease: curve };
     return true;
   }
 
-  /** The view for this frame, or null when nothing is moving. */
+  /** The view for the frame drawn at `now`, or null when nothing is moving. */
   advance(now: number): Viewport | null {
     const glide = this.glide;
     if (!glide) return null;
+    glide.start ??= now;
     const progress = (now - glide.start) / glide.duration;
     if (progress >= 1) {
       this.glide = null;
