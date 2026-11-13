@@ -6,6 +6,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
@@ -82,11 +83,11 @@ const browser = await webkit.launch();
 const app = await serveFixture();
 const file = (name) => path.join(app.vault, name);
 const disk = (name) => readFile(file(name), "utf8");
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const LONG = `${Array.from({ length: 90 }, (_, i) => `Paragraph number ${i} has enough words in it to take up a real line of the page.`).join("\n\n")}\n`;
 
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
+await watchIdle(page);
 const errors = [];
 watchPageErrors(page, errors);
 await page.addInitScript(installFakeGit);
@@ -95,7 +96,7 @@ await routeGit(page);
 const load = async (note) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(note)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(350);
+  await idle(page);
 };
 const lastToast = () => page.evaluate(() => [...document.querySelectorAll(".toast")].at(-1)?.textContent ?? "");
 const setStatus = (files) =>
@@ -129,7 +130,7 @@ const answered = async (act) => {
 const restoreClick = async () => {
   await openHistorySheet();
   await answered(() => page.locator('.sheet button:has-text("Restore this version")').click());
-  await pause(350);
+  await idle(page);
 };
 const confirmRestore = () => answered(() => page.locator('button:has-text("Save a copy and restore")').click());
 const typeInEditor = async (text) => {
@@ -159,13 +160,13 @@ try {
   await load("Restore edit");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await writesSettled(page, 200);
   await restoreClick();
   check("an open editor follows the restore", (await page.locator(".cm-content").textContent()).includes("The older text."));
-  await pause(700);
+  await writesSettled(page, 700);
   check("the editor holds no leftover save", (await disk("Restore edit.md")) === "The older text.\n");
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await writeFile(file("Dirty.md"), "Work not committed.\n");
   await load("Dirty");
@@ -173,12 +174,12 @@ try {
   await restoreClick();
   check("uncommitted work asks first", await page.locator('button:has-text("Save a copy and restore")').isVisible());
   await page.keyboard.press("Escape");
-  await pause(300);
+  await writesSettled(page, 300);
   check("cancelling changes nothing", (await disk("Dirty.md")) === "Work not committed.\n");
   check("cancelling leaves no copy", !readdirSync(app.vault).some((f) => f.startsWith("Dirty (before restore")));
   await restoreClick();
   await confirmRestore();
-  await pause(400);
+  await writesSettled(page, 400);
   const copies = readdirSync(app.vault).filter((f) => f.startsWith("Dirty (before restore"));
   check(
     "the uncommitted text is kept as a copy",
@@ -193,15 +194,15 @@ try {
   await load("Unsaved");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   await page.route("**/@vault/write", (route) => route.abort());
   await typeInEditor(" typed but not saved");
-  await pause(600);
+  await idle(page);
   await restoreClick();
   check("an unsaved editor asks first", await page.locator('button:has-text("Save a copy and restore")').isVisible());
   await page.unroute("**/@vault/write");
   await confirmRestore();
-  await pause(500);
+  await writesSettled(page, 500);
   const unsavedCopies = readdirSync(app.vault).filter((f) => f.startsWith("Unsaved (before restore"));
   check(
     "the unsaved typing is in the copy",
@@ -209,7 +210,7 @@ try {
   );
   check("the editor shows the restored text", (await page.locator(".cm-content").textContent()).includes("The older text."));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await writeFile(file("Binary.md"), "Plain now.\n");
   await load("Binary");
@@ -228,7 +229,7 @@ try {
   check("the failure is reported", (await lastToast()).includes("could not be read"), await lastToast());
   check("the sheet stays open so another version can be tried", await page.locator(".sheet").isVisible());
   await page.keyboard.press("Escape");
-  await pause(300);
+  await idle(page);
   await page.evaluate(() => {
     window.__git.fail = false;
     window.__git.older = "Plain now.\n";
@@ -244,7 +245,7 @@ try {
   await openHistorySheet();
   await unlink(file("Gone.md"));
   await answered(() => page.locator('.sheet button:has-text("Restore this version")').click());
-  await pause(400);
+  await writesSettled(page, 400);
   check("a note deleted meanwhile comes back with the old text", (await disk("Gone.md")) === "The older text.\n");
 
   /* ---- Compare both sides of a conflict ---- */
@@ -253,14 +254,14 @@ try {
     await load(name);
     await page.keyboard.press("Meta+e");
     await page.waitForSelector(".cm-content");
-    await pause(200);
+    await writesSettled(page, 200);
     await writeFile(file(`${name}.md`), `# ${name}\n\ntheirs text\n\nsecond paragraph\n`);
     await page.locator(".cm-line", { hasText: "base text" }).click();
     await page.keyboard.type(mine);
     await page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "conflict", null, {
       timeout: 5000,
     });
-    await pause(100);
+    await idle(page);
   };
   const trashed = (needle) => {
     const dir = file(".dev-trash");
@@ -280,13 +281,13 @@ try {
   );
   check("it labels which side is which", (await page.textContent(".compare-key")).includes("Only in yours"));
   await page.keyboard.press("Escape");
-  await pause(300);
+  await writesSettled(page, 300);
   check("closing the comparison decides nothing", (await disk("Compare one.md")).includes("theirs text"));
   check("the editor still has my text", (await page.locator(".cm-content").textContent()).includes("mine"));
   await page.click('.edit-banner button:has-text("Compare")');
   await page.waitForSelector(".sheet .diff-line");
   await page.click('.sheet button:has-text("Use other version")');
-  await pause(500);
+  await writesSettled(page, 500);
   check("using the other version leaves the file alone", (await disk("Compare one.md")).includes("theirs text"));
   check("the editor shows the other version", (await page.locator(".cm-content").textContent()).includes("theirs text"));
   const mineInTrash = trashed("Compare one (my version");
@@ -296,11 +297,11 @@ try {
   );
   check("the conflict is over", !(await page.locator(".edit-banner").isVisible()));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await writesSettled(page, 300);
 
   await startConflict("Compare two");
   await page.click('.edit-banner button:has-text("Keep mine")');
-  await pause(500);
+  await writesSettled(page, 500);
   check("keep mine writes my text", (await disk("Compare two.md")).includes("mine"));
   const otherInTrash = trashed("Compare two (other version");
   check(
@@ -308,41 +309,41 @@ try {
     otherInTrash.length === 1 && (await readFile(path.join(file(".dev-trash"), otherInTrash[0]), "utf8")).includes("theirs text"),
   );
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await startConflict("Compare three");
   await page.click('.edit-banner button:has-text("Compare")');
   await page.waitForSelector(".sheet .diff-line");
   await page.click('.sheet button:has-text("Keep both")');
-  await pause(500);
+  await writesSettled(page, 500);
   const both = readdirSync(app.vault).filter((f) => f.startsWith("Compare three (conflict"));
   check("keep both from the comparison saves my copy", both.length === 1 && (await disk(both[0])).includes("mine"));
   check("keep both leaves the other version in place", (await disk("Compare three.md")).includes("theirs text"));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await writesSettled(page, 300);
 
   await startConflict("Compare four");
   await page.route("**/@vault/keep-in-trash", (route) => route.fulfill({ status: 500, body: "no" }));
   await page.click('.edit-banner button:has-text("Keep mine")');
-  await pause(500);
+  await writesSettled(page, 500);
   check("if the replaced text cannot be kept, nothing is overwritten", (await disk("Compare four.md")).includes("theirs text"));
   check("and the conflict stays open", await page.locator(".edit-banner").isVisible());
   await page.click('.edit-banner button:has-text("Compare")');
   await page.waitForSelector(".sheet .diff-line");
   await page.click('.sheet button:has-text("Use other version")');
-  await pause(500);
+  await idle(page);
   check(
     "using the other side keeps my text when the Trash fails",
     (await page.locator(".cm-content").textContent()).includes("mine"),
   );
   await page.unroute("**/@vault/keep-in-trash");
   await page.keyboard.press("Meta+e");
-  await pause(500);
+  await idle(page);
 
   await startConflict("Compare five");
   await unlink(file("Compare five.md"));
   await page.click('.edit-banner button:has-text("Compare")');
-  await pause(400);
+  await idle(page);
   check(
     "comparing a deleted note says so",
     (await page.textContent(".edit-banner")).includes("moved or deleted"),
@@ -350,10 +351,10 @@ try {
   );
   check("my text survives the deletion", (await page.locator(".cm-content").textContent()).includes("mine"));
   await page.click('.edit-banner button:has-text("Save it here again")');
-  await pause(500);
+  await writesSettled(page, 500);
   check("it can be saved back", (await disk("Compare five.md")).includes("mine"));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await writesSettled(page, 300);
 
   /* ---- Remember where reading stopped ---- */
   await writeFile(file("Long read.md"), LONG);
@@ -361,11 +362,11 @@ try {
   const before = await disk("Long read.md");
   const openByPalette = async (query) => {
     await page.keyboard.press("Meta+k");
-    await pause(120);
+    await idle(page);
     await page.keyboard.type(query);
-    await pause(150);
+    await idle(page);
     await page.keyboard.press("Enter");
-    await pause(100);
+    await idle(page);
   };
   const scrollTo = (top) => page.evaluate((v) => document.querySelector(".scroller").scrollTo({ top: v }), top);
   const topBlock = () =>
@@ -380,10 +381,10 @@ try {
       };
     });
   await scrollTo(2400);
-  await pause(450);
+  await idle(page);
   const stopped = await topBlock();
   await openByPalette("Starter feeding");
-  await pause(300);
+  await idle(page);
   await page.evaluate(() => {
     window.__seen = [];
     new MutationObserver(() => {
@@ -396,7 +397,7 @@ try {
     }).observe(document.querySelector(".scroller"), { childList: true });
   });
   await openByPalette("Long read");
-  await pause(800);
+  await page.waitForTimeout(800);
   const back = await topBlock();
   check("reopening a note goes back to where reading stopped", back.line === stopped.line, `${stopped.line} vs ${back.line}`);
   check("to the same height", Math.abs(back.top - stopped.top) <= 2, `${stopped.top} vs ${back.top}`);
@@ -416,28 +417,28 @@ try {
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
   const settledOn = async (line) => {
-    for (let i = 0; i < 40 && (await topBlock()).line !== line; i++) await pause(150);
+    for (let i = 0; i < 40 && (await topBlock()).line !== line; i++) await idle(page);
     return topBlock();
   };
   const relaunched = await settledOn(stopped.line);
   check("the place survives a relaunch", relaunched.line === stopped.line, `${stopped.line} vs ${relaunched.line}`);
 
   await page.click('[data-act="new-tab"]');
-  await pause(120);
+  await idle(page);
   await page.keyboard.type("Long read");
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Enter");
   check("a note closed and opened in a new tab returns there", (await settledOn(stopped.line)).line === stopped.line);
 
   await writeFile(file("Anchored.md"), `${LONG}\n## Target heading\n\nEnd of the note.\n\n${LONG}`);
   await writeFile(file("Links in.md"), "Go to [[Anchored#Target heading]].\n");
   await load("Anchored");
-  await pause(200);
+  await idle(page);
   await scrollTo(1500);
-  await pause(450);
+  await idle(page);
   await load("Links in");
   await page.click(".doc a.wikilink");
-  await pause(700);
+  await idle(page);
   const headingTop = await page.evaluate(() => {
     const heading = [...document.querySelectorAll(".doc h2")].find((h) => h.textContent.includes("Target heading"));
     return Math.round(heading.getBoundingClientRect().top - document.querySelector(".scroller").getBoundingClientRect().top);
@@ -446,14 +447,14 @@ try {
 
   await load("Long read");
   await scrollTo(1800);
-  await pause(450);
+  await idle(page);
   await load("Links in");
   await page.keyboard.press("Meta+Shift+f");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type("Paragraph number 77");
-  await pause(500);
+  await idle(page);
   await page.locator(".search-hit", { hasText: "Long read" }).first().click();
-  await pause(700);
+  await idle(page);
   const matchShown = await page.evaluate(() => {
     const scroller = document.querySelector(".scroller").getBoundingClientRect();
     const hit = [...document.querySelectorAll(".doc p")].find((p) => p.textContent.includes("Paragraph number 77"));
@@ -465,14 +466,14 @@ try {
   await writeFile(file("Shrinks.md"), LONG);
   await load("Shrinks");
   await scrollTo(3200);
-  await pause(450);
+  await idle(page);
   await openByPalette("Starter feeding");
-  await pause(300);
+  await idle(page);
   await writeFile(file("Shrinks.md"), "Only one short paragraph is left.\n\nAnd one more.\n");
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Shrinks.md"]));
-  await pause(200);
+  await idle(page);
   await openByPalette("Shrinks");
-  await pause(500);
+  await idle(page);
   const shrunk = await page.evaluate(() => {
     const scroller = document.querySelector(".scroller");
     return {
@@ -489,7 +490,7 @@ try {
 
   await load("Long read");
   await scrollTo(0);
-  await pause(450);
+  await idle(page);
   await page.evaluate(() => window.waymark.reader.spots.record());
   check(
     "reading back to the top forgets the place",
@@ -497,24 +498,24 @@ try {
   );
 
   await scrollTo(1500);
-  await pause(450);
+  await idle(page);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(400);
+  await idle(page);
   await page.evaluate(() => document.querySelector(".scroller").scrollBy({ top: 600 }));
-  await pause(500);
+  await idle(page);
   const editStop = await page.evaluate(() => JSON.parse(JSON.stringify(window.waymark.prefs.value)));
   const stored = Object.values(editStop.vaults)[0].spots?.["Long read.md"];
   check("scrolling in Edit moves the place too", Number.isFinite(stored?.line) && stored.line > 0, JSON.stringify(stored));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await writeFile(file("Moved spot.md"), LONG);
   await load("Moved spot");
   await scrollTo(1500);
-  await pause(450);
+  await writesSettled(page, 450);
   await page.evaluate(() => window.waymark.reader.files.renameTo("Moved spot.md", "Renamed spot"));
-  await pause(400);
+  await writesSettled(page, 400);
   const movedPrefs = await page.evaluate(() => JSON.stringify(window.waymark.prefs.value));
   check("a renamed note keeps its place", movedPrefs.includes('"Renamed spot.md":{"line"'));
   check("no status property was added to any note", !(await disk("Long read.md")).includes("status:"));

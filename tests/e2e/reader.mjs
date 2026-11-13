@@ -2,6 +2,7 @@
 // Usage: node tests/e2e/reader.mjs [reduced] [--video <dir>]
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
+import { idle, watchIdle } from "./idle.mjs";
 import { serveFixture } from "./serve.mjs";
 
 const args = process.argv.slice(2);
@@ -15,6 +16,7 @@ const ctx = await browser.newContext({
   reducedMotion: reduced ? "reduce" : "no-preference",
   ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } } } : {}),
 });
+await watchIdle(ctx);
 const page = await ctx.newPage();
 const results = [];
 const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  (${detail})` : ""}`);
@@ -23,14 +25,14 @@ const pause = (ms) => page.waitForTimeout(ms);
 
 await page.goto(`${app.url}?note=${encodeURIComponent(NOTES.hero)}`);
 await page.waitForSelector(".diagram-svg svg");
-await pause(600);
+await idle(page);
 
 const rise = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--rise").trim());
 check("travel distances follow Reduce Motion", reduced ? rise === "0px" : rise === "6px", rise);
 
 // In-note heading link [[#Fixes]]
 await page.click('.doc a.wikilink[data-anchor="Fixes"]');
-await pause(500);
+await idle(page);
 const fixesTop = await page.evaluate(() => document.querySelector('[data-key="fixes"]').getBoundingClientRect().top);
 check("[[#Fixes]] scrolls to its heading", fixesTop >= 40 && fixesTop < 140, `top=${fixesTop.toFixed(0)}`);
 check(
@@ -40,42 +42,42 @@ check(
 
 // Copy button
 await page.hover(".doc .code");
-await pause(250);
+await idle(page);
 await page.click(".doc .code .code-copy");
-await pause(150);
+await idle(page);
 check("code copy gives feedback", (await page.textContent(".doc .code .code-copy")) !== "Copy");
-await pause(900);
+await idle(page);
 
 // Follow a link in place
 await page.evaluate(() => document.querySelector(".scroller").scrollTo({ top: 0 }));
-await pause(300);
+await idle(page);
 await page.click('.doc a.wikilink[data-path$="Starter feeding - float test, peak and discard.md"]');
-await pause(500);
+await idle(page);
 check("link opens in place", (await title()).startsWith("Starter feeding"));
 check("still one tab", (await page.locator(".tab").count()) === 1);
 
 // Back restores note and scroll position
 await page.keyboard.press("Meta+[");
-await pause(500);
+await idle(page);
 check("⌘[ goes back", (await title()).startsWith("Crumb structure"));
 await page.keyboard.press("Meta+]");
-await pause(500);
+await idle(page);
 check("⌘] goes forward", (await title()).startsWith("Starter feeding"));
 await page.keyboard.press("Meta+[");
-await pause(500);
+await idle(page);
 
 // Cmd-click opens a background tab
 await page.click('.doc a.wikilink[data-path$="Proofing baskets and banneton care.md"]', { modifiers: ["Meta"] });
-await pause(500);
+await idle(page);
 check(
   "⌘-click opens a background tab",
   (await page.locator(".tab").count()) === 2 && (await title()).startsWith("Crumb structure"),
 );
 await page.click(".tab:nth-child(2)");
-await pause(500);
+await idle(page);
 check("switching tabs shows the other note", (await title()).startsWith("Proofing baskets"));
 await page.keyboard.press("Meta+w");
-await pause(500);
+await idle(page);
 check("⌘W closes the tab", (await page.locator(".tab").count()) === 1);
 
 // File tree navigation and collapse
@@ -90,16 +92,16 @@ for (const f of flywayFolders) {
   const head = page.locator(`.tree-head[data-folder="${f}"]`);
   if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
 }
-await pause(350);
+await idle(page);
 await page.click('.nav-item[data-path$="Compass declination and magnetic north.md"]');
-await pause(500);
+await idle(page);
 check("file tree navigates", (await title()).startsWith("Compass declination"));
 const leaf = page.locator(`.tree-head[data-folder="${flywayFolders.at(-1)}"]`);
 await leaf.click();
-await pause(350);
+await idle(page);
 check("a folder collapses", (await leaf.getAttribute("aria-expanded")) === "false");
 await leaf.click();
-await pause(350);
+await idle(page);
 const treeFolders = await page.evaluate(() => {
   const onDisk = new Set(
     window.waymark.vault.index.notes.flatMap((p) =>
@@ -154,13 +156,13 @@ check(
   }),
 );
 await page.keyboard.press("Meta+\\");
-await pause(450);
+await idle(page);
 check(
   "⌘\\ collapses the sidebar",
   await page.evaluate(() => document.querySelector(".shell").classList.contains("sidebar-closed")),
 );
 await page.keyboard.press("Meta+\\");
-await pause(450);
+await idle(page);
 
 // Collapsible callout (a real note with [!note]-)
 const folded = await page.evaluate(() =>
@@ -169,7 +171,7 @@ const folded = await page.evaluate(() =>
 await page.evaluate((p) => window.waymark.open(p), folded);
 await page.waitForSelector('.callout[data-fold="closed"]');
 await page.evaluate(() => document.querySelector('.callout[data-fold="closed"]').scrollIntoView({ block: "center" }));
-await pause(300);
+await idle(page);
 const h0 = await page.evaluate(() => document.querySelector(".callout[data-fold] .callout-body").getBoundingClientRect().height);
 await page.click(".callout[data-fold] .callout-title");
 await pause(reduced ? 50 : 450);
@@ -185,9 +187,9 @@ await page.evaluate(() =>
 await page.waitForSelector(".diagram-svg svg");
 await page.evaluate(() => document.querySelector(".diagram").scrollIntoView({ block: "center" }));
 await page.hover(".diagram");
-await pause(200);
+await idle(page);
 await page.click(".diagram-expand");
-await pause(500);
+await idle(page);
 const lb = await page.evaluate(() => document.querySelector(".lightbox svg")?.getBoundingClientRect().width ?? 0);
 check("diagram enlarges", lb > 900, `${lb.toFixed(0)}px wide`);
 check(
@@ -195,7 +197,7 @@ check(
   await page.locator(".lightbox-close").evaluate((b) => document.activeElement === b && !b.matches(":focus-visible")),
 );
 await page.locator(".lightbox-sheet svg").click();
-await pause(250);
+await idle(page);
 check("clicking the diagram keeps it enlarged", (await page.locator(".lightbox:not(.is-leaving)").count()) === 1);
 const closeBox = await page.locator(".lightbox-close").boundingBox();
 const sheetBox = await page.locator(".lightbox-sheet").boundingBox();
@@ -210,21 +212,21 @@ await page.mouse.move(sheetBox.x + 60, sheetBox.y + 60);
 await page.mouse.down();
 await page.mouse.move(4, 400);
 await page.mouse.up();
-await pause(250);
+await idle(page);
 check("dragging out of the diagram keeps it open", (await page.locator(".lightbox:not(.is-leaving)").count()) === 1);
 await page.locator(".lightbox-close").click();
-await pause(300);
+await idle(page);
 check("the close control closes it", (await page.locator(".lightbox").count()) === 0);
 await page.click(".diagram-expand");
-await pause(400);
+await idle(page);
 await page.mouse.click(4, 400);
-await pause(300);
+await idle(page);
 check("clicking the backdrop closes it", (await page.locator(".lightbox").count()) === 0);
 await page.focus(".diagram-expand");
 await page.keyboard.press("Enter");
-await pause(400);
+await idle(page);
 await page.keyboard.press("Escape");
-await pause(300);
+await idle(page);
 check("Escape closes the enlarged diagram", (await page.locator(".lightbox").count()) === 0);
 check(
   "closing returns focus to the expand button",
@@ -251,38 +253,38 @@ const fill1 = await page.evaluate(
 );
 check("diagram follows appearance", fill0 !== fill1, `${fill0} → ${fill1}`);
 await page.keyboard.press("Meta+Shift+L");
-await pause(500);
+await idle(page);
 
 // Command palette: opens instantly, fuzzy-finds a note, opens it
 await page.keyboard.press("Meta+k");
 const paletteVisible = await page.isVisible(".palette");
 check("⌘K opens the palette", paletteVisible);
 await page.keyboard.type("tide chart");
-await pause(120);
+await idle(page);
 const firstRow = await page.textContent(".palette-row.is-selected .palette-label");
 check("palette fuzzy match ranks the right note first", /Tide charts/.test(firstRow), firstRow);
 await page.keyboard.press("Enter");
-await pause(500);
+await idle(page);
 check("palette opens the note", (await title()).startsWith("Tide charts"));
 
 await page.keyboard.press("Meta+k");
-await pause(150);
+await idle(page);
 await page.fill(".palette input", "harbour approach");
-await pause(100);
+await idle(page);
 await page.keyboard.press("Meta+Shift+f");
-await pause(250);
+await idle(page);
 check(
   "⌘⇧F from the palette searches for what was typed there",
   !(await page.isVisible(".palette")) && (await page.inputValue(".search-field input")) === "harbour approach",
 );
 check("and shows its results", (await page.locator(".search-hit").count()) > 0);
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 await page.keyboard.press("Meta+k");
-await pause(150);
+await idle(page);
 const paletteSizeFor = async (query) => {
   await page.fill(".palette input", query);
-  await pause(120);
+  await idle(page);
   return page.evaluate(() => ({
     height: document.querySelector(".palette").getBoundingClientRect().height,
     firstRow: document.querySelector(".palette-row")?.getBoundingClientRect().top ?? null,
@@ -305,19 +307,19 @@ check(
   JSON.stringify(typedRows),
 );
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 
 // Full-text search jumps to the matching passage
 await page.keyboard.press("Meta+Shift+f");
 await page.waitForSelector(".search-field input:visible");
 await page.keyboard.type("BannetonSeamDriftError");
-await pause(200);
+await idle(page);
 const hits = await page.locator(".search-hit").count();
 check("full-text search finds a phrase inside a note", hits >= 1, `${hits} hits`);
 const snippet = await page.textContent(".search-hit.is-selected .search-hit-snippet");
 check("search shows a snippet around the match", /BannetonSeamDriftError/.test(snippet ?? ""), snippet?.slice(0, 80));
 await page.keyboard.press("Enter");
-await pause(700);
+await idle(page);
 const visible = await page.evaluate(() => {
   const ranges = CSS.highlights.get("search");
   if (!ranges) return null;
@@ -326,16 +328,16 @@ const visible = await page.evaluate(() => {
 });
 check("search opens the note at the highlighted passage", visible === true);
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 
 // Find in note
 await page.keyboard.press("Meta+f");
 await page.keyboard.type("cold retard");
-await pause(200);
+await idle(page);
 const count = await page.textContent(".findbar-count");
 check("⌘F finds matches in the note", /of \d+/.test(count ?? ""), count);
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 check("Escape closes find", (await page.locator(".findbar").count()) === 0);
 
 // Find marks only the current query, and every way of ending the search clears them.
@@ -398,37 +400,37 @@ await cleared("the close button");
 await startFind("cold");
 await page.keyboard.press("Meta+e");
 await page.waitForSelector(".cm-content");
-await pause(150);
+await idle(page);
 check("switching to Edit closes find in Read", (await page.locator(".findbar:not(.cm-search)").count()) === 0);
 await cleared("switching to Edit");
 await page.keyboard.press("Meta+e");
 await page.waitForSelector(".doc:not(.doc-editing)");
-await pause(150);
+await idle(page);
 await startFind("cold");
 await page.keyboard.press("Meta+Shift+f");
-await pause(150);
+await idle(page);
 await cleared("opening vault search");
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 await startFind("cold");
 await page.click(`.doc a.wikilink[data-path*="${NOTES.starter}"]`);
 await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent.startsWith(t), NOTES.starter);
-await pause(150);
+await idle(page);
 check("opening another note closes find", (await page.locator(".findbar").count()) === 0);
 await cleared("opening another note");
 await page.click(`.doc a.wikilink[data-path*="${NOTES.hero}"]`, { modifiers: ["Meta"] });
-await pause(300);
+await idle(page);
 await startFind("feed");
 await page.click(".tab:nth-child(2)");
-await pause(300);
+await idle(page);
 check("switching tabs closes find", (await page.locator(".findbar").count()) === 0);
 await cleared("switching tabs");
 await page.keyboard.press("Meta+w");
-await pause(300);
+await idle(page);
 await page.keyboard.press("Meta+[");
-await pause(600);
+await idle(page);
 await page.waitForFunction((t) => document.querySelector(".doc-title")?.textContent.startsWith(t), NOTES.hero);
-await pause(300);
+await idle(page);
 
 // Backlinks and local graph
 check("the panel shows Links", (await page.getAttribute('[data-rail="links"]', "aria-pressed")) === "true");
@@ -488,7 +490,7 @@ const TOGETHER = "M13.30 6.70L9.30 6.70L9.30 2.70";
 const leaveFrames = arrowFrames(".graph-leave path");
 await openGraph.click();
 const leaving = await leaveFrames;
-await pause(500);
+await idle(page);
 check("the icon opens the full graph", await page.locator(".graph-view canvas").isVisible());
 check(
   "the full graph fills the note area",
@@ -510,7 +512,7 @@ check(
 const backFrames = arrowFrames(".rail-graph-open path");
 await page.locator(".graph-leave").click();
 const returning = await backFrames;
-await pause(300);
+await idle(page);
 check("the arrows take you back to the note", !(await page.locator(".graph-view").isVisible()));
 check("the panel's arrows turn back outwards", (await page.locator(".rail-graph-open path").getAttribute("d")).startsWith(APART));
 check(
@@ -527,7 +529,7 @@ await page.evaluate(() => {
   };
 });
 await page.locator(".local-graph canvas").hover();
-await pause(200);
+await idle(page);
 check("the local graph draws no names over its dots", (await page.evaluate(() => window.__graphText)) === 0);
 
 // Vault graph
@@ -536,21 +538,21 @@ await pause(reduced ? 300 : 1500);
 const stats = await page.textContent(".graph-stats");
 check("graph view shows the vault", /\d{3} notes/.test(stats ?? ""), stats);
 await page.click('[data-gmode="local"]');
-await pause(400);
+await idle(page);
 const localStats = await page.textContent(".graph-stats");
 check("graph switches to this note's neighbourhood", localStats !== stats, localStats);
 await page.keyboard.press("Escape");
-await pause(300);
+await idle(page);
 check("Escape closes the graph", (await page.locator(".graph-view").count()) === 0);
 
 // Every state has a visible way in and out
 await page.keyboard.press("Meta+g");
-await pause(900);
+await idle(page);
 check("the graph button shows that the graph is open", (await page.locator('[data-act="graph"].is-on').count()) === 1);
 const strip = page.locator(".graph-groups");
 await strip.hover();
 await page.mouse.wheel(0, 240);
-await pause(150);
+await idle(page);
 check(
   "the community strip scrolls sideways",
   await strip.evaluate((e) => e.scrollWidth > e.clientWidth && e.scrollLeft > 0),
@@ -564,45 +566,45 @@ check(
 const beforeGraphClick = await title();
 const sibling = page.locator(".tree-folder.is-open .nav-item:not(.is-current)").first();
 await sibling.click();
-await pause(500);
+await idle(page);
 check(
   "opening a note from the tree replaces the graph in its tab",
   (await page.locator(".graph-view").count()) === 0 && (await title()) !== beforeGraphClick,
   await title(),
 );
 await page.keyboard.press("Meta+[");
-await pause(600);
+await idle(page);
 check("Back returns to the graph", (await page.locator(".graph-view").count()) === 1);
 await page.keyboard.press("Escape");
-await pause(300);
+await idle(page);
 check("Escape closes the graph tab", (await page.locator(".graph-view").count()) === 0);
 await page.click('[data-side="search"]');
-await pause(120);
+await idle(page);
 check("Search tab shows the search field", await page.locator(".search-field input").isVisible());
 await page.keyboard.type("zzzznothing");
-await pause(150);
+await idle(page);
 await page.click('[data-act="search-clear"]');
-await pause(100);
+await idle(page);
 check(
   "the X clears the field and stays in Search",
   (await page.inputValue(".search-field input")) === "" && (await page.locator(".search-field input").isVisible()),
 );
 await page.keyboard.type("declination");
-await pause(200);
+await idle(page);
 await page.keyboard.press("Escape");
-await pause(120);
+await idle(page);
 check(
   "Escape returns to the tree",
   (await page.locator(".tree").isVisible()) && !(await page.locator(".search-field input").isVisible()),
 );
 await page.click('[data-side="search"]');
-await pause(120);
+await idle(page);
 check(
   "Search keeps the query when you come back",
   (await page.inputValue(".search-field input")) === "declination" && (await page.locator(".search-hit").count()) > 0,
 );
 await page.keyboard.press("Escape");
-await pause(120);
+await idle(page);
 check("Escape in Search returns to the tree", await page.locator(".tree").isVisible());
 
 // The right panel's edge drags to resize it
@@ -613,7 +615,7 @@ const dragRailEdge = async (by) => {
   await page.mouse.down();
   await page.mouse.move(edge.x + 3 + by, edge.y + 200, { steps: 4 });
   await page.mouse.up();
-  await pause(200);
+  await idle(page);
 };
 const railAtStart = await railWidth();
 await dragRailEdge(-60);
@@ -631,7 +633,7 @@ await page.evaluate(async () => {
   const f = window.waymark;
   await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
-await pause(400);
+await idle(page);
 const trailPane = page.locator(".rail-trail");
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 const focusedRow = () => page.evaluate(() => document.activeElement?.closest(".trail-row")?.textContent ?? "");
@@ -652,7 +654,7 @@ const followLink = async () => {
   const l = page.locator(".doc a.wikilink:not(.is-missing):not(.is-ambiguous)").nth(index);
   followed.push(await l.textContent());
   await l.click();
-  await pause(450);
+  await idle(page);
 };
 await followLink();
 check("following a link grows the trail", (await page.locator(".trail-row").count()) === 2);
@@ -664,7 +666,7 @@ check("the path row has no trail control", (await page.locator(".pane-head .trai
 check("nothing sits between the path row and the note", (await page.locator(".reader > .trail").count()) === 0);
 const titleBeforeOpen = await titleTop();
 await page.keyboard.press("Meta+y");
-await pause(200);
+await idle(page);
 check("the shortcut goes to the trail in the panel", await trailPane.isVisible());
 check(
   "the links, the trail and the graph are on screen together",
@@ -678,7 +680,7 @@ check(
     .evaluate((m) => m.getAnimations().length > 0 || document.activeElement?.closest(".trail-row") !== null),
 );
 await page.locator(".trail-row").first().click();
-await pause(450);
+await idle(page);
 check(
   "clicking a stop moves this tab there",
   (await title()).startsWith("Compass declination") && (await page.locator(".trail-row").count()) === 2,
@@ -698,10 +700,10 @@ const graphTop = () => page.locator('[data-section="graph"]').evaluate((e) => e.
 check("the trail is as tall as its stops", (await trailHeight()) === 31 + 3 * 28 + 8, String(await trailHeight()));
 const graphWasAt = await graphTop();
 await page.locator('[data-fold-section="trail"]').click();
-await pause(320);
+await idle(page);
 check("the graph stays put while the trail changes height", (await graphTop()) === graphWasAt);
 await page.locator('[data-fold-section="trail"]').click();
-await pause(320);
+await idle(page);
 const sectionBox = (name) => page.locator(`[data-section="${name}"]`).evaluate((e) => e.getBoundingClientRect().toJSON());
 const dragSection = async (name, by) => {
   const box = await sectionBox(name);
@@ -711,7 +713,7 @@ const dragSection = async (name, by) => {
   await page.mouse.move(box.x + 60, box.y + 2 + by, { steps: 8 });
   await pause(60);
   await page.mouse.up();
-  await pause(250);
+  await idle(page);
 };
 const graphBefore = await sectionBox("graph");
 const titleBeforeDrag = await titleTop();
@@ -765,24 +767,24 @@ check(
 await page.keyboard.down("Meta");
 await page.locator(".tree-folder.is-open .nav-item").first().click();
 await page.keyboard.up("Meta");
-await pause(500);
+await idle(page);
 await page.click(".tab:nth-child(2)");
-await pause(450);
+await idle(page);
 check("another tab has its own trail", !(await trailSection.isVisible()));
 check(
   "a tab with no trail shows no trail section at all",
   await page.locator('[data-section="trail"]').evaluate((e) => getComputedStyle(e).display === "none"),
 );
 await page.click(".tab:nth-child(1)");
-await pause(450);
+await idle(page);
 check("the first tab keeps its trail", (await page.locator(".trail-row").count()) === 3);
 await page.click(".tab:nth-child(2) .tab-close", { force: true });
-await pause(300);
+await idle(page);
 
 const firstStop = page.locator(".trail-row").first();
 const sideRow = page.locator('.trail-row[aria-level="2"]');
 await page.mouse.move(2, 450);
-await pause(200);
+await idle(page);
 check(
   "a stop's remove control waits until the row is pointed at",
   (await sideRow.locator(".trail-x").evaluate((e) => getComputedStyle(e).opacity)) === "0" ||
@@ -790,7 +792,7 @@ check(
 );
 const lastStop = page.locator(".trail-row").last();
 await lastStop.hover();
-await pause(200);
+await idle(page);
 check(
   "pointing at a stop shows its remove control at full size",
   await lastStop
@@ -804,7 +806,7 @@ check(
 const foldButton = page.locator(".trail-fold").first();
 const titleBeforeFold = await titleTop();
 await foldButton.click();
-await pause(250);
+await idle(page);
 check("folding leaves the note where it is", (await titleTop()) === titleBeforeFold);
 check(
   "folding hides the branch the tab is not on and says how much",
@@ -813,7 +815,7 @@ check(
     (await firstStop.locator(".trail-count").textContent()) === "+1",
 );
 await foldButton.click();
-await pause(250);
+await idle(page);
 check(
   "unfolding brings it back",
   (await page.locator(".trail-row").count()) === 3 && (await firstStop.getAttribute("aria-expanded")) === "true",
@@ -825,19 +827,19 @@ const titleBeforeSection = await titleTop();
 const linksHeight = () => page.locator(".rail-body").evaluate((b) => b.getBoundingClientRect().height);
 const linksTall = await linksHeight();
 await page.locator('[data-fold-section="trail"]').click();
-await pause(320);
+await idle(page);
 check("folding the trail section hides it", !(await trailPane.isVisible()));
 check("its room goes to the links", (await linksHeight()) > linksTall + 60, `${linksTall} to ${await linksHeight()}`);
 check("folding a section leaves the note alone", (await titleTop()) === titleBeforeSection);
 await page.keyboard.press("Meta+y");
-await pause(320);
+await idle(page);
 check("the shortcut unfolds it", await trailPane.isVisible());
 await page.keyboard.press("Meta+y");
-await pause(320);
+await idle(page);
 check("pressing it again folds it back", !(await trailPane.isVisible()));
 check("the links stay throughout", await page.locator('[data-pane="links"]').isVisible());
 await page.keyboard.press("Meta+y");
-await pause(200);
+await idle(page);
 const onCurrentRow = await focusedRow();
 check(
   "the shortcut opens the trail on the current stop",
@@ -850,14 +852,14 @@ check("the arrow keys move along the stops", movedUp !== onCurrentRow, movedUp);
 await page.keyboard.press("Home");
 check("Home goes to the start", (await focusedRow()) === (await firstStop.textContent()));
 await page.keyboard.press("ArrowLeft");
-await pause(250);
+await idle(page);
 check("Left folds a branching stop", (await firstStop.getAttribute("aria-expanded")) === "false");
 await page.keyboard.press("ArrowRight");
-await pause(250);
+await idle(page);
 check("Right unfolds it", (await firstStop.getAttribute("aria-expanded")) === "true");
 await page.keyboard.press("End");
 await page.keyboard.press("Enter");
-await pause(450);
+await idle(page);
 check("Enter moves this tab to the stop", (await currentRow()) === (await lastStop.locator(".trail-name").textContent()));
 check("Enter leaves focus on the trail", (await focusedRow()) !== "" && (await trailPane.isVisible()));
 await page.keyboard.press("ArrowUp");
@@ -865,7 +867,7 @@ await page.keyboard.press("ArrowUp");
 const beforeRemove = await page.locator(".trail-row").count();
 const removedName = await page.evaluate(() => document.activeElement.querySelector(".trail-name").textContent);
 await page.keyboard.press("Delete");
-await pause(300);
+await idle(page);
 check("Delete removes one stop", (await page.locator(".trail-row").count()) === beforeRemove - 1);
 check("focus moves to the row in its place", (await focusedRow()) !== "");
 check("the toast names the stop and offers Undo", (await page.locator(".toast").textContent()).includes(removedName));
@@ -886,88 +888,88 @@ check(
   }),
 );
 await page.locator(".toast-action").click();
-await pause(300);
+await idle(page);
 check("Undo puts the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
 await page.locator(".trail-row:not(.is-current)").first().focus();
 await page.keyboard.press("Delete");
-await pause(250);
+await idle(page);
 await page.keyboard.press("Meta+z");
-await pause(250);
+await idle(page);
 check("Command-Z on the trail brings the stop back", (await page.locator(".trail-row").count()) === beforeRemove);
 const scrollTop = () => page.locator(".scroller").evaluate((sc) => Math.round(sc.scrollTop));
 const scrollNoteTo = async (y) => {
   await page.locator(".scroller").evaluate((sc, to) => {
     sc.scrollTop = to;
   }, y);
-  await pause(350);
+  await idle(page);
   return scrollTop();
 };
 await scrollNoteTo(160);
 await page.locator(".trail-row:not(.is-current)").last().click();
-await pause(450);
+await idle(page);
 await page.keyboard.press("Meta+[");
-await pause(450);
+await idle(page);
 const onNote = await title();
 const leftAt = await scrollNoteTo(90);
 await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Delete");
-await pause(500);
+await idle(page);
 check(
   "closing the note the tab is on steps back to another stop",
   (await page.locator(".trail-row").count()) === beforeRemove - 1 && (await title()) !== onNote,
 );
 await page.locator(".toast-action").click();
-await pause(500);
+await idle(page);
 check("Undo returns to that note", (await page.locator(".trail-row").count()) === beforeRemove && (await title()) === onNote);
 check("at the place it was left", (await scrollTop()) === leftAt, `${await scrollTop()} for ${leftAt}`);
 const beforeGraph = await scrollNoteTo(120);
 await page.keyboard.press("Meta+Shift+g");
-await pause(900);
+await idle(page);
 await page.locator(".graph-leave").click();
-await pause(600);
+await idle(page);
 check(
   "leaving the graph returns to the same place in the note",
   (await scrollTop()) === beforeGraph,
   `${await scrollTop()} for ${beforeGraph}`,
 );
 await page.keyboard.press("Meta+g");
-await pause(900);
+await idle(page);
 await page.click(".tab:nth-child(1)");
-await pause(600);
+await idle(page);
 check(
   "so does clicking the note's tab while the graph shows",
   (await scrollTop()) === beforeGraph,
   `${await scrollTop()} for ${beforeGraph}`,
 );
 await page.click(".tab:nth-child(2)");
-await pause(600);
+await idle(page);
 await page.keyboard.press("Escape");
-await pause(600);
+await idle(page);
 check("and Escape from the graph", (await scrollTop()) === beforeGraph, `${await scrollTop()} for ${beforeGraph}`);
 await page.locator(".trail-row.is-current").focus();
 await page.keyboard.press("Escape");
-await pause(100);
+await idle(page);
 check(
   "Escape returns to the note and leaves the trail open",
   (await page.evaluate(() => document.activeElement?.classList.contains("scroller"))) && (await trailPane.isVisible()),
 );
 await page.locator(".trail-row").nth(1).hover();
 await page.locator(".trail-row").nth(1).locator(".trail-x").click();
-await pause(300);
+await idle(page);
 check("a removed stop hands its place on, and the note stays", (await page.locator(".trail-row").count()) === beforeRemove - 1);
 await page.locator(".trail-row:not(.is-current)").first().hover();
 await page.locator(".trail-row:not(.is-current) .trail-x").first().click();
-await pause(300);
+await idle(page);
 check(
   "removing the last other stop empties the trail and keeps the note",
   !(await trailSection.isVisible()) && (await page.locator(".trail").isHidden()),
 );
 await followLink();
 await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
-await pause(450);
+await idle(page);
 check("opening an unrelated note from Files starts a new trail", !(await trailSection.isVisible()));
 await page.keyboard.press("Meta+[");
-await pause(450);
+await idle(page);
 check("Back brings the previous trail back", (await page.locator(".trail-row").count()) === 2);
 
 // Twenty-odd stops with branches, in a short window, with the real wheel
@@ -977,6 +979,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
     colorScheme: "light",
     reducedMotion: reduced ? "reduce" : "no-preference",
   });
+  await watchIdle(big);
   const p = await big.newPage();
   await p.goto(`${app.url}?note=${encodeURIComponent(NOTES.hero)}`);
   await p.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
@@ -988,9 +991,9 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
       if (i && i % 7 === 0) r.tab.trail.select(r.tab.trail.layout()[Math.floor(i / 2)].id);
     }
   });
-  await p.waitForTimeout(300);
+  await idle(p);
   await p.keyboard.press("Meta+y");
-  await p.waitForTimeout(300);
+  await idle(p);
   const body = () =>
     p.evaluate(() => {
       const b = document.querySelector(".rail-trail");
@@ -1025,7 +1028,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
   const trailBox = await p.locator(".rail-trail").boundingBox();
   await p.mouse.move(trailBox.x + trailBox.width / 2, trailBox.y + trailBox.height / 2);
   await p.mouse.wheel(0, -3000);
-  await p.waitForTimeout(200);
+  await idle(p);
   const atStart = await body();
   check("the real wheel reaches the first stop", atStart.top === 0 && atStart.first, JSON.stringify(atStart));
   await p.mouse.wheel(0, 3000);
@@ -1048,7 +1051,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
     );
   });
   await p.locator(".rail-links .rail-link").nth(unseen).click();
-  await p.waitForTimeout(400);
+  await idle(p);
   check(
     "a link followed from the list adds a stop with both still showing",
     unseen >= 0 &&
@@ -1057,7 +1060,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
       (await p.locator(".rail-trail").isVisible()),
   );
   await p.setViewportSize({ width: 560, height: 560 });
-  await p.waitForTimeout(250);
+  await idle(p);
   const narrow = () =>
     p.evaluate(() => {
       const box = (s) => document.querySelector(s).getBoundingClientRect();
@@ -1067,7 +1070,7 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
       };
     });
   await p.keyboard.press("Meta+y");
-  await p.waitForTimeout(450);
+  await idle(p);
   const floated = await narrow();
   check(
     "at 560 px the trail slides in, inside the window",
@@ -1075,13 +1078,13 @@ check("Back brings the previous trail back", (await page.locator(".trail-row").c
     JSON.stringify(floated),
   );
   await p.locator(".trail-row:not(.is-current)").first().click();
-  await p.waitForTimeout(400);
+  await idle(p);
   check("at 560 px clicking a stop leaves the trail open", (await narrow()).rail < 560 - 200);
   await p.locator(".rail-links .rail-link").first().click();
-  await p.waitForTimeout(400);
+  await idle(p);
   check("at 560 px following a link from the list leaves the trail open", (await narrow()).rail < 560 - 200);
   await p.keyboard.press("Escape");
-  await p.waitForTimeout(450);
+  await idle(p);
   check("Escape slides it away", (await narrow()).rail >= 560);
   await big.close();
 }
@@ -1096,10 +1099,10 @@ const loop = await page.evaluate(() => {
 await page.evaluate(async ([a]) => {
   await window.waymark.open(a);
 }, loop);
-await pause(400);
+await idle(page);
 const clickTo = async (target) => {
   await page.locator(`.doc a.wikilink[data-path="${target}"]`).first().click();
-  await pause(450);
+  await idle(page);
 };
 await clickTo(loop[1]);
 await clickTo(loop[0]);
@@ -1111,7 +1114,7 @@ check(
 );
 check("a link back adds no line to the trail", (await page.locator(".trail-lines path").count()) === 1);
 await page.keyboard.press("Meta+[");
-await pause(450);
+await idle(page);
 check(
   "Back retraces the stop you came from",
   (await page.locator(".trail-row.is-current .trail-name").textContent()) ===
@@ -1119,7 +1122,7 @@ check(
 );
 
 await page.click('[data-rail="info"]');
-await pause(150);
+await idle(page);
 check("the Info pane has a history section", (await page.textContent(".rail-history")).includes("History"));
 await page.click('[data-rail="links"]');
 
@@ -1127,7 +1130,7 @@ const tabsBefore = await page.locator(".tab").count();
 const noteBefore = await title();
 const activeTabTitle = () => page.textContent(".tab.is-active .tab-title");
 await page.click('[data-act="new-tab"]');
-await pause(400);
+await idle(page);
 check(
   "the + button opens a tab labelled New tab, with the palette",
   (await page.locator(".tab").count()) === tabsBefore + 1 &&
@@ -1136,7 +1139,7 @@ check(
 );
 check("a new tab does not copy the note", (await page.locator(".doc-title").count()) === 0);
 await page.keyboard.press("Escape");
-await pause(250);
+await idle(page);
 check(
   "Escape closes the palette and leaves the blank tab",
   !(await page.locator(".palette input").isVisible()) &&
@@ -1144,15 +1147,15 @@ check(
     (await page.locator(".start-page").isVisible()),
 );
 await page.keyboard.press("Meta+t");
-await pause(250);
+await idle(page);
 check(
   "a second new tab reuses the blank one",
   (await page.locator(".tab").count()) === tabsBefore + 1 && (await page.locator(".palette input").isVisible()),
 );
 await page.keyboard.type("Starter feeding");
-await pause(250);
+await idle(page);
 await page.keyboard.press("Enter");
-await pause(500);
+await idle(page);
 check(
   "picking a note fills the blank tab with nothing to go back to",
   (await page.locator(".tab").count()) === tabsBefore + 1 &&
@@ -1161,13 +1164,13 @@ check(
     (await page.locator('[data-act="back"]').isDisabled()),
 );
 await page.keyboard.press("Meta+w");
-await pause(300);
+await idle(page);
 await page.click('[data-act="new-tab"]');
-await pause(300);
+await idle(page);
 await page.keyboard.press("Escape");
-await pause(250);
+await idle(page);
 await page.keyboard.press("Escape");
-await pause(400);
+await idle(page);
 check(
   "a second Escape closes the blank tab and returns to the note",
   (await page.locator(".tab").count()) === tabsBefore && (await title()) === noteBefore,
@@ -1175,14 +1178,14 @@ check(
 
 // Settings popover changes theme family
 await page.click('[data-act="settings"]');
-await pause(250);
+await idle(page);
 await page.click('[data-family="rose-pine"]');
-await pause(400);
+await idle(page);
 const theme = await page.evaluate(() => document.documentElement.dataset.theme);
 check("theme family switches", theme === "dawn" || theme === "moon", theme);
 await page.click('[data-family="catppuccin"]');
 await page.keyboard.press("Escape");
-await pause(300);
+await idle(page);
 
 console.log(results.join("\n"));
 if (videoDir) console.log("video:", await page.video().path());

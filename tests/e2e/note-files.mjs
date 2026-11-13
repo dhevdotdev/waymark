@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -44,27 +45,28 @@ await writeFile(file("Rel/A/Old.md".replace("Rel/A/", "")), "old\n");
 const obsidianBefore = await disk(".obsidian/app.json");
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+await watchIdle(page);
 const errors = [];
 watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
 const openNote = async (name) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(500);
+  await idle(page);
 };
 const saved = () =>
   page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "saved", null, { timeout: 5000 });
 const rightClick = async (note, item) => {
   await page.locator(`.nav-item[data-path="${note}"]`).click({ button: "right" });
-  await pause(100);
+  await idle(page);
   await page.locator(`.context-item:has-text("${item}")`).click();
-  await pause(150);
+  await idle(page);
 };
 const menuPick = async (typed) => {
   await page.keyboard.type(typed);
-  await pause(350);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(350);
+  await idle(page);
 };
 const line = (text) => page.locator(".cm-line", { hasText: text });
 
@@ -86,17 +88,17 @@ try {
     JSON.stringify(firstLine),
   );
   await page.click('[data-rail="info"]');
-  await pause(150);
+  await idle(page);
   check("Info in the title bar switches the panel", await page.locator('[data-rail="info"].is-on').isVisible());
   const menuItems = () => page.locator(".context-menu:not(.is-leaving) .context-item").allTextContents();
   await page.locator('.nav-item[data-path="Writing.md"]').click({ button: "right" });
-  await pause(150);
+  await idle(page);
   const fromList = await menuItems();
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   const more = page.locator('[data-act="note-menu"]');
   await more.click();
-  await pause(150);
+  await idle(page);
   const menuBox = await page.locator(".context-menu:not(.is-leaving)").boundingBox();
   const moreBox = await more.boundingBox();
   check(
@@ -110,32 +112,32 @@ try {
   );
   check("the button says its menu is open", (await more.getAttribute("aria-expanded")) === "true");
   await more.click();
-  await pause(200);
+  await idle(page);
   check(
     "a second click on … closes its menu",
     (await page.locator(".context-menu:not(.is-leaving)").count()) === 0 &&
       (await more.getAttribute("aria-expanded")) === "false",
   );
   await more.click();
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   check("and closed", (await more.getAttribute("aria-expanded")) === "false");
   await more.focus();
   await page.keyboard.press("Enter");
-  await pause(150);
+  await idle(page);
   check(
     "from the keyboard the first item takes focus",
     await page.evaluate(() => document.activeElement?.matches(".context-menu .context-item:first-child")),
   );
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   check("Escape gives focus back to …", await page.evaluate(() => document.activeElement?.dataset.act === "note-menu"));
   await page.click('[data-side="search"]');
-  await pause(200);
+  await idle(page);
   check("the file tools' search opens Search", await page.locator(".sidebar-search").isVisible());
   await page.click('[data-act="search-clear"]');
-  await pause(200);
+  await idle(page);
   check("the X on an empty field returns to Files", await page.locator(".sidebar-inner").isVisible());
   check(
     "the reading status bar counts words",
@@ -143,7 +145,7 @@ try {
     await page.textContent(".status-stats"),
   );
   await page.locator(".doc p").first().selectText();
-  await pause(150);
+  await idle(page);
   check(
     "selecting text counts the selection",
     /^3 of \d+ words$/.test(await page.textContent(".status-stats")),
@@ -153,18 +155,18 @@ try {
   const scheme = () => page.evaluate(() => document.documentElement.dataset.scheme);
   const before = await scheme();
   await page.click('[data-act="appearance"]');
-  await pause(200);
+  await idle(page);
   check("one click flips light and dark", (await scheme()) !== before);
   await page.click('[data-act="appearance"]');
 
   await page.keyboard.press("Meta+n");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   check("a new note goes where Obsidian is set to put them", existsSync(file("Inbox/Untitled.md")));
   check("the title is ready to type", await page.evaluate(() => document.activeElement.classList.contains("doc-title")));
   await page.keyboard.type("My idea");
   await page.keyboard.press("Enter");
-  await pause(500);
+  await idle(page);
   check("naming it renames the file", existsSync(file("Inbox/My idea.md")) && !existsSync(file("Inbox/Untitled.md")));
   check("Enter moves on to the body", await page.evaluate(() => document.activeElement.classList.contains("cm-content")));
   check(
@@ -173,35 +175,35 @@ try {
   );
   await page.keyboard.type("Body text.");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("saving follows the renamed file", (await disk("Inbox/My idea.md")) === "Body text.");
 
   await page.keyboard.press("Meta+n");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await writesSettled(page, 300);
   await page.keyboard.type("My idea");
   await page.keyboard.press("Enter");
-  await pause(400);
+  await writesSettled(page, 400);
   check(
     "a name already in use is refused",
     existsSync(file("Inbox/Untitled.md")) && (await disk("Inbox/My idea.md")) === "Body text.",
   );
   check("the title goes back", (await page.textContent(".doc-title")) === "Untitled");
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await openNote("Target");
   await rightClick("Target.md", "Rename");
   await page.keyboard.type("Bad/name");
   await page.keyboard.press("Enter");
-  await pause(150);
+  await idle(page);
   check(
     "a bad name is explained and nothing happens",
     (await page.locator(".tree-name-input.is-problem").isVisible()) && existsSync(file("Target.md")),
   );
   await page.fill(".tree-name-input", "Renamed");
   await page.keyboard.press("Enter");
-  await pause(600);
+  await writesSettled(page, 600);
   check("renaming moves the file", existsSync(file("Renamed.md")) && !existsSync(file("Target.md")));
   check(
     "links in other notes follow, and code does not",
@@ -216,32 +218,32 @@ try {
   check("a note can move to a new folder", existsSync(file("Archive/Deep/Mover.md")) && !existsSync(file("Mover.md")));
   await page.click('.tree-head[data-folder="Archive"]');
   await page.click('.tree-head[data-folder="Archive/Deep"]');
-  await pause(350);
+  await idle(page);
   await rightClick("Archive/Deep/Mover.md", "Move to…");
   await menuPick("Vault root");
   check("and back to the root", existsSync(file("Mover.md")));
 
   await rightClick("Doomed.md", "Move to Trash");
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   check("cancelling keeps the note", existsSync(file("Doomed.md")));
   await openNote("Doomed");
   await rightClick("Doomed.md", "Move to Trash");
   await page.locator('.prompt button:has-text("Move to Trash")').click();
-  await pause(500);
+  await idle(page);
   check("deleting removes the note", !existsSync(file("Doomed.md")));
   check("its tab goes to the start page", await page.locator(".start-page").isVisible());
 
   await openNote("Writing");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   await line("First line here.").click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
   await page.keyboard.type("/");
-  await pause(300);
+  await idle(page);
   check("typing / opens the insert menu", await page.locator(".cm-tooltip-autocomplete").isVisible());
   const offered = await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents();
   check(
@@ -250,9 +252,9 @@ try {
     offered.slice(0, 4).join(),
   );
   await page.keyboard.type("table");
-  await pause(300);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(400);
+  await idle(page);
   check("choosing Table makes a table", (await page.locator(".cm-table-widget table").count()) === 1);
   check(
     "the header is ready to type",
@@ -260,7 +262,7 @@ try {
   );
   await page.keyboard.type("Name");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   const withTable = await disk("Writing.md");
   check(
     "the typing goes into an empty header",
@@ -271,7 +273,7 @@ try {
   check("the table has a blank line before it, so it counts as a table", /here\.\n\n\| Name/.test(withTable));
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
 
   const addLine = async () => {
     await page.keyboard.press(DOC_END);
@@ -279,7 +281,7 @@ try {
   };
   await addLine();
   await page.keyboard.type("/check");
-  await pause(300);
+  await idle(page);
   check(
     "menu items can be found by other words",
     (await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents()).some((o) => o.startsWith("Task")),
@@ -289,7 +291,7 @@ try {
   await saved();
   await page.keyboard.press("Home");
   await page.keyboard.type("/");
-  await pause(300);
+  await idle(page);
   check(
     "blocks that need a whole line are not offered above existing text",
     !(await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents()).some((o) =>
@@ -300,13 +302,13 @@ try {
   await page.keyboard.press("Backspace");
   await page.keyboard.press("End");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("Task inserts a task", (await disk("Writing.md")).includes("- [ ] todo"));
   await addLine();
   await page.keyboard.press("Enter");
-  await pause(100);
+  await idle(page);
   await page.keyboard.type("words /");
-  await pause(300);
+  await idle(page);
   const midLine = await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").allTextContents();
   check(
     "mid-sentence, only inline items are offered",
@@ -317,26 +319,26 @@ try {
 
   await addLine();
   await page.keyboard.type("[[Rena");
-  await pause(350);
+  await writesSettled(page, 350);
   await page.keyboard.press("Enter");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("[[ completes a note and closes the link", (await disk("Writing.md")).includes("[[Renamed]]"));
   await addLine();
   await page.keyboard.type("[[Renamed#");
-  await pause(350);
+  await writesSettled(page, 350);
   check(
     "# offers that note's headings",
     (await page.locator(".cm-tooltip-autocomplete li .cm-completionLabel").first().textContent()).includes("Part"),
   );
   await page.keyboard.press("Enter");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("a heading can be completed", (await disk("Writing.md")).includes("[[Renamed#Part]]"));
 
   await addLine();
   await saved();
-  await pause(600);
+  await writesSettled(page, 600);
   const contentBefore = await disk("Writing.md");
   await page.evaluate(async () => {
     const bytes = Uint8Array.from(
@@ -349,7 +351,7 @@ try {
     Object.defineProperty(event, "clipboardData", { value: data });
     document.querySelector(".cm-content").dispatchEvent(event);
   });
-  await pause(500);
+  await idle(page);
   const attached = readdirSync(file("Attachments")).filter((name) => name.startsWith("Pasted image"));
   check(
     "a pasted image goes where Obsidian is set to keep attachments",
@@ -357,14 +359,14 @@ try {
     attached.join(),
   );
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "it is embedded where the cursor was",
     (await disk("Writing.md")) === `${contentBefore}![[${attached[0]}]]`,
     (await disk("Writing.md")).slice(-60),
   );
   await addLine();
-  await pause(300);
+  await idle(page);
   check("the image shows in the editor", await page.locator("img.cm-embed-image").evaluate((img) => img.naturalWidth === 1));
 
   await line("First line here.").click();
@@ -378,34 +380,34 @@ try {
     document.querySelector(".cm-content").dispatchEvent(event);
   });
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "pasting a URL over a selection makes a link",
     (await disk("Writing.md")).includes("[First line here.](https://example.com/x)"),
   );
   const folderMenu = async (folder, item) => {
     await page.locator(`.tree-head[data-folder="${folder}"]`).click({ button: "right" });
-    await pause(100);
+    await idle(page);
     await page.locator(`.context-item:has-text("${item}")`).click();
-    await pause(150);
+    await idle(page);
   };
 
   await openNote("Trips/Plan");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   await folderMenu("Trips", "Rename");
   await page.fill(".tree-name-input", "Scrap");
   await page.keyboard.press("Enter");
-  await pause(100);
+  await idle(page);
   check("a folder cannot take the name of another", await page.locator(".tree-name-input.is-problem").isVisible());
   await page.fill(".tree-name-input", "a/b");
   await page.keyboard.press("Enter");
-  await pause(100);
+  await idle(page);
   check("a folder name with a slash is refused", await page.locator(".tree-name-input.is-problem").isVisible());
   await page.fill(".tree-name-input", "Journeys");
   await page.keyboard.press("Enter");
-  await pause(900);
+  await idle(page);
   check(
     "renaming a folder moves everything in it",
     existsSync(file("Journeys/Later/Deep.md")) && existsSync(file("Journeys/dot.png")),
@@ -426,15 +428,15 @@ try {
   await page.keyboard.press("Meta+ArrowDown");
   await page.keyboard.type("after the move");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("saving goes to the new path", (await disk("Journeys/Plan.md")).includes("after the move"));
   check("the tree shows the new name", await page.locator('.tree-head[data-folder="Journeys"]').isVisible());
   check("no trace of the old folder is left in the tree", (await page.locator('.tree-head[data-folder="Trips"]').count()) === 0);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(300);
+  await idle(page);
   await page.locator(".doc a.wikilink", { hasText: "next" }).click();
-  await pause(400);
+  await idle(page);
   check("a Markdown link opens its note in reading", (await page.textContent(".doc-title")).includes("Day"));
 
   await openNote("Scrap/One");
@@ -445,11 +447,11 @@ try {
     await page.textContent(".prompt-note"),
   );
   await page.locator('.prompt button:has-text("Cancel")').click();
-  await pause(150);
+  await writesSettled(page, 150);
   check("cancelling keeps the folder", existsSync(file("Scrap/One.md")));
   await folderMenu("Scrap", "Move to Trash");
   await page.locator('.prompt button:has-text("Move to Trash")').click();
-  await pause(600);
+  await writesSettled(page, 600);
   check("the folder is removed", !existsSync(file("Scrap")));
   check("nothing outside it was touched", existsSync(file("Refers.md")) && (await disk("Refers.md")).includes("[[One]]"));
   check("the tab showing it goes blank", (await page.locator(".doc-title").count()) === 0);
@@ -482,9 +484,9 @@ try {
         );
       if (clicked) break;
     }
-    await pause(120);
+    await idle(page);
     await page.locator(`.context-item:has-text("${item}")`).click();
-    await pause(150);
+    await idle(page);
   };
   await hover('.nav-item[data-path="Writing.md"]');
   check("hovering a note shows only its menu button", (await strip().count()) === 1);
@@ -513,10 +515,10 @@ try {
     });
   const FOLDER = '.tree-head[data-folder="Journeys"]';
   await page.mouse.move(0, 0);
-  await pause(300);
+  await idle(page);
   const folderAtRest = await styleOf(FOLDER);
   await hover(FOLDER);
-  await pause(250);
+  await idle(page);
   const folderHovered = await styleOf(FOLDER);
   check(
     "hovering a folder adds no shade",
@@ -525,23 +527,23 @@ try {
   );
   check("it brightens the folder's text instead", folderHovered.color !== folderAtRest.color, folderHovered.color);
   await strip().last().hover();
-  await pause(250);
+  await idle(page);
   check("the text stays bright with the pointer on a button", (await styleOf(FOLDER)).color === folderHovered.color);
   const NOTE = '.nav-item[data-path="Writing.md"]';
   await hover(NOTE);
-  await pause(250);
+  await idle(page);
   const noteHovered = await styleOf(NOTE);
   check("hovering a note still shades it", noteHovered.backgroundColor !== "rgba(0, 0, 0, 0)", noteHovered.backgroundColor);
   await strip().last().hover();
-  await pause(250);
+  await idle(page);
   check(
     "the note stays shaded with the pointer on its button",
     (await styleOf(NOTE)).backgroundColor === noteHovered.backgroundColor,
   );
   await hover(FOLDER);
-  await pause(100);
+  await idle(page);
   await strip().last().click();
-  await pause(350);
+  await idle(page);
   const menuPlacement = await page.evaluate(() => {
     const button = document.querySelector(".row-actions .row-action:last-child").getBoundingClientRect();
     const menu = document.querySelector(".context-menu").getBoundingClientRect();
@@ -553,10 +555,10 @@ try {
     (await page.locator(".context-item").allTextContents()).join().includes("New folder here"),
   );
   await page.mouse.move(700, 500);
-  await pause(120);
+  await idle(page);
   check("the row stays marked while its menu is open", await page.locator(".row-actions:not([hidden])").isVisible());
   await page.keyboard.press("Escape");
-  await pause(120);
+  await idle(page);
   check("closing the menu clears the row", (await page.locator(".has-actions").count()) === 0);
   const headerLine = await page.evaluate(() => {
     const centre = (r) => r.left + r.width / 2;
@@ -587,7 +589,7 @@ try {
   await pause(80);
   await page.keyboard.press("Shift");
   await page.locator('.tree-head[data-folder="Journeys"]').focus();
-  await pause(100);
+  await idle(page);
   check("keyboard focus on a row shows its buttons", (await strip().count()) === 2);
   check(
     "and they come next in tab order",
@@ -611,62 +613,62 @@ try {
   check("each icon is centred in its button", offCentre <= 0.5, String(offCentre));
 
   await page.locator('.tree-head[data-folder="Journeys"]').click({ button: "right" });
-  await pause(100);
+  await idle(page);
   check("the folder menu offers a new folder", await page.locator('.context-item:has-text("New folder here")').isVisible());
   await page.keyboard.press("Escape");
-  await pause(100);
+  await idle(page);
 
   await page.click('[data-act="new-folder"]');
-  await pause(100);
+  await idle(page);
   await page.keyboard.press("Escape");
-  await pause(100);
+  await idle(page);
   check("escaping a new folder leaves no row behind", (await page.locator(".tree-name-input").count()) === 0);
   await page.click('[data-act="new-folder"]');
-  await pause(100);
+  await idle(page);
   await page.keyboard.type("Journeys");
   await page.keyboard.press("Enter");
-  await pause(100);
+  await idle(page);
   check("a new folder cannot reuse a name", await page.locator(".tree-name-input.is-problem").isVisible());
   await page.fill(".tree-name-input", "Fresh ideas");
   await page.keyboard.press("Enter");
-  await pause(700);
+  await idle(page);
   check("a new folder is created with a first note", existsSync(file("Fresh ideas/Untitled.md")));
   check("and that note is ready to name", await page.locator(".cm-content, .doc-editing").first().isVisible());
   await page.keyboard.press("Escape");
   await moreMenu('.tree-head[data-folder="Journeys"]', "New folder here");
   await page.keyboard.type("Nested");
   await page.keyboard.press("Enter");
-  await pause(700);
+  await idle(page);
   check("a folder can be made inside a folder", existsSync(file("Journeys/Nested/Untitled.md")));
 
   await openNote("Writing");
   await page.keyboard.press("F2");
-  await pause(150);
+  await idle(page);
   check("F2 renames the open note in place", await page.locator(".tree-name-input").isVisible());
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
   check("escaping keeps the name", existsSync(file("Writing.md")) && (await page.locator(".tree-name-input").count()) === 0);
 
   await moreMenu('.nav-item[data-path="Mover.md"]', "Rename");
   await page.keyboard.type("Moved on");
   await page.locator(".doc-title, .start-page").first().click();
-  await pause(600);
+  await idle(page);
   check("clicking away accepts a rename", existsSync(file("Moved on.md")) && !existsSync(file("Mover.md")));
   await moreMenu('.nav-item[data-path="Moved on.md"]', "Move to Trash");
-  await pause(350);
+  await idle(page);
   check(
     "a note nothing links to goes without a dialog",
     !existsSync(file("Moved on.md")) && (await page.locator(".prompt").count()) === 0,
   );
 
   await page.click('[data-act="collapse-folders"]');
-  await pause(350);
+  await idle(page);
   check("collapse closes every folder", (await page.locator(".tree-folder:not(.bookmarks).is-open").count()) === 0);
 
   await writeFile(file("Plans.md"), "## One\n- [ ] a\n- [ ] b\n\n## Two\n- [x] c\n- [ ] d\n- [x] e\n");
   await openNote("Plans");
   await page.keyboard.press("Meta+t");
-  await pause(400);
+  await idle(page);
   check(
     "the new tab shows a count for each to-do list",
     (await page.locator('.start-row[data-path="Plans.md"] .start-count').allTextContents()).join(" ") === "0/2 2/3",
@@ -685,7 +687,7 @@ try {
    * pixel there that differs from the window's colour. Returns the x positions of such pixels.
    */
   const titlebarLines = async () => {
-    await pause(500);
+    await idle(page);
     const band = (await page.screenshot({ clip: { x: 0, y: 1, width: 1400, height: 6 } })).toString("base64");
     return page.evaluate(async (data) => {
       const image = new Image();
@@ -715,7 +717,7 @@ try {
   check("on a blank tab no column line crosses the title bar", linesOnBlank.length === 0, linesOnBlank.join(","));
   await page.keyboard.press("Meta+n");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   const onNew = await inspectorShown();
   check(
     "a new note from a blank tab brings the inspector back whole",
@@ -738,7 +740,7 @@ try {
   check("on the graph no column line crosses the title bar", linesOnGraph.length === 0, linesOnGraph.join(","));
   await page.keyboard.press("Meta+g");
   await page.waitForSelector(".shell:not(.is-graph)");
-  await pause(300);
+  await idle(page);
 
   const diffGeometry = await page.evaluate(async () => {
     const { renderDiff } = await import(/* @vite-ignore */ `${location.origin}/src/ui/diff.ts`);
@@ -801,11 +803,11 @@ try {
   await openNote("Writing");
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(500);
+  await idle(page);
   const pictureHeights = await heightsWhileOpening("Picture.md");
   check("an image never moves the page as it loads", pictureHeights.length === 1, pictureHeights.join());
   await page.evaluate(() => window.waymark.reader.open("Small picture.md"));
-  await pause(300);
+  await idle(page);
   check(
     "a size written on an image is honoured",
     Math.round(await page.locator(".doc img").evaluate((img) => img.getBoundingClientRect().width)) === 300,
@@ -813,22 +815,22 @@ try {
   await page.evaluate(() => window.waymark.reader.open("Chart.md"));
   await page.waitForSelector(".doc .diagram-svg svg", { timeout: 15000 });
   await page.evaluate(() => window.waymark.reader.open("Writing.md"));
-  await pause(200);
+  await idle(page);
   const chartHeights = await heightsWhileOpening("Chart.md");
   check("a diagram seen before never moves the page", chartHeights.length === 1, chartHeights.join());
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(500);
+  await idle(page);
   const afterRestart = await heightsWhileOpening("Chart.md");
   check("nor does it after the app restarts", afterRestart.length === 1, afterRestart.join());
 
   await openNote("Writing");
   await page.click('[data-side="search"]');
-  await pause(150);
+  await idle(page);
   await page.fill(".search-field input", "Below");
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(500);
+  await idle(page);
   const searchMarks = () => page.evaluate(() => CSS.highlights.get("search")?.size ?? 0);
   check("opening a search result marks the matches", (await searchMarks()) > 0, String(await searchMarks()));
   await page.locator(".search-field input").click();
@@ -836,7 +838,7 @@ try {
   await pause(80);
   check("editing the search clears the old marks at once", (await searchMarks()) === 0, String(await searchMarks()));
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
 
   const outside = (paths) => page.evaluate((p) => window.waymark.reader.onVaultChanged(p), paths);
   const listed = (selector) => page.locator(`.sidebar-inner ${selector}`).count();
@@ -853,7 +855,7 @@ try {
     await openNote("Writing");
     if (mode === "Edit") {
       await page.keyboard.press("Meta+e");
-      await pause(300);
+      await idle(page);
     }
     if (!(await page.locator('.sidebar-inner .tree-folder.is-open > [data-folder="Apiary"]').count())) {
       await page.locator('.sidebar-inner [data-folder="Apiary"]').click();
@@ -863,7 +865,7 @@ try {
       box.scrollTop = box.scrollHeight;
       box.querySelector('[data-folder="Apiary"]').focus({ preventScroll: true });
     });
-    await pause(250);
+    await idle(page);
     const before = await treeState();
     const unchanged = async (what) => {
       const now = await treeState();
@@ -875,7 +877,7 @@ try {
     };
     await writeFile(file(`Arrived ${mode}.md`), "new\n");
     await outside([`Arrived ${mode}.md`]);
-    await pause(150);
+    await idle(page);
     check(
       `${mode}: a note written outside the app appears in the file list`,
       (await listed(`[data-path="Arrived ${mode}.md"]`)) === 1,
@@ -883,14 +885,14 @@ try {
     await unchanged("a note arrives");
     await rename(file(`Arrived ${mode}.md`), file(`Renamed ${mode}.md`));
     await outside([`Arrived ${mode}.md`, `Renamed ${mode}.md`]);
-    await pause(150);
+    await idle(page);
     check(
       `${mode}: a note renamed outside the app is listed under its new name only`,
       (await listed(`[data-path="Arrived ${mode}.md"]`)) === 0 && (await listed(`[data-path="Renamed ${mode}.md"]`)) === 1,
     );
     await unlink(file(`Renamed ${mode}.md`));
     await outside([`Renamed ${mode}.md`]);
-    await pause(150);
+    await idle(page);
     check(
       `${mode}: a note deleted outside the app leaves the file list`,
       (await listed(`[data-path="Renamed ${mode}.md"]`)) === 0,
@@ -898,7 +900,7 @@ try {
     mkdirSync(file(`Outside ${mode}`));
     await writeFile(file(`Outside ${mode}/Inner.md`), "inner\n");
     await outside([`Outside ${mode}/Inner.md`]);
-    await pause(150);
+    await idle(page);
     check(
       `${mode}: a folder made outside the app appears in the file list`,
       (await listed(`[data-folder="Outside ${mode}"]`)) === 1,

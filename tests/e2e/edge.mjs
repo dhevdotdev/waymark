@@ -2,6 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -12,6 +13,7 @@ const browser = await webkit.launch();
 async function withApp(options, drive) {
   const app = await serveFixture(options);
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await watchIdle(page);
   const errors = [];
   const requests = [];
   watchPageErrors(page, errors);
@@ -31,7 +33,7 @@ await withApp({ empty: true }, async (page, app, { errors }) => {
   check("an empty vault offers no panel buttons", !(await page.isVisible('[data-rail="links"]')));
   await page.keyboard.press("Meta+Alt+\\");
   await page.keyboard.press("Meta+k");
-  await page.waitForTimeout(150);
+  await idle(page);
   check("the palette still opens in an empty vault", await page.isVisible(".palette"));
   await page.keyboard.press("Escape");
   check("nothing throws with no note open", errors.length === 0, errors[0]);
@@ -40,10 +42,10 @@ await withApp({ empty: true }, async (page, app, { errors }) => {
 await withApp({}, async (page, app, { errors, requests }) => {
   await page.goto(`${app.url}?note=${encodeURIComponent("Untrusted content")}`);
   await page.waitForSelector(".doc .doc-title");
-  await page.waitForTimeout(400);
+  await idle(page);
   check("scripts and handlers in a note do not run", (await page.evaluate(() => window.pwned)) === undefined);
   await page.click("#js-link", { noWaitAfter: true }).catch(() => {});
-  await page.waitForTimeout(100);
+  await idle(page);
   check("a javascript: link does nothing", (await page.evaluate(() => window.pwned)) === undefined);
   check("note HTML cannot trigger app commands", (await page.locator(".doc [data-act]").count()) === 0);
   check("media and frames are removed", (await page.locator(".doc iframe, .doc video, .doc audio").count()) === 0);
@@ -61,7 +63,7 @@ await withApp({}, async (page, app, { errors }) => {
       "A very long note title that keeps going well past the width of any sidebar so that truncation has something to do.md",
     ),
   );
-  await page.waitForTimeout(500);
+  await idle(page);
   const box = await page.locator(".tab.is-active").boundingBox();
   const clipped = await page.locator(".tab.is-active .tab-title").evaluate((t) => t.scrollWidth > t.clientWidth);
   check("a very long title is clipped inside a capped tab", box.width <= 420 && clipped, `${Math.round(box.width)}px`);
@@ -74,15 +76,15 @@ await withApp({}, async (page, app, { errors }) => {
   const openInNewTab = async (query) => {
     await page.keyboard.press("Meta+k");
     await page.keyboard.type(query);
-    await page.waitForTimeout(200);
+    await idle(page);
     await page.keyboard.press("Meta+Enter");
-    await page.waitForTimeout(400);
+    await idle(page);
   };
   for (const query of ["Crumb structure", "Starter feeding", "Welcome"]) await openInNewTab(query);
   await page.setViewportSize({ width: 1000, height: 800 });
-  await page.waitForTimeout(300);
+  await idle(page);
   await page.locator(".tab").first().click();
-  await page.waitForTimeout(300);
+  await idle(page);
   const measureTabs = () =>
     page.$$eval(".tab", (tabs) =>
       tabs.map((tab) => {
@@ -113,7 +115,7 @@ await withApp({}, async (page, app, { errors }) => {
     ),
   );
   await page.setViewportSize({ width: 1900, height: 800 });
-  await page.waitForTimeout(300);
+  await idle(page);
   const roomy = await measureTabs();
   check(
     "tabs grow back when the window gives them room",
@@ -126,7 +128,7 @@ await withApp({}, async (page, app, { errors }) => {
   await writeFile(path.join(app.vault, "Tasks.md"), "- [ ] open item\n- [x] done item\n- plain item\n\n1. [ ] numbered item\n");
   await page.goto(`${app.url}?note=Tasks`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await page.waitForTimeout(400);
+  await idle(page);
   await page.waitForSelector(".doc .task-box");
   const items = await page.$$eval(".doc ul > li", (lis) =>
     lis.map((li) => {

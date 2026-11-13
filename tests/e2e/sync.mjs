@@ -1,5 +1,6 @@
 // The sync panel in every state that needs its own treatment, with Git faked over a fixture vault.
 import { webkit } from "playwright";
+import { idle, watchIdle } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
@@ -9,6 +10,7 @@ const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  
 const app = await serveFixture();
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1320, height: 860 } });
+await watchIdle(page);
 const errors = [];
 watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
@@ -106,7 +108,7 @@ const stage = async (state, error = null) => {
     },
     [state, error],
   );
-  await pause(350);
+  await idle(page);
   /* A slow machine can still be running the sheet's open, and a scaling sheet moves what sits inside it. */
   await page.waitForFunction(() => document.querySelector(".sync-sheet")?.getAnimations().length === 0);
 };
@@ -117,13 +119,13 @@ const primary = () => page.locator(".sync-actions .btn-primary").allTextContents
 const statusLabel = () => text(".sync-label");
 const tab = async (label) => {
   await page.locator(`.sync-sheet [role="tablist"] button:has-text("${label}")`).click();
-  await pause(300);
+  await idle(page);
 };
 
 try {
   await page.goto(`${app.url}?note=Welcome`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(700);
+  await idle(page);
 
   await stage("incoming");
   check("Sync leads when commits are coming in", (await primary()).join() === "Sync");
@@ -166,7 +168,7 @@ try {
   check("a timeout can be retried", await page.locator('.notice-actions button:has-text("Try again")').isVisible());
   const before = await page.evaluate(() => window.__fetches);
   await page.locator('.notice-actions button:has-text("Try again")').click();
-  await pause(300);
+  await idle(page);
   check("and retrying really runs", (await page.evaluate(() => window.__fetches)) > before);
   await stage("clean", "other");
   check("a generic problem explains itself", ((await text(".notice p")) ?? "").length > 10);
@@ -184,7 +186,7 @@ try {
   });
   await stage("clean");
   await tab("History");
-  await pause(600);
+  await idle(page);
   check(
     "no commits says so instead of loading forever",
     (await text(".sync-body")).includes("No commits yet"),
@@ -197,7 +199,7 @@ try {
   await stage("clean");
   await tab("History");
   await page.locator(".commit-row").first().click();
-  await pause(400);
+  await idle(page);
   const fromPanel = await page.locator(".sheet").boundingBox();
   const subtitle = await text(".sheet-sub");
   check(
@@ -207,13 +209,13 @@ try {
   );
   check("the sheet closes with a close button", (await page.locator('.sheet-head button[aria-label="Close"]').count()) === 1);
   await page.keyboard.press("Escape");
-  await pause(300);
+  await idle(page);
   await closeAll();
-  await pause(300);
+  await idle(page);
   await page.click('[data-rail="info"]');
-  await pause(400);
+  await idle(page);
   await page.locator(".rail-history .rail-commit").first().click();
-  await pause(400);
+  await idle(page);
   const fromInfo = await page.locator(".sheet").boundingBox();
   check(
     "the same sheet has the same frame from the panel and from Info",
@@ -221,13 +223,13 @@ try {
     `${JSON.stringify(fromPanel)} ${JSON.stringify(fromInfo)}`,
   );
   await page.keyboard.press("Escape");
-  await pause(300);
+  await idle(page);
 
   await page.evaluate(() => {
     window.__state = "changedOutgoing";
     window.waymark.reader.sync.panel.open();
   });
-  await pause(350);
+  await idle(page);
   await tab("Changes");
   const link = await page
     .locator(".sync-sheet .link-btn")
@@ -277,7 +279,7 @@ try {
     check("a refresh keeps the keyboard focus ring", before.ring && after.ring, `${before.ring} ${after.ring}`);
     check("a refresh keeps the scroll position", (await inBody()) === 300, String(await inBody()));
     for (let i = 0; i < 6; i++) void refreshNow();
-    await pause(120);
+    await idle(page);
     check("repeated refreshes keep focus", (await focusKey()).label === before.label, JSON.stringify(await focusKey()));
 
     await page.locator('.seg-btn[role="tab"]', { hasText: "Changes" }).focus();
@@ -318,7 +320,7 @@ try {
       document.querySelector(".sync-body").scrollTop = 300;
     });
     await tab("History");
-    await pause(120);
+    await idle(page);
     check("another tab starts at its top", (await inBody()) === 0, String(await inBody()));
   }
   {
@@ -356,7 +358,7 @@ try {
       });
       await act();
       await page.waitForFunction(() => !window.waymark.reader.sync.busy);
-      await pause(100);
+      await idle(page);
       return page.evaluate(() => {
         Element.prototype.animate = window.realAnimate;
         return window.pulses;

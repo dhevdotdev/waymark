@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { fetchRoute } from "./route-fetch.mjs";
 import { serveFixture } from "./serve.mjs";
@@ -38,7 +39,6 @@ const put = async (name, text) => {
   await writeFile(file(name), text);
 };
 const disk = (name) => readFile(file(name), "utf8");
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 await mkdir(file(".obsidian"), { recursive: true });
 await writeFile(
@@ -87,6 +87,7 @@ await put("Paste.md", "# Paste\n\nStart.\n\n```js\nconst inside = 1;\n```\n\nEnd
 const browser = await webkit.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
+await watchIdle(page);
 const errors = [];
 const requests = [];
 watchPageErrors(page, errors);
@@ -113,23 +114,23 @@ await page.route(/\/src\/ui\/(sync-controller|reader|note-files)\.ts/, async (ro
 const load = async (note) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(note)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(350);
+  await idle(page);
 };
 const palette = async (query) => {
   await page.keyboard.press("Meta+k");
-  await pause(120);
+  await idle(page);
   await page.keyboard.type(query);
-  await pause(150);
+  await idle(page);
 };
 const runPalette = async (query) => {
   await palette(query);
   await page.keyboard.press("Enter");
-  await pause(350);
+  await idle(page);
 };
 const paletteRows = () => page.locator(".palette-row .palette-label").allTextContents();
 const closePalette = async () => {
   await page.keyboard.press("Escape");
-  await pause(250);
+  await idle(page);
 };
 const lastToast = () => page.evaluate(() => [...document.querySelectorAll(".toast")].at(-1)?.textContent ?? "");
 const currentPath = () => page.evaluate(() => window.waymark.reader.current);
@@ -156,7 +157,7 @@ try {
   await page.evaluate(() => {
     for (const head of document.querySelectorAll(".tree-head[data-folder]")) head.click();
   });
-  await pause(200);
+  await idle(page);
   const treeText = await page.textContent(".sidebar");
   check("an excluded file is not in the sidebar", !treeText.includes("AGENTS"), "");
   check("an excluded folder is not in the sidebar", !treeText.includes("Hidden stuff"));
@@ -182,29 +183,29 @@ try {
     (await page.locator(".doc a.wikilink", { hasText: "AGENTS" }).getAttribute("data-path")) === "AGENTS.md",
   );
   await page.evaluate(() => window.waymark.reader.sync.panel.refresh());
-  await pause(100);
+  await idle(page);
   await page.click('[data-act="sync-panel"]');
-  await pause(450);
+  await idle(page);
   check("the sync panel still shows a changed excluded file", (await page.textContent(".sync-sheet")).includes("AGENTS"), "");
   const sheetBox = await page.locator(".sync-sheet").boundingBox();
   const sheetPixels = async () => {
     await page.mouse.move(4, 4);
-    await pause(250);
+    await idle(page);
     return page.screenshot({ clip: sheetBox });
   };
   const beforeDiff = await sheetPixels();
   await page.locator(".change-name").first().click();
   await page.waitForSelector(".sheet .diff-line");
-  await pause(350);
+  await idle(page);
   check(
     "the sync sheet is never hidden behind a diff",
     (await page.locator(".sync-sheet").evaluate((e) => getComputedStyle(e).visibility)) === "visible",
   );
   await page.keyboard.press("Escape");
-  await pause(450);
+  await writesSettled(page, 450);
   check("coming back from a diff shows the whole sync sheet", beforeDiff.equals(await sheetPixels()));
   await page.keyboard.press("Escape");
-  await pause(350);
+  await writesSettled(page, 350);
   check(
     "Obsidian's settings were not touched",
     (await disk(".obsidian/app.json")).includes("userIgnoreFilters") && !existsSync(file(".obsidian/bookmarks.json")),
@@ -224,7 +225,7 @@ try {
   check("the empty section says how to add one", (await emptyLine()).includes("right-clicking"), await emptyLine());
   check("the path carries no bookmark button", (await page.locator(".pane-head .pane-bookmark").count()) === 0);
   await runPalette("Bookmark this note");
-  await pause(350);
+  await idle(page);
   check("the palette bookmarks the note", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
   check(
     "the open note is highlighted once, its bookmark only tinted",
@@ -233,13 +234,13 @@ try {
   );
   check("the empty line goes once there is a bookmark", (await page.locator(".bookmarks-empty").count()) === 0);
   await runPalette("Bookmark this note");
-  await pause(350);
+  await idle(page);
   check("running it again removes the bookmark", (await bookmarkRows()).length === 0);
   check("the empty line comes back", (await page.locator(".bookmarks-empty").count()) === 1);
   await runPalette("Bookmark this note");
   check("the palette bookmarks a note again", (await bookmarkRows()).join() === "Keep", (await bookmarkRows()).join());
   await page.evaluate(() => document.querySelector(".scroller").scrollTo({ top: 3400 }));
-  await pause(200);
+  await idle(page);
   await runPalette("Bookmark the current heading");
   check(
     "the current heading can be bookmarked",
@@ -248,16 +249,16 @@ try {
   );
   await load("Going");
   await page.evaluate(() => window.waymark.reader.open("Marked/Going.md", {}));
-  await pause(250);
+  await writesSettled(page, 250);
   await runPalette("Bookmark this note");
   const beforeBytes = await disk("Marked/Keep.md");
   await page.evaluate(() => window.waymark.prefs.flush());
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(400);
+  await idle(page);
   check("bookmarks survive a relaunch", (await bookmarkRows()).length === 3, (await bookmarkRows()).join());
   await page.locator(".bookmarks .nav-item", { hasText: "Deep heading" }).click();
-  await pause(500);
+  await idle(page);
   const headingAt = await page.evaluate(() => {
     const heading = [...document.querySelectorAll(".doc h2")].find((h) => h.textContent.includes("Deep heading"));
     return Math.round(heading.getBoundingClientRect().top - document.querySelector(".scroller").getBoundingClientRect().top);
@@ -266,7 +267,7 @@ try {
   await palette("");
   check("the palette lists bookmarks", (await page.locator(".palette-group", { hasText: "Bookmarks" }).count()) === 1);
   await page.keyboard.type("Deep heading");
-  await pause(150);
+  await idle(page);
   check(
     "a query finds a heading bookmark",
     (await paletteRows()).some((r) => r.includes("Deep heading")),
@@ -275,7 +276,7 @@ try {
   await closePalette();
 
   await page.evaluate(() => window.waymark.reader.files.renameTo("Marked/Keep.md", "Kept"));
-  await pause(500);
+  await idle(page);
   check(
     "a bookmark follows a rename",
     (await bookmarkRows()).includes("Kept") && !(await bookmarkRows()).includes("Keep"),
@@ -283,34 +284,34 @@ try {
   );
   check("a heading bookmark follows a rename", (await bookmarkRows()).includes("Kept › Deep heading"));
   await page.locator(".bookmarks .nav-item", { hasText: "Going" }).click();
-  await pause(300);
+  await idle(page);
   await unlink(file("Marked/Going.md"));
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Marked/Going.md"]));
-  await pause(300);
+  await idle(page);
   const missingRow = page.locator(".bookmarks .nav-item.is-missing", { hasText: "Going" });
   check("a deleted note shows as missing", (await missingRow.count()) === 1);
   await page.evaluate(() => window.waymark.reader.open("Links to agents.md", {}));
-  await pause(250);
+  await idle(page);
   await missingRow.click();
-  await pause(300);
+  await writesSettled(page, 300);
   check("a missing bookmark opens nothing", (await currentPath()) === "Links to agents.md", await currentPath());
   check("not even a note with the same name", (await currentPath()) !== "Elsewhere/Going.md");
   check("it says why", (await lastToast()).includes("no longer in the vault"), await lastToast());
 
   await put("Marked/Kept.md", (await disk("Marked/Kept.md")).replace("## Deep heading", "## Renamed heading"));
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Marked/Kept.md"]));
-  await pause(200);
+  await idle(page);
   await page.locator(".bookmarks .nav-item", { hasText: "Deep heading" }).click();
-  await pause(400);
+  await idle(page);
   check(
     "a heading that is gone opens the note and says so",
     (await currentPath()) === "Marked/Kept.md" && (await lastToast()).includes("heading is no longer"),
     await lastToast(),
   );
   await page.locator(".bookmarks .nav-item", { hasText: "Deep heading" }).hover();
-  await pause(120);
+  await idle(page);
   await page.locator('.row-action[aria-label="Remove bookmark"]').click();
-  await pause(150);
+  await idle(page);
   check(
     "a bookmark can be removed from its row",
     !(await bookmarkRows()).some((r) => r.includes("Deep heading")),
@@ -332,10 +333,10 @@ try {
     const head = document.querySelector('.tree-head[data-folder="Views"]');
     if (head.getAttribute("aria-expanded") !== "true") head.click();
   });
-  await pause(250);
+  await idle(page);
   await page.locator('.nav-item[data-path="Views/Open items.base"]').click();
   await page.waitForSelector(".doc.is-base table");
-  await pause(200);
+  await idle(page);
   const header = () => page.locator(".doc.is-base th").allTextContents();
   const firstColumn = () => page.locator(".doc.is-base tbody tr td:first-child").allTextContents();
   check(
@@ -352,18 +353,18 @@ try {
   check("there is no Edit control", !(await page.locator(".mode-switch").isVisible()));
 
   await page.locator(".base-views button", { hasText: "Shut only" }).click();
-  await pause(250);
+  await idle(page);
   check(
     "each view has its own filter and columns",
     (await firstColumn()).join() === "" || (await page.locator(".base-notice").count()) === 1,
     (await firstColumn()).join(),
   );
   await page.locator(".base-views button", { hasText: "By rank" }).click();
-  await pause(250);
+  await idle(page);
 
   await put("Items/Three.md", "---\nstate: open\nrank: 7\n---\n\nThird.\n");
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Items/Three.md"]));
-  await pause(300);
+  await idle(page);
   check(
     "the table follows a frontmatter change on disk",
     (await firstColumn()).join() === "Two,Three,One",
@@ -371,25 +372,25 @@ try {
   );
 
   await page.locator(".doc.is-base tbody tr", { hasText: "One" }).click();
-  await pause(350);
+  await idle(page);
   check("a row opens its note", (await currentPath()) === "Items/One.md", await currentPath());
   await page.keyboard.press("Meta+[");
-  await pause(350);
+  await idle(page);
   check("back returns to the view", (await page.locator(".doc.is-base table").count()) === 1);
   await page.keyboard.press("Meta+]");
-  await pause(350);
+  await idle(page);
   check("forward goes to the note again", (await currentPath()) === "Items/One.md");
   await page.keyboard.press("Meta+[");
-  await pause(300);
+  await idle(page);
   await page.evaluate(() => window.waymark.prefs.flush());
-  await page.waitForTimeout(100);
+  await idle(page);
   await page.evaluate(() => {
     window.waymark.reader.persist();
     return window.waymark.prefs.flush();
   });
   await page.goto(app.url);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(600);
+  await idle(page);
   check("the view is restored with its tab", (await page.locator(".doc.is-base table").count()) === 1);
 
   await palette("Open items");
@@ -398,7 +399,7 @@ try {
 
   const openBase = async (name) => {
     await page.evaluate((n) => window.waymark.reader.open(n, {}), name);
-    await pause(350);
+    await idle(page);
   };
   await openBase("Views/Cannot.base");
   check("a filter it cannot evaluate says so", (await page.textContent(".base-notice")).includes('file.hasTag("x")'));
@@ -417,7 +418,7 @@ try {
   await load("Paste");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(250);
+  await idle(page);
   const atLine = async (text) => {
     await page.locator(".cm-line", { hasText: text }).click();
     await page.keyboard.press("End");
@@ -425,14 +426,14 @@ try {
   await atLine("End.");
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
-  await pause(600);
+  await writesSettled(page, 600);
   const beforePaste = await page.evaluate(() => document.querySelector(".cm-content").textContent);
   const prevented = await paste(
     '<!-- c --><script>window.pwned=1</script><h2>Web title</h2><p>A <strong>bold</strong> move.</p><ul><li>one</li></ul><img src="https://example.invalid/pic.png" alt="Remote"><table><tr><th>A</th></tr><tr><td>1</td></tr></table>',
     "plain",
   );
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   const text = await disk("Paste.md");
   check(
     "pasted HTML becomes Markdown",
@@ -447,7 +448,7 @@ try {
   check("no pasted script ran", (await page.evaluate(() => window.pwned)) === undefined);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
   await saved();
-  await pause(150);
+  await idle(page);
   check(
     "one undo reverts the whole paste",
     (await page.evaluate(() => document.querySelector(".cm-content").textContent)) === beforePaste,
@@ -456,7 +457,7 @@ try {
   await atLine("const inside");
   await paste("<b>bold</b>", "plain code");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "paste inside a code block stays plain",
     (await disk("Paste.md")).includes("plain code") && !(await disk("Paste.md")).includes("**bold**"),
@@ -466,7 +467,7 @@ try {
   const pastedAs = async (html, plain, extra) => {
     await paste(html, plain, extra);
     await saved();
-    await pause(150);
+    await writesSettled(page, 150);
     return disk("Paste.md");
   };
   const vscode = await pastedAs('<div style="color:#fff"><b>vscodetext</b></div>', "vscodetext", { "vscode-editor-data": "{}" });
@@ -487,22 +488,22 @@ try {
   });
   await page.keyboard.press(process.platform === "darwin" ? "Meta+Shift+v" : "Control+Shift+v");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("⌘⇧V pastes the plain text as it is", (await disk("Paste.md")).includes("**not bold** plain"));
 
   await atLine("End.");
   await page.keyboard.press("Shift+Home");
-  await pause(100);
+  await writesSettled(page, 100);
   check("a URL over a selection still makes a link", await paste("", "https://example.org/a"));
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "and writes it",
     /\[End\.?\]?.*\(https:\/\/example\.org\/a\)/.test(await disk("Paste.md")),
     (await disk("Paste.md")).slice(-60),
   );
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   check("the vault gained no .obsidian/bookmarks.json", !readdirSync(file(".obsidian")).includes("bookmarks.json"));
   check("nothing threw", errors.length === 0, errors[0]);

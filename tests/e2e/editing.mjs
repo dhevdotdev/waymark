@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -106,11 +107,12 @@ const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
 watchPageErrors(page, errors);
+await watchIdle(page);
 const pause = (ms) => page.waitForTimeout(ms);
 const openNote = async (name) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(500);
+  await idle(page);
 };
 const box = (n) => page.locator("button.task-box").nth(n);
 /* Only the editor's own lines: KaTeX keeps the TeX in hidden MathML inside a drawn block. */
@@ -139,47 +141,47 @@ try {
   );
   check("an open box has no fill", await box(0).evaluate((b) => getComputedStyle(b).backgroundColor === "rgba(0, 0, 0, 0)"));
   await box(0).click();
-  await pause(250);
+  await writesSettled(page, 250);
   check("clicking a task writes that line", (await disk("Tasks.md")) === TASKS.replace("- [ ] alpha", "- [x] alpha"));
   check("the box shows the new state", (await box(0).getAttribute("aria-checked")) === "true");
   await box(1).click();
-  await pause(250);
+  await writesSettled(page, 250);
   check("a done task can be reopened", (await disk("Tasks.md")).includes("- [ ] beta"));
   await box(2).click();
   await box(3).focus();
   await page.keyboard.press("Space");
-  await pause(300);
+  await writesSettled(page, 300);
   const afterMany = await disk("Tasks.md");
   check("nested tasks land on their own line", afterMany.includes("  - [x] nested"));
   check("quoted tasks work from the keyboard", afterMany.includes("> - [x] quoted"));
   check("a task inside code is left alone", afterMany.includes('"- [ ] not a task"'));
   await page.mouse.click(5, 5);
   await page.keyboard.press("Meta+z");
-  await pause(300);
+  await writesSettled(page, 300);
   check("undo reverses the last task", (await disk("Tasks.md")).includes("> - [ ] quoted"));
 
   await box(0).click();
-  await pause(250);
+  await writesSettled(page, 250);
   const afterClick = await disk("Tasks.md");
   await writeFile(file("Tasks.md"), afterClick.replace("Intro", "New line\n\nIntro"));
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Tasks.md"]));
-  await pause(300);
+  await writesSettled(page, 300);
   await page.mouse.click(5, 5);
   await page.keyboard.press("Meta+z");
-  await pause(300);
+  await writesSettled(page, 300);
   check(
     "undo never flips a task after the note has moved on",
     (await disk("Tasks.md")) === afterClick.replace("Intro", "New line\n\nIntro"),
   );
   await writeFile(file("Tasks.md"), afterClick);
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Tasks.md"]));
-  await pause(300);
+  await writesSettled(page, 300);
 
   const beforeOutside = await disk("Tasks.md");
   const outside = beforeOutside.replace("Last line.", "Changed elsewhere.");
   await writeFile(file("Tasks.md"), outside);
   await box(0).click();
-  await pause(400);
+  await writesSettled(page, 400);
   check("a task click never overwrites a change made elsewhere", (await disk("Tasks.md")) === outside);
   check("the note then shows the latest text", (await page.textContent(".doc")).includes("Changed elsewhere."));
 
@@ -187,7 +189,7 @@ try {
   await openNote("Tasks");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await writesSettled(page, 300);
   check("the switch shows Edit", await page.locator('[data-act="mode-edit"].is-on').isVisible());
   check(
     "the save state replaces the reading time",
@@ -209,7 +211,7 @@ try {
   check("heading marks are hidden off the line", (await markOpacity()) === "0", await markOpacity());
   const headingAway = await headingLeft();
   await page.locator(".cm-line", { hasText: "Third heading" }).click();
-  await pause(120);
+  await idle(page);
   check("heading marks show on the line", (await markOpacity()) === "1", await markOpacity());
   check(
     "showing them does not move the heading",
@@ -217,16 +219,16 @@ try {
     `${headingAway} ${await headingLeft()}`,
   );
   await page.locator(".cm-line", { hasText: "Last line." }).click();
-  await pause(120);
+  await idle(page);
   check("bold marks are hidden off the line", !(await page.locator(".cm-content").textContent()).includes("**bold**"));
   check("a task shows as a box", (await page.locator(".cm-task").count()) >= 4);
   check("the wikilink is shown as a link", (await page.locator('.cm-wikilink:has-text("Welcome")').count()) === 1);
   check("frontmatter stays out of the way at rest", (await page.locator(".cm-frontmatter").count()) === 0);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowUp" : "Control+Home");
-  await pause(120);
+  await idle(page);
   check("frontmatter appears as text when the cursor goes there", (await page.locator(".cm-frontmatter").count()) === 3);
   await page.locator(".cm-line", { hasText: "Third heading" }).click();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "heading marks appear on the line being edited",
     (await page.locator(".cm-content").textContent()).includes("## Third heading"),
@@ -238,7 +240,7 @@ try {
   await pause(100);
   check("the state says it is saving", (await stateIs("unsaved")) || (await stateIs("saving")));
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "typing saves only that change",
     (await disk("Tasks.md")) === TASKS.replace("## Third heading", "## Third heading extended"),
@@ -246,17 +248,17 @@ try {
 
   await page.locator(".cm-task").first().click();
   await saved();
-  await pause(600);
+  await writesSettled(page, 600);
   check("a task can be clicked while editing", (await disk("Tasks.md")).includes("- [x] alpha"));
   await page.keyboard.press(EDITOR_UNDO);
   await saved();
-  await pause(600);
+  await writesSettled(page, 600);
   check("undo works in the editor", (await disk("Tasks.md")).includes("- [ ] alpha"));
 
   await page.locator(".cm-line", { hasText: "Last line." }).click();
   await page.keyboard.press("End");
   await page.keyboard.press("Shift+Home");
-  await pause(200);
+  await idle(page);
   check("selecting by keyboard stays out of the way", (await page.locator(".edit-bubble-btn").count()) === 0);
   await page.keyboard.press("ArrowRight");
   const lastLine = await page.locator(".cm-line", { hasText: "Last line." }).boundingBox();
@@ -266,15 +268,15 @@ try {
   await pause(60);
   check("the toolbar waits for a mouse selection to finish", (await page.locator(".edit-bubble-btn").count()) === 0);
   await page.mouse.up();
-  await pause(200);
+  await writesSettled(page, 200);
   check("selecting text offers formatting", (await page.locator(".edit-bubble-btn").count()) === 6);
   check("the toolbar is on screen", (await page.locator(".edit-bubble").boundingBox()).y > 0);
   await page.locator(".edit-bubble-btn.is-bold").click();
   await saved();
-  await pause(600);
+  await writesSettled(page, 600);
   check("the bubble formats the selection", (await disk("Tasks.md")).includes("**Last line.**"));
   await page.keyboard.press("Meta+f");
-  await pause(200);
+  await idle(page);
   check("find opens inside the editor", await page.locator(".cm-search").isVisible());
   await page.keyboard.press("Escape");
 
@@ -283,7 +285,7 @@ try {
   await page.keyboard.type(" quick");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(300);
+  await writesSettled(page, 300);
   check("leaving straight after typing still saves", (await disk("Tasks.md")).includes("## Second heading quick"));
   check("reading shows the edit", (await page.textContent(".doc")).includes("Second heading quick"));
   check("the switch is back on Read", await page.locator('[data-act="mode-read"].is-on').isVisible());
@@ -293,9 +295,9 @@ try {
   await page.locator(".cm-line", { hasText: "Second heading" }).click();
   await page.keyboard.type("Z");
   await page.keyboard.press("Meta+1");
-  await pause(500);
+  await writesSettled(page, 500);
   await page.locator(".nav-item", { hasText: "Welcome" }).first().click();
-  await pause(500);
+  await writesSettled(page, 500);
   check("moving to another note saves first", (await disk("Tasks.md")).includes("Z"));
   check("moving to another note leaves the editor", (await page.locator(".cm-editor").count()) === 0);
 
@@ -305,13 +307,13 @@ try {
   await writeFile(file("Conflict.md"), "# Conflict\n\nchanged on another machine\n");
   await page.locator(".cm-line", { hasText: "base text" }).click();
   await page.keyboard.type("mine ");
-  await pause(800);
+  await writesSettled(page, 800);
   check("a conflict stops the save", (await disk("Conflict.md")).includes("another machine"));
   check("a conflict explains itself", await page.locator('.edit-banner:has-text("changed outside")').isVisible());
   check("the save state says it is not saved", await stateIs("conflict"));
   await page.locator('.edit-banner button:has-text("Keep mine")').click();
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   const kept = await disk("Conflict.md");
   check("keep mine overwrites only when asked", kept.includes("mine") && !kept.includes("another machine"));
   check("the banner goes away", !(await page.locator(".edit-banner").isVisible()));
@@ -322,21 +324,21 @@ try {
   await writeFile(file("Both.md"), "# Both\n\ntheirs\n");
   await page.locator(".cm-line", { hasText: "base text" }).click();
   await page.keyboard.type("mine ");
-  await pause(800);
+  await writesSettled(page, 800);
   await page.locator('.edit-banner button:has-text("Keep both")').click();
-  await pause(400);
+  await writesSettled(page, 400);
   check("keep both leaves the other version in place", (await disk("Both.md")) === "# Both\n\ntheirs\n");
   check("keep both shows the other version", (await page.locator(".cm-content").textContent()).includes("theirs"));
   const copies = (await import("node:fs")).readdirSync(app.vault).filter((f) => f.startsWith("Both (conflict"));
   check("keep both saves a copy of mine", copies.length === 1 && (await disk(copies[0])).includes("mine"), copies.join());
 
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
   await writeFile(file("Both.md"), "# Both\n\nfrom a sync\n");
   await externalChange("Both.md");
-  await pause(300);
+  await idle(page);
   check(
     "with nothing unsaved the editor follows the disk",
     (await page.locator(".cm-content").textContent()).includes("from a sync"),
@@ -347,9 +349,9 @@ try {
     "Opening paragraph that is long enough to take up a full line of this column and wrap on to a second one.\n\n## First heading\n\n- [ ] one\n- [ ] two\n- [ ] three\n\n> A quote that sits here.\n\n## Second heading\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n### Third heading\n\nBody under it.\n\n```js\nconst a = 1;\n```\n\n> [!tip] Label\n> Text of the tip.\n\nClosing line.\n",
   );
   await page.evaluate(() => window.waymark.reader.onVaultChanged(["Parity.md"]));
-  await pause(200);
+  await idle(page);
   await openNote("Parity");
-  await pause(300);
+  await idle(page);
   const MARKS = [
     "Opening paragraph",
     "First heading",
@@ -385,7 +387,7 @@ try {
   const readTops = await blockTops(".doc :is(p, h2, h3, li, .code, blockquote)");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(400);
+  await idle(page);
   const editTops = await blockTops(".cm-content > .cm-line");
   const drift = MARKS.map((mark, i) => [mark, editTops[i] - readTops[i]]).filter(([, gap]) => Math.abs(gap) > 12);
   check(
@@ -394,7 +396,7 @@ try {
     JSON.stringify(MARKS.map((_m, i) => editTops[i] - readTops[i])),
   );
   await page.keyboard.press("Meta+e");
-  await pause(250);
+  await idle(page);
 
   const headingText = await page.locator(".doc h2").first().textContent();
   const headingTop = () =>
@@ -409,11 +411,11 @@ try {
     const heading = scroller.querySelector(".doc h2");
     scroller.scrollTop += heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 10;
   });
-  await pause(100);
+  await idle(page);
   const headingInRead = await headingTop();
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   const headingInEdit = await headingTop();
   check(
     "a heading at the top stays put going to Edit",
@@ -421,7 +423,7 @@ try {
     `${headingInRead} to ${headingInEdit}`,
   );
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
   const headingBack = await headingTop();
   check("and coming back to Read", Math.abs(headingBack - headingInRead) <= 2, `${headingInRead} to ${headingBack}`);
 
@@ -432,12 +434,12 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.type("!");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("Windows line endings are kept", (await disk("Crlf.md")) === CRLF.replace("first line", "first line!"));
 
   await openNote("Mixed");
   await page.keyboard.press("Meta+e");
-  await pause(400);
+  await idle(page);
   check("a file with mixed line endings is not opened for editing", (await page.locator(".cm-editor").count()) === 0);
   check("it says why", (await page.textContent("body")).includes("line endings"));
 
@@ -446,13 +448,13 @@ try {
   check("the inspector opens on Links", await page.locator('[data-rail="links"].is-on').isVisible());
   check("the outline shows with the inspector open", await page.locator(".floating-outline").isVisible());
   if (await page.locator(".shell:not(.rail-closed)").count()) await page.keyboard.press("Meta+Alt+\\");
-  await pause(400);
+  await idle(page);
   const outline = page.locator(".floating-outline");
   check("the outline appears with the inspector closed", await outline.isVisible());
   check("one dash per heading", (await page.locator(".fo-dash").count()) === 2);
   const restingWidth = (await outline.boundingBox()).width;
   await outline.hover();
-  await pause(200);
+  await idle(page);
   const hovered = await outline.boundingBox();
   check(
     "hovering opens the titles",
@@ -461,7 +463,7 @@ try {
   );
   check("the opened outline stays on screen", hovered.x >= 0 && hovered.x + hovered.width <= 1400);
   await page.locator(".fo-item").last().click();
-  await pause(800);
+  await idle(page);
   check(
     "clicking a title goes there",
     await page.evaluate(() => {
@@ -475,25 +477,25 @@ try {
   await page.waitForSelector(".cm-content");
   check("the outline steps aside while editing", !(await outline.isVisible()));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
   await page.keyboard.press("Meta+Alt+\\");
-  await pause(400);
+  await idle(page);
   check("the outline stays when the inspector opens", await outline.isVisible());
 
   await page.keyboard.press("Meta+t");
-  await pause(300);
+  await idle(page);
   await page.keyboard.press("Escape");
-  await pause(300);
+  await idle(page);
   check("a new tab shows the start page", await page.locator(".start-page").isVisible());
   check("it lists recent notes", (await page.locator(".start-row").count()) >= 1);
   check("it shows task progress", /\d+\/\d+/.test(await page.locator(".start-row", { hasText: "Tasks" }).first().textContent()));
   await page.locator(".start-row", { hasText: "Tasks" }).first().click();
-  await pause(500);
+  await idle(page);
   check("a recent note fills the tab", (await page.textContent(".tab.is-active .tab-title")).startsWith("Tasks"));
   await openNote("Table");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-table-widget");
-  await pause(300);
+  await writesSettled(page, 300);
   const cell = (row, column) => page.locator(`.cm-table-widget [data-row="${row}"][data-column="${column}"]`);
   const activeCell = () => page.evaluate(() => `${document.activeElement.dataset.row},${document.activeElement.dataset.column}`);
   const content = () => page.locator(".cm-content").textContent();
@@ -509,7 +511,7 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.type("x");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("typing in a cell changes only that cell", (await disk("Table.md")) === TABLE.replace("| Ada   |", "| Adax   |"));
   check("the cell keeps focus while saving", (await activeCell()) === "1,0");
   await page.keyboard.press("Tab");
@@ -527,55 +529,55 @@ try {
   await cell(1, 0).click();
   await pause(50);
   await page.evaluate(() => document.activeElement.blur());
-  await pause(100);
+  await writesSettled(page, 100);
   await cell(1, 2).focus();
-  await pause(100);
+  await writesSettled(page, 100);
   await page.keyboard.type("!");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("a cell reached without clicking keeps its formatting", (await disk("Table.md")).includes("| **bold**! |"));
   await page.keyboard.press("Backspace");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
 
   await cell(2, 2).click();
   await page.keyboard.press("End");
   await page.keyboard.type("|z");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("a typed pipe is escaped in the file", (await disk("Table.md")).includes("with \\| pipe\\|z |"));
   await page.keyboard.press("Meta+z");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("undo works inside a cell", !(await disk("Table.md")).includes("z |"));
   await page.keyboard.press("Tab");
-  await pause(250);
+  await writesSettled(page, 250);
   check(
     "Tab on the last cell adds a row",
     (await page.locator(".cm-table-widget tr").count()) === 4 && (await activeCell()) === "3,0",
   );
   await page.keyboard.type("new");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   const withRow = await disk("Table.md");
   check("the new row is in the file, right under the table", /\| Grace .*\n\| new \|\s+\|\s+\|\n\n> /.test(withRow));
   const beforeColumn = withRow;
   const gripMenu = async (kind, item) => {
     await page.locator(`.cm-table-grip.is-${kind}`).click();
-    await pause(120);
+    await writesSettled(page, 120);
     await page.locator(`.context-item:has-text("${item}")`).click();
   };
   await gripMenu("column", "Insert column right");
-  await pause(600);
+  await writesSettled(page, 600);
   check("a column can be added", (await page.locator(".cm-table-widget th").count()) === 4);
   check("the delimiter row grows too", (await disk("Table.md")).includes("|:------| --- |"));
   check("focus follows into the new column", (await activeCell()) === "3,1");
   await gripMenu("column", "Delete column");
-  await pause(600);
+  await writesSettled(page, 600);
   check("a column can be deleted, leaving the file as it was", (await disk("Table.md")) === beforeColumn);
   await cell(3, 0).click();
   await gripMenu("row", "Delete row");
-  await pause(600);
+  await writesSettled(page, 600);
   check(
     "a row can be deleted",
     (await page.locator(".cm-table-widget tr").count()) === 3 && !(await disk("Table.md")).includes("| new |"),
@@ -587,12 +589,12 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.type(" and one more word with spaces in it");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("spaces survive typing in a cell", (await disk("Table.md")).includes("and one more word with spaces in it"));
   check("columns hold still while typing", (await columnWidths()).join() === widthsBefore.join(), (await columnWidths()).join());
   await gripMenu("column", "Align center");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check(
     "a column can be aligned from its handle",
     (await disk("Table.md")).includes("| :---: |"),
@@ -607,10 +609,10 @@ try {
   check("the left arrow at a cell's start moves back", (await activeCell()) === "1,0");
   const rowsBefore = await page.locator(".cm-table-widget tr").count();
   await page.locator(".cm-table-add.is-row").click();
-  await pause(500);
+  await idle(page);
   check("the bar under a table adds a row", (await page.locator(".cm-table-widget tr").count()) === rowsBefore + 1);
   await gripMenu("row", "Delete row");
-  await pause(500);
+  await idle(page);
   const lined = await page.evaluate(() => {
     const textLeft = (el) => {
       const range = document.createRange();
@@ -625,24 +627,24 @@ try {
   check("a table's text lines up with the paragraphs", Math.abs(lined) <= 1, String(lined));
   await cell(1, 0).click();
   await gripMenu("row", "Edit as Markdown");
-  await pause(250);
+  await idle(page);
   check("a table can be edited as text", (await content()).includes("|:------|"));
   await page.locator(".cm-line", { hasText: "After." }).click();
-  await pause(250);
+  await idle(page);
   check("it goes back to a table when you leave it", (await page.locator(".cm-table-widget table").count()) === 1);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(300);
+  await idle(page);
   check("reading shows the edited table", (await page.locator(".doc table").first().textContent()).includes("Adax"));
 
   await openNote("Tasks");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   await page.keyboard.press("Meta+f");
-  await pause(200);
+  await idle(page);
   await page.keyboard.type("third");
-  await pause(100);
+  await idle(page);
   const matches = () => page.locator(".cm-searchMatch").count();
   check("find in Edit marks what is typed", (await matches()) === 1, String(await matches()));
   for (let i = 0; i < 4; i++) await page.keyboard.down("Backspace");
@@ -654,7 +656,7 @@ try {
   await page.keyboard.up("Backspace");
   await page.keyboard.press("Escape");
   await page.keyboard.press("Meta+e");
-  await pause(200);
+  await idle(page);
 
   await openNote("Tasks");
   await page.waitForFunction(() => window.waymark.sound.keys.load("tactile"));
@@ -667,7 +669,7 @@ try {
   check("typing while reading is silent", (await sounds()).length === 0);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   await sounds();
   await page.keyboard.type("a b");
   await page.keyboard.press("Enter");
@@ -737,16 +739,16 @@ try {
     window.waymark.sound.muted = false;
   });
   await page.click('[data-act="settings"]');
-  await pause(250);
+  await idle(page);
   await page.click('[data-keysound="clicky"]');
-  await pause(300);
+  await idle(page);
   const previewed = await sounds();
   check("picking a switch plays a few keys", previewed.length >= 10, String(previewed.length));
   check("the volume stays available", !(await page.locator(".key-volume").evaluate((row) => row.classList.contains("is-off"))));
   const volumeTop = () => page.locator(".key-volume").evaluate((row) => row.getBoundingClientRect().top);
   const beforeOff = await volumeTop();
   await page.click('[data-keysound="off"]');
-  await pause(200);
+  await idle(page);
   check(
     "turning sounds off disables the volume",
     await page.locator(".key-volume").evaluate((row) => row.classList.contains("is-off")),
@@ -754,22 +756,22 @@ try {
   check("and moves nothing", (await volumeTop()) === beforeOff);
   await sounds();
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   await page.locator(".cm-content").click();
   await page.keyboard.type("w");
   check("off means silent", (await sounds()).length === 0);
   await page.click('[data-act="settings"]');
-  await pause(250);
+  await idle(page);
   await page.click('[data-keysound="tactile"]');
   await page.keyboard.press("Escape");
-  await pause(200);
+  await idle(page);
   await page.keyboard.press("Meta+e");
-  await pause(200);
+  await idle(page);
 
   await openNote("Long para");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(200);
+  await idle(page);
   const wrapStyle = (selector) =>
     page
       .locator(selector)
@@ -780,9 +782,9 @@ try {
   await page.locator(".cm-line", { hasText: "The idea" }).click();
   await page.keyboard.press("End");
   await page.keyboard.type(" more");
-  await pause(100);
+  await idle(page);
   await page.locator(".cm-line", { hasText: "The idea" }).click({ clickCount: 2 });
-  await pause(250);
+  await idle(page);
   const bubbleAlpha = await page.locator(".edit-bubble").evaluate((bubble) => {
     const canvas = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
     canvas.fillStyle = getComputedStyle(bubble).backgroundColor;
@@ -793,7 +795,7 @@ try {
   await page.keyboard.press("ArrowRight");
   await saved();
   await page.keyboard.press("Meta+e");
-  await pause(200);
+  await idle(page);
 
   await openNote("Anchored");
   const topText = () =>
@@ -817,11 +819,11 @@ try {
     while (node && node.scrollHeight <= node.clientHeight + 10) node = node.parentElement;
     node.scrollTop = 2400;
   });
-  await pause(150);
+  await idle(page);
   const beforeEdit = await topText();
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await writesSettled(page, 300);
   const inEdit = await topText();
   check("switching to Edit keeps the same text in view", beforeEdit.text === inEdit.text, `${beforeEdit.text} ${inEdit.text}`);
   check("in the same place on screen", Math.abs(beforeEdit.y - inEdit.y) <= 12, `${beforeEdit.y} ${inEdit.y}`);
@@ -835,7 +837,7 @@ try {
   const editTop = await topText();
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(300);
+  await idle(page);
   const inRead = await topText();
   check("switching back keeps the same text in view", editTop.text === inRead.text, `${editTop.text} ${inRead.text}`);
 
@@ -843,7 +845,7 @@ try {
   await openNote("Heads");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(400);
+  await idle(page);
   const caret = () =>
     page.evaluate(() => {
       const sel = getSelection();
@@ -914,17 +916,17 @@ try {
   );
   await page.keyboard.press("Home");
   check("and stays there", (await caret()).x === home.x);
-  await pause(600);
+  await writesSettled(page, 600);
   await page.keyboard.press("Backspace");
-  await pause(650);
+  await writesSettled(page, 650);
   await saved();
   check(
     "Backspace there turns the heading into plain text in one step",
     (await disk("Heads.md")) === HEADS.replace("### Beta sub", "Beta sub"),
   );
-  await pause(600);
+  await writesSettled(page, 600);
   await page.keyboard.press(EDITOR_UNDO);
-  await pause(650);
+  await writesSettled(page, 650);
   await saved();
   check("one Undo brings the heading back", (await disk("Heads.md")) === HEADS);
   check("with the caret on its text", (await caret()).text === "### Beta sub" && !(await caret()).inMarks);
@@ -933,22 +935,22 @@ try {
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Backspace");
-  await pause(650);
+  await writesSettled(page, 650);
   await saved();
   check(
     "a hash inside code is left to ordinary Backspace",
     (await disk("Heads.md")) === HEADS.replace("# not a heading", "#not a heading"),
   );
   await page.keyboard.press(EDITOR_UNDO);
-  await pause(650);
+  await writesSettled(page, 650);
   await saved();
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await openNote("Broken blocks");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-preview-block .diagram.is-error", { timeout: 15000 });
-  await pause(200);
+  await idle(page);
   check(
     "a broken diagram says so and keeps its source visible",
     await page.locator(".cm-preview-block .diagram-source").isVisible(),
@@ -959,15 +961,15 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.type("!");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("typing still works beside them", (await disk("Broken blocks.md")).includes("Still works!"));
 
   await openNote("Long code");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-code-token");
-  await pause(200);
+  await idle(page);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowDown" : "Control+End");
-  await pause(400);
+  await idle(page);
   check(
     "the end of a long code block is coloured too",
     await page.locator(".cm-line", { hasText: "field499" }).locator(".cm-code-token").first().isVisible(),
@@ -975,7 +977,7 @@ try {
   await page.locator(".cm-line", { hasText: "field499" }).click();
   await page.keyboard.press("End");
   await page.keyboard.type("x");
-  await pause(300);
+  await writesSettled(page, 300);
   check(
     "a line typed in a long block keeps its colours",
     await page.locator(".cm-line", { hasText: "field499" }).locator(".cm-code-token").first().isVisible(),
@@ -989,7 +991,7 @@ try {
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
   await page.waitForSelector(".cm-preview-block svg", { timeout: 15000 });
-  await pause(300);
+  await idle(page);
   const line2 = (text) => page.locator(".cm-line", { hasText: text });
   const editColours = await page.$$eval(".cm-code-token", (spans) =>
     [...new Set(spans.filter((s) => s.textContent.trim()).map((s) => getComputedStyle(s).color))].sort(),
@@ -1008,34 +1010,34 @@ try {
   check("drawing changes nothing on disk", (await disk("Blocks.md")) === BLOCKS);
 
   await line2("Inline").click({ position: { x: 4, y: 10 } });
-  await pause(200);
+  await idle(page);
   check("math stays drawn while the cursor is elsewhere on its line", !(await editText()).includes("$a^2+b^2$"));
   await page.locator(".cm-math-inline").first().click();
-  await pause(200);
+  await idle(page);
   check("math shows its source when the cursor reaches it", (await editText()).includes("$a^2+b^2$"));
   await line2("After blocks").click();
-  await pause(200);
+  await idle(page);
   check("and is drawn again after leaving it", !(await editText()).includes("$a^2+b^2$"));
 
   await page.locator(".cm-preview-block .diagram").click();
-  await pause(250);
+  await idle(page);
   check("clicking a diagram shows its source", (await editText()).includes("graph TD"));
   await line2("After blocks").click();
-  await pause(300);
+  await idle(page);
   check("leaving it draws it again without a new render", await page.locator(".cm-preview-block .diagram-svg > svg").isVisible());
 
   await page.locator(".cm-math-block").click();
-  await pause(250);
+  await writesSettled(page, 250);
   check("clicking math shows its source", (await editText()).includes("int_0"));
   await page.keyboard.type("+1");
   await saved();
-  await pause(150);
+  await writesSettled(page, 150);
   check("math can be edited as text", (await disk("Blocks.md")).includes("+1") && (await disk("Blocks.md")).includes("$$"));
   await line2("Between them").click();
-  await pause(200);
+  await idle(page);
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
-  await pause(250);
+  await idle(page);
   check("the arrow keys walk into a block", (await editText()).includes("int_0"));
 
   await line2("After blocks").click();
@@ -1053,7 +1055,7 @@ try {
   const firstToken = () => page.locator(".cm-code-token").first().getAttribute("style");
   const tokenBefore = await firstToken();
   await page.click('[data-act="settings"]');
-  await pause(250);
+  await idle(page);
   await page.click('[data-family="rose-pine"]');
   await page
     .waitForFunction((before) => document.querySelector(".cm-code-token")?.getAttribute("style") !== before, tokenBefore, {
@@ -1064,10 +1066,10 @@ try {
   check("switching theme leaves the editor open", await page.locator(".cm-content").isVisible());
   await page.click('[data-family="catppuccin"]');
   await page.keyboard.press("Escape");
-  await pause(500);
+  await idle(page);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(300);
+  await idle(page);
   check("reading still draws the same note", (await page.locator(".doc .diagram-svg > svg").count()) === 1);
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {

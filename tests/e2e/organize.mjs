@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -13,6 +14,7 @@ const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  
 const app = await serveFixture();
 const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 800 } });
+await watchIdle(page);
 const errors = [];
 watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
@@ -31,7 +33,7 @@ const toastText = () =>
 const openNote = async (name) => {
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(350);
+  await idle(page);
 };
 const row = (file) => page.locator(`.nav-item[data-path="${file}"]`);
 const folder = (name) => page.locator(`.tree-head[data-folder="${name}"]`);
@@ -47,7 +49,7 @@ const showOnly = async (...folders) => {
     for (const name of names) tree.focusFolder(name);
     document.querySelector(".sidebar-inner").scrollTop = 0;
   }, folders);
-  await pause(300);
+  await idle(page);
 };
 
 async function dragTo(from, to, during) {
@@ -69,11 +71,11 @@ try {
   await put("Sailing/Rye harbour.md", "The rye crew moored at the harbour.\n");
   await openNote("Welcome");
   await page.keyboard.press("Meta+Shift+f");
-  await pause(200);
+  await idle(page);
   const input = page.locator(".sidebar-search input");
   const search = async (q) => {
     await input.fill(q);
-    await pause(150);
+    await idle(page);
     return page.$$eval(".search-hit", (hits) =>
       hits.map((h) => h.querySelector(".search-hit-title, strong")?.textContent ?? h.textContent),
     );
@@ -114,7 +116,7 @@ try {
   await search("rye path:");
   check("a half-typed path is ignored", (await page.locator(".search-hit").count()) >= 2);
   await page.keyboard.press("Escape");
-  await pause(100);
+  await idle(page);
 
   /* Copy a link (#21) */
   await put("Links/Field guide.md", "# Field guide\n\n## Soil: the first | layer\n\nText.\n\n## Water\n\nMore.\n");
@@ -131,39 +133,39 @@ try {
   });
   const copied = () => page.evaluate(() => window.copied.at(-1));
   await row("Links/Field guide.md").click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Copy link")').click();
-  await pause(120);
+  await idle(page);
   check("the note menu copies the note's link", (await copied()) === "[[Field guide]]", await copied());
   check("copying shows what was copied", (await toastText()).includes("[[Field guide]]"), await toastText());
   await row("Links/Twin.md").click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Copy link")').click();
-  await pause(120);
+  await idle(page);
   check("a shared name copies the path", (await copied()) === "[[Links/Twin]]", await copied());
   await page.locator(".doc h2", { hasText: "Soil" }).click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Copy link to this heading")').click();
-  await pause(120);
+  await idle(page);
   check(
     "a heading's menu copies a heading link, with link-breaking characters removed",
     (await copied()) === "[[Field guide#Soil the first layer]]",
     await copied(),
   );
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">copy link to this note");
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(150);
+  await idle(page);
   check("the palette copies the note's link", (await copied()) === "[[Field guide]]", await copied());
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   await page.locator(".cm-line.cm-h2", { hasText: "Water" }).click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Copy link to this heading")').click();
-  await pause(120);
+  await idle(page);
   check("a heading in Edit copies the same link", (await copied()) === "[[Field guide#Water]]", await copied());
   await page.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {
@@ -172,12 +174,12 @@ try {
     });
   });
   await page.locator(".cm-line.cm-h2", { hasText: "Water" }).click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Copy link to this note")').click();
-  await pause(150);
+  await idle(page);
   check("a failed copy says so", (await toastText()).includes("could not be copied"), await toastText());
   await page.keyboard.press("Meta+e");
-  await pause(200);
+  await idle(page);
 
   /* Sort by date (#19) */
   await put("Sorted/Apple.md", "a\n");
@@ -195,9 +197,9 @@ try {
   check("notes start in name order", (await order()) === "Apple,Banana,Cherry", await order());
   const sortButton = page.locator('[data-act="sort-files"]');
   await sortButton.click();
-  await pause(120);
+  await writesSettled(page, 120);
   await page.locator('.context-item:has-text("Date modified")').click();
-  await pause(300);
+  await writesSettled(page, 300);
   check("sorting by date puts the newest first", (await order()) === "Banana,Cherry,Apple", await order());
   check("the control shows the choice", await sortButton.evaluate((b) => b.classList.contains("is-on")));
   check("sorting confirms itself", (await toastText()).includes("date modified"), await toastText());
@@ -214,9 +216,9 @@ try {
   await openNote("Apple");
   check("notes written at the same moment fall back to names", (await order()) === "Apple,Banana,Cherry", await order());
   await page.locator('[data-act="sort-files"]').click();
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Name")').click();
-  await pause(200);
+  await idle(page);
 
   /* Dragging notes between folders (#18) */
   await put("Inbox/Alpha.md", "Alpha text.\n");
@@ -236,7 +238,7 @@ try {
   }));
   check("the drop target is marked", seen.target && seen.chip === "Alpha" && seen.source, JSON.stringify(seen));
   check("nothing in the list moves during a drag", seen.still);
-  await pause(600);
+  await idle(page);
   check("a dragged note moves on disk", existsSync(inVault("Archive/Alpha.md")) && !existsSync(inVault("Inbox/Alpha.md")));
   check("links to it are rewritten", (await read("Refs.md")).includes("[[Archive/Alpha]]"), await read("Refs.md"));
   check("the drop is confirmed", /Updated links in 1 note|Moved/.test(await toastText()), await toastText());
@@ -244,7 +246,7 @@ try {
 
   await showOnly("Inbox");
   await dragTo(row("Inbox/Dup.md"), folder("Archive"));
-  await pause(400);
+  await idle(page);
   check(
     "a note of the same name is never overwritten",
     (await read("Archive/Dup.md")) === "Archive copy.\n" && (await read("Inbox/Dup.md")) === "Inbox copy.\n",
@@ -259,7 +261,7 @@ try {
   await page.mouse.move(b.x + 40, b.y + 8, { steps: 6 });
   await page.keyboard.press("Escape");
   await page.mouse.up();
-  await pause(250);
+  await idle(page);
   check(
     "Escape cancels a drag",
     existsSync(inVault("Inbox/Dup.md")) &&
@@ -278,7 +280,7 @@ try {
   check("a closed folder opens when held over", await closed.evaluate((h) => h.getAttribute("aria-expanded") === "true"));
   await page.keyboard.press("Escape");
   await page.mouse.up();
-  await pause(150);
+  await idle(page);
 
   const scrollerBefore = await page.evaluate(() => {
     const box = document.querySelector(".sidebar-inner");
@@ -295,19 +297,19 @@ try {
   await page.keyboard.press("Escape");
   await page.mouse.up();
   check("the list scrolls near its edges during a drag", scrolled > scrollerBefore, String(scrolled));
-  await pause(150);
+  await idle(page);
 
   await put("Inbox/Editing.md", "Editing body.\n");
   await openNote("Editing");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   await page.locator(".cm-line", { hasText: "Editing body" }).click();
   await page.keyboard.press("End");
   await page.keyboard.type(" unsaved");
   await showOnly("Inbox");
   await dragTo(row("Inbox/Editing.md"), folder("Archive"));
-  await pause(900);
+  await idle(page);
   check(
     "an open note with unsaved typing moves with its text",
     (await read("Archive/Editing.md")).includes("unsaved") && !existsSync(inVault("Inbox/Editing.md")),
@@ -319,14 +321,14 @@ try {
       (await page.locator(".cm-content").isVisible()),
   );
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await page.evaluate(() => {
     Object.defineProperty(window.waymark.reader.sync, "busy", { get: () => true, configurable: true });
   });
   await showOnly("Inbox");
   await dragTo(row("Inbox/Dup.md"), folder("Sorted"));
-  await pause(300);
+  await idle(page);
   check(
     "a drag during sync waits and says so",
     existsSync(inVault("Inbox/Dup.md")) && (await toastText()).includes("Sync is running"),
@@ -338,7 +340,7 @@ try {
 
   await page.route("**/@vault/rename", (route) => route.abort());
   await dragTo(row("Inbox/Dup.md"), folder("Sorted"));
-  await pause(500);
+  await idle(page);
   check(
     "a failed move is shown and leaves the note",
     existsSync(inVault("Inbox/Dup.md")) && /could not|failed/i.test(await toastText()),
@@ -367,7 +369,7 @@ try {
   );
   await dragTo(row("Inbox/Dup.md"), folder("Closed"));
   const marked = await landing;
-  await pause(600);
+  await idle(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   check("Reduce Motion keeps the landing mark", marked === 1, String(marked));
 
@@ -388,7 +390,7 @@ try {
     await page.evaluate(() => {
       window.waymark.reader.sidebar.tree.openFolder("Sorted");
     });
-    await pause(250);
+    await idle(page);
     await page.locator('.nav-item[data-path="Sorted/Banana.md"]').focus();
     const tree = page.locator(".sidebar .tree").first();
     const list = page.locator(".sidebar-inner");
@@ -426,11 +428,11 @@ try {
   await openNote("Welcome");
   const openTab = (note) => page.evaluate((n) => window.waymark.reader.open(`${n}.md`, { newTab: true, focus: true }), note);
   await openTab("Refs");
-  await pause(120);
+  await idle(page);
   await openTab("Sorted/Apple");
-  await pause(120);
+  await idle(page);
   await page.locator(".tab").first().click();
-  await pause(120);
+  await idle(page);
   const tabs = () => page.$$eval(".tab .tab-title", (t) => t.map((x) => x.textContent).join());
   const activeTab = () => page.textContent(".tab.is-active .tab-title");
 
@@ -458,7 +460,7 @@ try {
     await page.keyboard.press("Home");
     check("Home reaches the first tab", (await strip()).active === "Welcome");
     for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowRight", { delay: 0 });
-    await pause(250);
+    await idle(page);
     const rapid = await strip();
     check(
       "rapid arrows land on the right tab and keep focus",
@@ -480,7 +482,7 @@ try {
     await page.evaluate(() => window.waymark.reader.renderTabs());
     check("a redraw keeps focus on the close control", (await strip()).focusIsClose);
     await page.keyboard.press("Enter");
-    await pause(200);
+    await idle(page);
     const closed = await strip();
     check(
       "closing from the keyboard moves focus to the tab that takes over",
@@ -488,10 +490,10 @@ try {
       JSON.stringify(closed),
     );
     await page.keyboard.press("Meta+Shift+t");
-    await pause(200);
+    await idle(page);
     await page.evaluate(() => document.activeElement?.blur());
     await page.locator(".tab").first().click();
-    await pause(120);
+    await idle(page);
     const afterClick = await strip();
     check(
       "a click selects a tab without taking focus or showing a ring",
@@ -521,14 +523,14 @@ try {
   await pause(150);
   const inactiveGuide = await page.locator(".tab-drop:not([hidden])").count();
   await page.mouse.up();
-  await pause(250);
+  await idle(page);
   check(
     "a tab that was not active can be dragged too, keeping its guide",
     inactiveGuide === 1 && (await tabs()) === "Apple,Welcome,Refs",
     `${inactiveGuide} ${await tabs()}`,
   );
   await page.locator(".tab").nth(2).click();
-  await pause(120);
+  await idle(page);
   const back = await page.locator(".tab").nth(2).boundingBox();
   const start = await page.locator(".tab").nth(0).boundingBox();
   await page.mouse.move(back.x + back.width / 2, back.y + 14);
@@ -536,21 +538,21 @@ try {
   await page.mouse.move(start.x + 4, start.y + 14, { steps: 8 });
   await pause(40);
   await page.mouse.up();
-  await pause(250);
+  await idle(page);
   await page.locator(".tab", { hasText: "Welcome" }).click();
-  await pause(120);
+  await idle(page);
   const t1 = await page.locator(".tab").nth(0).boundingBox();
   await page.mouse.move(t1.x + 20, t1.y + 14);
   await page.mouse.down();
   await page.mouse.move(t1.x + 200, t1.y + 14, { steps: 5 });
   await page.keyboard.press("Escape");
   await page.mouse.up();
-  await pause(100);
+  await idle(page);
   check("Escape cancels a tab drag", (await tabs()) === "Refs,Apple,Welcome", await tabs());
   await page.locator(".tab").nth(1).click({ button: "right" });
-  await pause(120);
+  await idle(page);
   await page.locator('.context-item:has-text("Pin tab")').click();
-  await pause(150);
+  await idle(page);
   check(
     "pinning moves a tab to the left and marks it",
     (await tabs()) === "Apple,Refs,Welcome" && (await page.locator(".tab.is-pinned").count()) === 1,
@@ -560,73 +562,73 @@ try {
     const countTabs = () => page.locator(".tab").count();
     const before = await countTabs();
     await page.locator(".tab").nth(1).click();
-    await pause(150);
+    await idle(page);
     const opener = await activeTab();
     await page.keyboard.press("Meta+t");
-    await pause(200);
+    await idle(page);
     check(
       "a new tab opens blank behind the palette",
       (await activeTab()) === "New tab" && (await page.locator(".palette").count()) === 1,
     );
     check("the palette's field has focus", await page.evaluate(() => document.activeElement?.matches(".palette input")));
     await page.keyboard.press("Meta+w");
-    await pause(200);
+    await idle(page);
     check("⌘W closes a blank tab from the palette field", (await countTabs()) === before, String(await countTabs()));
     check("the palette closes with it", (await page.locator(".palette:not(.is-leaving)").count()) === 0);
     check("the tab it opened beside comes back", (await activeTab()) === opener, await activeTab());
     await page.keyboard.press("Meta+t");
-    await pause(200);
+    await idle(page);
     await page.keyboard.press("Escape");
-    await pause(120);
+    await idle(page);
     check("Escape closed the palette and kept the blank tab", (await activeTab()) === "New tab");
     await page.keyboard.press("Meta+w");
-    await pause(200);
+    await idle(page);
     check("⌘W closes a blank tab with the palette shut too", (await countTabs()) === before && (await activeTab()) === opener);
     await page.keyboard.press("Meta+k");
-    await pause(120);
+    await idle(page);
     await page.keyboard.press("Meta+w");
-    await pause(120);
+    await idle(page);
     check("⌘W over a note leaves the tab alone while typing", (await countTabs()) === before);
     await page.keyboard.press("Escape");
-    await pause(120);
+    await idle(page);
   }
   check("a pinned tab has no close button", (await page.locator(".tab.is-pinned .tab-close").count()) === 0);
   await page.locator(".tab.is-pinned").click();
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Meta+w");
-  await pause(150);
+  await idle(page);
   check(
     "closing a pinned tab says why",
     (await toastText()).includes("Unpin") && (await page.locator(".tab").count()) === 3,
     await toastText(),
   );
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">move tab right");
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(150);
+  await idle(page);
   check(
     "a pinned tab cannot leave the pinned group, and says so",
     (await tabs()) === "Apple,Refs,Welcome" && (await toastText()).includes("already last"),
     await toastText(),
   );
   await page.locator(".tab").nth(1).click();
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">move tab right");
-  await pause(150);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(200);
+  await idle(page);
   check("the palette moves a tab without dragging", (await tabs()) === "Apple,Welcome,Refs", await tabs());
   await writeFile(inVault("Reopen side.md"), "# Reopen side\n");
   await writeFile(inVault("Reopen long.md"), `# Reopen long\n\n${"A plain paragraph of words.\n\n".repeat(200)}`);
   await page.evaluate(() => window.waymark.reader.persist());
-  await pause(300);
+  await idle(page);
   await page.goto(app.url);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(400);
+  await idle(page);
   check(
     "order and pin survive a relaunch",
     (await tabs()) === "Apple,Welcome,Refs" && (await page.locator(".tab.is-pinned").count()) === 1,
@@ -636,26 +638,26 @@ try {
   /* Reopening closed tabs */
   const reopen = async () => {
     await page.keyboard.press("Meta+Shift+t");
-    await pause(250);
+    await idle(page);
   };
   const noteScroll = () => page.locator(".scroller").evaluate((s) => Math.round(s.scrollTop));
   const trailSize = () => page.evaluate(() => window.waymark.reader.workspace.active.trail.size);
   await reopen();
   check("with nothing closed the shortcut still answers", (await toastText()).includes("No closed tabs"), await toastText());
   await openTab("Reopen long");
-  await pause(200);
+  await idle(page);
   await page.evaluate(() => window.waymark.reader.open("Reopen side.md", { via: "link" }));
-  await pause(200);
+  await idle(page);
   await page.keyboard.press("Meta+[");
-  await pause(250);
+  await idle(page);
   await page.locator(".scroller").evaluate((s) => {
     s.scrollTop = 900;
   });
-  await pause(120);
+  await idle(page);
   const openOrder = await tabs();
   const stops = await trailSize();
   await page.keyboard.press("Meta+w");
-  await pause(250);
+  await idle(page);
   check("closing removes the tab", !(await tabs()).includes("Reopen long"), await tabs());
   await reopen();
   check("the tab comes back where it was", (await tabs()) === openOrder, await tabs());
@@ -663,34 +665,34 @@ try {
   check("with its place in the note", Math.abs((await noteScroll()) - 900) < 40, String(await noteScroll()));
   check("and its trail", stops === 2 && (await trailSize()) === 2, `${stops} ${await trailSize()}`);
   await page.keyboard.press("Meta+w");
-  await pause(250);
+  await idle(page);
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">reopen closed");
-  await pause(150);
+  await idle(page);
   const offered = await page.locator(".palette-row.is-selected").textContent();
   check("the palette offers it with its shortcut", offered.includes("Reopen closed tab") && offered.includes("⌘⇧T"), offered);
   await page.keyboard.press("Enter");
-  await pause(250);
+  await idle(page);
   check("the palette brings it back", (await tabs()) === openOrder, await tabs());
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   await page.keyboard.press("Meta+w");
-  await pause(400);
+  await idle(page);
   await reopen();
   check("it works from the editor too", (await tabs()) === openOrder, await tabs());
   await page.keyboard.press("Meta+t");
-  await pause(200);
+  await idle(page);
   await page.evaluate(() => {
     const { reader } = window.waymark;
     reader.closeTab(reader.workspace.activeIndex);
     reader.closeTab(reader.workspace.tabs.findIndex((t) => t.trail.current.view.path === "Reopen long.md"));
   });
-  await pause(250);
+  await idle(page);
   await rm(inVault("Reopen long.md"));
   await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Reopen long.md"]));
-  await pause(200);
+  await idle(page);
   const stillOpen = await tabs();
   await reopen();
   check("a note that has gone says so", (await toastText()).includes("no longer in the vault"), await toastText());
