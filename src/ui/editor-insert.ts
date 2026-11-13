@@ -133,6 +133,7 @@ const BLOCK_GLYPHS: Record<string, string> = {
   Table: "|",
   "Code block": "```",
   Callout: "[!]",
+  Toggle: "[!]-",
   Diagram: "->",
   "Math block": "$$",
   Divider: "---",
@@ -169,6 +170,11 @@ const WHOLE_LINE: [label: string, keywords: string, apply: Apply][] = [
   ],
   ["Code block", "fence snippet", (view, from, to) => void insertBlock(view, from, to, ["```", "", "```"], 1, 0, true)],
   ["Callout", "note admonition", (view, from, to) => void insertBlock(view, from, to, ["> [!note]", "> "], 1, 2, true)],
+  [
+    "Toggle",
+    "collapse fold details callout",
+    (view, from, to) => void insertBlock(view, from, to, ["> [!note]- ", "> "], 0, 11, true),
+  ],
   [
     "Diagram",
     "mermaid flowchart",
