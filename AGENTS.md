@@ -45,6 +45,7 @@ Regexes that scan whole notes must not use lookbehind. The macOS system WebKit r
 
 - Write the failing test first when fixing a bug. Unit tests live in `tests/unit/` and assert behaviour through public interfaces.
 - `tests/e2e/reader.mjs` pins user-visible behaviour. A structural change must leave it fully green in both normal and `reduced` modes.
+- In an e2e suite, wait with `idle` or `writesSettled` from `tests/e2e/idle.mjs`, not a fixed pause. Keep a fixed pause only to sample motion mid-flight, to let a deliberate delay of 400 ms or more run, or while a mouse button is held. A new suite goes in `RUNS` in `scripts/e2e.mjs` with its CI seconds, which CI uses to deal the shards.
 - A change to the Rust layer or IPC is proven only by `pnpm test:native`. A browser preview does not exercise Git or `vault://`.
 - Comments state a non-obvious reason. Do not narrate the change.
 - Test files are named `tests/unit/<subject>.test.ts`. Types and classes are PascalCase, functions and variables camelCase, constants SCREAMING_SNAKE_CASE. Biome enforces this.
