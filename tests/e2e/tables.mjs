@@ -2,7 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
-import { idle, watchIdle } from "./idle.mjs";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -64,13 +64,9 @@ const file = (name) => path.join(app.vault, `${name}.md`);
 const disk = (name) => readFile(file(name), "utf8");
 const saved = () =>
   page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "saved", null, { timeout: 5000 });
-/* An edit marks the note unsaved at once and autosave writes 400 ms later. A step that should change nothing still gets 650 ms to show a stray write. */
 const settle = async () => {
-  await page
-    .waitForFunction(() => document.querySelector(".edit-state")?.dataset.state !== "saved", null, { timeout: 650 })
-    .catch(() => {});
+  await writesSettled(page);
   await saved();
-  await idle(page);
 };
 
 async function open(name) {

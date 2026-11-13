@@ -95,3 +95,18 @@ export const watchIdle = (target) => target.addInitScript(track, LONGEST_SHORT_T
 
 /** Resolves once the page is at rest. CI machines are slower than a laptop, so the default timeout is generous. */
 export const idle = (page, timeout = 15000) => page.evaluate((ms) => window.__e2eIdle(ms), timeout);
+
+/**
+ * Waits out a save, then rest. An edit marks the note unsaved at once and autosave writes it 400 ms later, so once the
+ * note reads unsaved this waits for that write to end, however it ends. When nothing reads unsaved within `ms`, the step
+ * changed nothing or wrote some other way, and the full `ms` has still passed for a stray write to show.
+ */
+export async function writesSettled(page, ms = 650) {
+  await page
+    .waitForFunction(() => document.querySelector(".edit-state")?.dataset.state !== "saved", null, { timeout: ms })
+    .catch(() => {});
+  await page.waitForFunction(() => !["unsaved", "saving"].includes(document.querySelector(".edit-state")?.dataset.state), null, {
+    timeout: 15000,
+  });
+  await idle(page);
+}
