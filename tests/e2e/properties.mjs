@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -47,12 +48,13 @@ for (const [name, text] of Object.entries(NOTES)) await writeFile(file(name), te
 const browser = await webkit.launch();
 const context = await browser.newContext({ viewport: { width: 1320, height: 860 }, colorScheme: "light" });
 const page = await context.newPage();
+await watchIdle(page);
 const errors = [];
 watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
 const open = async (name) => {
   await page.evaluate((target) => window.waymark.open(target), name);
-  await pause(350);
+  await idle(page);
 };
 const cell = (key) => page.locator(`.prop-cell[data-key="${key}"]`);
 const value = (key) => cell(key).locator(".prop-value");
@@ -74,15 +76,15 @@ const change = async (key, text) => {
   await pause(60);
   await page.keyboard.type(text);
   await page.keyboard.press("Enter");
-  await pause(250);
+  await idle(page);
 };
 
 try {
   await page.goto(`${app.url}?note=${encodeURIComponent("Messy")}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(400);
+  await writesSettled(page, 400);
   await page.click('[data-rail="info"]');
-  await pause(300);
+  await writesSettled(page, 300);
 
   check("a name with a space is listed", await cell("Due date").isVisible());
   check("the file is not touched by looking at it", (await disk("Messy.md")) === MESSY);
@@ -97,22 +99,22 @@ try {
   );
   await page.keyboard.type("read");
   await page.keyboard.press("Enter");
-  await pause(250);
+  await writesSettled(page, 250);
   check("Enter writes only that value, byte for byte", (await disk("Messy.md")) === MESSY.replace("unread", "read"));
   check("the value shows what was written", (await value("status").textContent()) === "read");
   check("focus stays on the value", await value("status").evaluate((v) => document.activeElement === v));
 
   await page.keyboard.press("Meta+z");
-  await pause(350);
+  await writesSettled(page, 350);
   check("Command-Z takes that back in one step", (await disk("Messy.md")) === MESSY);
-  await pause(150);
+  await idle(page);
   check("and the panel shows the old value", (await value("status").textContent()) === "unread");
 
   await value("status").click();
   await pause(60);
   await page.keyboard.type("nope");
   await page.keyboard.press("Escape");
-  await pause(200);
+  await writesSettled(page, 200);
   check("Escape changes nothing", (await disk("Messy.md")) === MESSY && (await value("status").textContent()) === "unread");
   check("Escape leaves the panel open", await page.locator(".rail-info").isVisible());
 
@@ -121,7 +123,7 @@ try {
   await pause(60);
   await page.keyboard.type("by keyboard");
   await page.keyboard.press("Tab");
-  await pause(250);
+  await writesSettled(page, 250);
   check(
     "the keyboard alone can change a value, and leaving saves",
     (await disk("Messy.md")) === MESSY.replace("unread", "by keyboard"),
@@ -138,27 +140,27 @@ try {
   await pause(60);
   await page.keyboard.type("Changed");
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check("a list item changes on its own line", (await disk("Messy.md")) === MESSY.replace('"Second"', "Changed"));
   await cell("aliases").locator(".prop-chip-add").click();
   await pause(60);
   await page.keyboard.type("Third: one");
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check(
     "a list grows and quotes what it must",
     (await disk("Messy.md")) === MESSY.replace('  - "Second"', '  - Changed\n  - "Third: one"'),
   );
   await cell("aliases").locator(".prop-chip").last().focus();
   await page.keyboard.press("Delete");
-  await pause(300);
+  await writesSettled(page, 300);
   check("Delete removes an item", (await disk("Messy.md")) === MESSY.replace('"Second"', "Changed"));
 
   await cell("tags").locator(".prop-chip-add").click();
   await pause(60);
   await page.keyboard.type("new");
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check(
     "an inline list stays inline and keeps its other items exact",
     (await disk("Messy.md")).includes("tags: [one, 'two words', new]"),
@@ -171,7 +173,7 @@ try {
   await page.keyboard.press("Enter");
   await page.keyboard.type("Sam");
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check(
     "a new property goes at the end of the block",
     (await disk("Messy.md")) === MESSY.replace('  - "Second"\n', '  - "Second"\nReviewed by: Sam\n'),
@@ -184,17 +186,17 @@ try {
   await page.keyboard.press("Enter");
   await page.keyboard.type("twice");
   await page.keyboard.press("Enter");
-  await pause(200);
+  await writesSettled(page, 200);
   check(
     "a name already there is refused, and says so",
     (await page.locator(".prop-hint").textContent()).includes("already") && !(await disk("Messy.md")).includes("twice"),
   );
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
   check("Escape closes the new row", !(await page.locator(".prop-new").isVisible()));
 
   await cell("Reviewed by").hover();
-  await pause(400);
+  await idle(page);
   check(
     "the remove control shows on the row being pointed at",
     (await cell("Reviewed by")
@@ -202,14 +204,14 @@ try {
       .evaluate((b) => getComputedStyle(b).opacity)) === "1",
   );
   await cell("Reviewed by").locator(".prop-remove").click();
-  await pause(300);
+  await writesSettled(page, 300);
   check("removing takes out only its line", (await disk("Messy.md")) === MESSY);
   await page.locator(".toast-action").click();
-  await pause(300);
+  await writesSettled(page, 300);
   check("Undo brings it back", (await disk("Messy.md")).includes("Reviewed by: Sam"));
   await cell("Reviewed by").locator(".prop-remove").focus();
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check("removing works from the keyboard", (await disk("Messy.md")) === MESSY);
 
   await open("Plain.md");
@@ -219,7 +221,7 @@ try {
   await page.keyboard.press("Enter");
   await page.keyboard.type("v");
   await page.keyboard.press("Enter");
-  await pause(300);
+  await writesSettled(page, 300);
   check("a note with no block gets one at the very top", (await disk("Plain.md")) === `---\nk: v\n---\n${NOTES["Plain.md"]}`);
 
   await open("Tasks.md");
@@ -229,13 +231,13 @@ try {
   await page.keyboard.press("Enter");
   await page.keyboard.type("v");
   await page.keyboard.press("Enter");
-  await pause(500);
+  await idle(page);
   check(
     "focus stays in the panel after the note redraws",
     await page.evaluate(() => document.activeElement?.closest(".prop-editor") !== null),
   );
   await page.locator("button.task-box").nth(1).click();
-  await pause(400);
+  await writesSettled(page, 400);
   check(
     "a task still toggles its own line after a property moved the lines",
     (await disk("Tasks.md")) === "---\nk: v\n---\n# Tasks\n\n- [ ] first\n- [x] second\n",
@@ -245,7 +247,7 @@ try {
   await open("Solo.md");
   await cell("only").hover();
   await cell("only").locator(".prop-remove").click();
-  await pause(300);
+  await writesSettled(page, 300);
   check("removing the last property removes the block", (await disk("Solo.md")) === "Solo body\n");
 
   await open("Windows.md");
@@ -264,11 +266,11 @@ try {
   check("a value beside those still edits exactly", (await disk("Nested.md")) === before.replace("yes please", "changed"));
   await cell("place").locator(".prop-raw").click();
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await writesSettled(page, 300);
   check("Edit as text opens the raw lines", await page.locator(".cm-line", { hasText: "city: Paris" }).isVisible());
   check("the file is unchanged by that", (await disk("Nested.md")) === before.replace("yes please", "changed"));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await open("Broken.md");
   check(
@@ -281,18 +283,18 @@ try {
   await open("Editing.md");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await writesSettled(page, 300);
   await change("status", "done");
-  await pause(500);
+  await writesSettled(page, 500);
   check("a change during Edit reaches the file", (await disk("Editing.md")) === NOTES["Editing.md"].replace("draft", "done"));
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
-  await pause(700);
+  await writesSettled(page, 700);
   check("one undo in the editor takes it back", (await disk("Editing.md")) === NOTES["Editing.md"]);
-  await pause(200);
+  await idle(page);
   check("and the panel follows", (await value("status").textContent()) === "draft");
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await open("Conflict.md");
   await value("status").click();
@@ -301,10 +303,10 @@ try {
   await writeFile(file("Conflict.md"), "---\nstatus: theirs\n---\nConflict body\n");
   await pause(60);
   await page.keyboard.press("Enter");
-  await pause(500);
+  await writesSettled(page, 500);
   check("a change from elsewhere is not overwritten", (await disk("Conflict.md")).includes("status: theirs"));
   check("and the panel says so", (await toast()).includes("changed elsewhere"), await toast());
-  await pause(500);
+  await idle(page);
   check(
     "and shows what is really there",
     (await value("status").textContent()) === "theirs",
@@ -318,7 +320,7 @@ try {
   await pause(60);
   await page.keyboard.type("z");
   await page.keyboard.press("Enter");
-  await pause(400);
+  await idle(page);
   check(
     "a failed write puts the old value back",
     (await value("status").textContent()) === "a",
@@ -328,27 +330,27 @@ try {
   check("and the file is untouched", (await disk("Locked.md")) === NOTES["Locked.md"]);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
   await value("status").click();
   await pause(60);
   await page.keyboard.type("y");
   await page.keyboard.press("Enter");
-  await pause(700);
+  await idle(page);
   check("in Edit too", (await value("status").textContent()) === "a", await value("status").textContent());
   check(
     "and the editor's text goes back",
     await page.locator(".cm-content").evaluate((c) => !c.textContent.includes("status: y")),
   );
   await page.unroute("**/@vault/write", refuseWrites);
-  await pause(600);
+  await writesSettled(page, 600);
   check("nothing was written meanwhile", (await disk("Locked.md")) === NOTES["Locked.md"]);
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
 
   await open("Messy.md");
   await change("Due date", "soon");
   await page.evaluate(() => window.waymark.reader.open("Views.base"));
-  await pause(500);
+  await idle(page);
   check('views read note["Due date"] with the new value', (await page.textContent(".reader")).includes("soon"));
 
   await open("Long.md");
@@ -363,7 +365,7 @@ try {
   check("long names and values stay in the panel", (await overflow()) === 0, String(await overflow()));
   await page.setViewportSize({ width: 560, height: 700 });
   await page.keyboard.press("Meta+Alt+\\");
-  await pause(500);
+  await idle(page);
   check("including at 560 px", (await overflow()) === 0, String(await overflow()));
 
   check("nothing threw", errors.length === 0, errors[0]);

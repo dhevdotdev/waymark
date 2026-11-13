@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { webkit } from "playwright";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -15,12 +16,13 @@ await writeFile(
 const browser = await webkit.launch();
 const errors = [];
 const page = await (await browser.newContext({ viewport: { width: 1320, height: 800 } })).newPage();
+await watchIdle(page);
 watchPageErrors(page, errors);
 const pause = (ms) => page.waitForTimeout(ms);
 const toastText = () => page.locator(".toast").last().textContent();
 const open = async (name) => {
   await page.evaluate((target) => window.waymark.open(target), name);
-  await pause(350);
+  await idle(page);
 };
 await page.addInitScript(() => {
   window.__copied = [];
@@ -32,7 +34,7 @@ await page.addInitScript(() => {
 });
 await page.goto(`${app.url}?note=Links`);
 await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-await pause(400);
+await idle(page);
 
 /* Drops */
 const dropOn = (selector, type) =>
@@ -49,7 +51,7 @@ check("dragging over the reading area is refused", await dropOn(".doc", "dragove
 check("a drop on the file list is refused", await dropOn(".sidebar", "drop"));
 await page.keyboard.press("Meta+e");
 await page.waitForSelector(".cm-content");
-await pause(300);
+await idle(page);
 const refusedInEditor = await page.evaluate(() => {
   const event = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() });
   let refused = false;
@@ -63,47 +65,47 @@ const refusedInEditor = await page.evaluate(() => {
 });
 check("the editor still takes drops", !refusedInEditor);
 await page.keyboard.press("Meta+e");
-await pause(300);
+await idle(page);
 
 /* Link menu */
 const menuLabels = () => page.locator(".context-menu .context-item").allTextContents();
 await page.locator(".doc a", { hasText: "Site" }).click({ button: "right" });
-await pause(150);
+await idle(page);
 check(
   "right-clicking a link offers its address",
   (await menuLabels()).join() === "Open link,Copy link address",
   (await menuLabels()).join(),
 );
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 await page.locator(".doc a", { hasText: "Inside" }).click({ button: "right" });
-await pause(150);
+await idle(page);
 check(
   "a link in a heading is treated as a link",
   (await menuLabels()).includes("Copy link address"),
   (await menuLabels()).join(),
 );
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 await page.locator(".doc h1", { hasText: "Heading" }).click({ button: "right", position: { x: 20, y: 10 } });
-await pause(150);
+await idle(page);
 check(
   "the heading itself keeps its own menu",
   (await menuLabels()).some((l) => l.includes("heading")),
   (await menuLabels()).join(),
 );
 await page.keyboard.press("Escape");
-await pause(150);
+await idle(page);
 
 /* Swipe and mouse buttons */
 const WIDE = Array.from({ length: 14 }, (_, i) => `| Column number ${i + 1} `).join("");
 await writeFile(`${app.vault}/Swipe one.md`, "# Swipe one\n\n[[Swipe two]]\n");
 await writeFile(`${app.vault}/Swipe two.md`, `# Swipe two\n\nPlain words here.\n\n${WIDE}|\n${"| --- ".repeat(14)}|\n${WIDE}|\n`);
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Swipe one.md", "Swipe two.md"]));
-await pause(200);
+await idle(page);
 await open("Swipe one.md");
 await page.locator(".doc a.wikilink").first().click();
-await pause(400);
+await idle(page);
 const title = () => page.textContent(".tab.is-active .tab-title");
 check("a link was followed before swiping", (await title()) === "Swipe two", await title());
 const notePoint = async (selector) => {
@@ -186,21 +188,21 @@ check(
   !(await cue()).on && (await title()) === "Swipe two",
   JSON.stringify(await cue()),
 );
-await pause(320);
+await idle(page);
 await swipe(240, 0, 16, 0);
 check(
   "with nothing forward there is no cue and no step",
   !(await cue()).on && (await title()) === "Swipe two",
   JSON.stringify(await cue()),
 );
-await pause(320);
+await idle(page);
 await swipe(60, 400);
 check("mostly vertical scrolling is not a swipe", (await title()) === "Swipe two", await title());
 await page.mouse.move(...(await notePoint(".table-wrap")));
 await swipe(300);
 await swipe(-600, 0, 8, 0);
 const overTable = await cue();
-await pause(320);
+await idle(page);
 check("swiping over a wide table scrolls the table only", (await title()) === "Swipe two" && !overTable.on, await title());
 await page.mouse.move(...(await notePoint(".doc p")));
 await watchFill();
@@ -441,7 +443,7 @@ check(
   busy.running === 0 && busy.frames === 1 && busy.wait >= 0,
   JSON.stringify(busy),
 );
-await pause(320);
+await idle(page);
 check("that swipe went back", (await title()) === "Swipe one", await title());
 await gestureOver();
 await swipe(260, 0, 16);
@@ -453,13 +455,13 @@ const mouseButton = (button) =>
     button,
   );
 await mouseButton(3);
-await pause(350);
+await idle(page);
 check("mouse button 3 goes back", (await title()) === "Swipe one", await title());
 await mouseButton(4);
-await pause(350);
+await idle(page);
 check("mouse button 4 goes forward", (await title()) === "Swipe two", await title());
 await page.keyboard.press("Meta+g");
-await pause(500);
+await idle(page);
 const graphBefore = await page.evaluate(() => window.waymark.reader.workspace.active.trail.size);
 await page.mouse.move(600, 400);
 await swipe(-260, 0, 16);
@@ -470,7 +472,7 @@ check(
     !(await cue()).on,
 );
 await page.keyboard.press("Meta+g");
-await pause(400);
+await idle(page);
 await page.emulateMedia({ reducedMotion: "reduce" });
 await page.mouse.move(...(await notePoint(".doc p")));
 await swipe(-50, 0, 6, 0);
@@ -478,7 +480,7 @@ const still = await page.evaluate(() => {
   const el = document.querySelector(".swipe-cue.is-on");
   return { on: el !== null, transform: el && getComputedStyle(el).transform };
 });
-await pause(400);
+await idle(page);
 const settled = await cue();
 check(
   "under Reduce Motion the cue appears whole without following the fingers",
@@ -493,17 +495,17 @@ await page.emulateMedia({ reducedMotion: "no-preference" });
 const inVault = (name) => `${app.vault}/${name}`;
 const moreAction = async (selector, label) => {
   await page.locator(selector).first().click({ button: "right" });
-  await pause(150);
+  await idle(page);
   await page.locator(".context-item", { hasText: label }).click();
-  await pause(150);
+  await idle(page);
   const confirm = page.locator('.prompt button:has-text("Move to Trash")');
   if (await confirm.count()) await confirm.click();
-  await pause(400);
+  await idle(page);
 };
 const undoButton = page.locator(".toast .toast-action", { hasText: "Undo" });
 await writeFile(inVault("Doomed.md"), "# Doomed\n\nExact   bytes  \n");
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
-await pause(250);
+await idle(page);
 await open("Doomed.md");
 await page.waitForFunction(() => document.querySelector(".tab.is-active .tab-title")?.textContent === "Doomed");
 const tabsBefore = await page.$$eval(".tab", (t) => t.length);
@@ -530,21 +532,21 @@ check("it says so", (await toastText()).includes("Put back"), await toastText())
 await moreAction('.nav-item[data-path="Doomed.md"]', "Move to Trash");
 await writeFile(inVault("Doomed.md"), "someone else\n");
 await undoButton.click();
-await pause(400);
+await writesSettled(page, 400);
 check("Undo refuses to overwrite", (await readFile(inVault("Doomed.md"), "utf8")) === "someone else\n");
 check("and says why", !(await toastText()).includes("Put back"), await toastText());
 await rm(inVault("Doomed.md"));
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Doomed.md"]));
-await pause(200);
+await idle(page);
 
 /* Command-K */
 await writeFile(inVault("Keyed.md"), "# Keyed\n\nSome words here.\n\n| A | B |\n| --- | --- |\n| one | two |\n");
 await page.evaluate(() => window.waymark.reader.vault.applyChanges(["Keyed.md"]));
-await pause(200);
+await idle(page);
 await open("Keyed.md");
 await page.keyboard.press("Meta+e");
 await page.waitForSelector(".cm-content");
-await pause(400);
+await idle(page);
 const paletteOpen = () => page.locator(".palette").count();
 const line = page.locator(".cm-line", { hasText: "Some words here" });
 await line.click({ position: { x: 4, y: 8 } });
@@ -553,7 +555,7 @@ await page.keyboard.press("Home");
 await page.keyboard.press("Shift+End");
 await pause(80);
 await page.keyboard.press("Meta+k");
-await pause(200);
+await idle(page);
 check(
   "Command-K with text selected makes a link",
   (await line.first().textContent()).includes("Some words here.") &&
@@ -562,33 +564,33 @@ check(
   await line.first().textContent(),
 );
 await page.keyboard.press("Meta+p");
-await pause(200);
+await idle(page);
 check("Command-P stays the palette with text selected", (await paletteOpen()) === 1);
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 await page.locator(".cm-line").last().click();
 await pause(80);
 await page.keyboard.press("Meta+k");
-await pause(200);
+await idle(page);
 check("with nothing selected Command-K is the palette", (await paletteOpen()) === 1);
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 const cell = page.locator('.cm-table-widget td[data-row="1"][data-column="0"]');
 await cell.click();
-await pause(120);
+await idle(page);
 await page.keyboard.press("Shift+End");
 await pause(80);
 await page.keyboard.press("Meta+k");
-await pause(200);
+await idle(page);
 check(
   "a table cell keeps the palette and its text",
   (await paletteOpen()) === 1 && (await cell.textContent()) === "one",
   await cell.textContent(),
 );
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 await page.keyboard.press("Meta+e");
-await pause(500);
+await idle(page);
 
 /* The file list */
 const focused = () =>
@@ -596,10 +598,10 @@ const focused = () =>
     () => document.activeElement?.dataset.path ?? document.activeElement?.dataset.folder ?? document.activeElement?.tagName,
   );
 const tabStops = () => page.locator(".sidebar .tree :is(.tree-head, .nav-item)[tabindex='0']").count();
-await pause(200);
+await idle(page);
 check("the file list is one Tab stop", (await tabStops()) === 1, String(await tabStops()));
 await page.evaluate(() => window.waymark.reader.sidebar.tree.collapseAll());
-await pause(300);
+await idle(page);
 const heads = await page.$$eval(".sidebar .tree-head[data-folder]", (h) => h.map((x) => x.dataset.folder));
 await page.locator(".sidebar .tree [tabindex='0']").focus();
 await page.locator(`.tree-head[data-folder="${heads[0]}"]`).focus();
@@ -610,7 +612,7 @@ await page.keyboard.press("ArrowUp");
 await pause(60);
 check("Up moves back", (await focused()) === heads[0], await focused());
 await page.keyboard.press("ArrowRight");
-await pause(300);
+await idle(page);
 check(
   "Right opens a folder",
   await page.locator(`.tree-head[data-folder="${heads[0]}"]`).evaluate((h) => h.getAttribute("aria-expanded") === "true"),
@@ -623,7 +625,7 @@ await page.keyboard.press("ArrowLeft");
 await pause(60);
 check("Left goes to the parent", (await focused()) === heads[0], await focused());
 await page.keyboard.press("ArrowLeft");
-await pause(300);
+await idle(page);
 check(
   "Left closes it",
   await page.locator(`.tree-head[data-folder="${heads[0]}"]`).evaluate((h) => h.getAttribute("aria-expanded") === "false"),
@@ -636,7 +638,7 @@ await pause(60);
 const lastRow = await focused();
 check("End reaches the last row", typeof lastRow === "string" && lastRow.endsWith(".md"), lastRow);
 await page.keyboard.press("Enter");
-await pause(450);
+await idle(page);
 check(
   "Enter opens the note",
   (await page.evaluate(() => window.waymark.reader.notePath)) === lastRow,
@@ -662,7 +664,7 @@ await page.evaluate(() =>
   ),
 );
 await page.evaluate(() => window.waymark.reader.sidebar.tree.collapseAll());
-await pause(300);
+await idle(page);
 await page
   .locator(".doc")
   .first()
@@ -673,7 +675,7 @@ const rowFill = (path) =>
 const clickRow = async (path) => {
   const box = await page.locator(`.sidebar-inner .nav-item[data-path="${path}"]`).boundingBox();
   await page.mouse.click(box.x + 40, box.y + box.height / 2);
-  await pause(450);
+  await idle(page);
 };
 const plainFill = await rowFill(rootNotes[1]);
 await clickRow(rootNotes[0]);
@@ -692,7 +694,7 @@ check(
 );
 for (const scheme of ["light", "dark"]) {
   await page.emulateMedia({ colorScheme: scheme });
-  await pause(100);
+  await idle(page);
   const selected = await rowFill(rootNotes[1]);
   const current = await rowFill(rootNotes[0]);
   const plain = await rowFill(rootNotes[2]);
@@ -709,7 +711,7 @@ const transitionNow = await page.evaluate(
 );
 check("the selection moves without a fade from the keyboard", /^0s(, 0s)*$/.test(transitionNow), transitionNow);
 await page.keyboard.press("Enter");
-await pause(450);
+await idle(page);
 check(
   "Enter opens the selected note",
   (await page.evaluate(() => window.waymark.reader.notePath)) === rootNotes[1],
@@ -722,7 +724,7 @@ await page
   .first()
   .click({ position: { x: 5, y: 5 } });
 await page.mouse.click(panel.x + panel.width / 2, panel.y + panel.height - 12);
-await pause(150);
+await idle(page);
 check("a click on empty space hands the arrows to the list", (await focused()) === rootNotes[1], await focused());
 await page.keyboard.press("ArrowUp");
 await pause(60);
@@ -731,29 +733,29 @@ await page
   .locator(".doc")
   .first()
   .click({ position: { x: 5, y: 5 } });
-await pause(100);
+await idle(page);
 await page.keyboard.press("ArrowDown");
-await pause(100);
+await idle(page);
 check(
   "arrows outside the list leave it alone",
   !(await page.evaluate(() => document.activeElement?.closest(".sidebar-inner"))),
   await focused(),
 );
 await page.locator(`.nav-item[data-path="${lastRow}"]`).click({ button: "right" });
-await pause(150);
+await idle(page);
 await page.locator(".context-item", { hasText: "Rename" }).click();
-await pause(200);
+await idle(page);
 const nameBox = page.locator(".tree-name-input");
 await page.keyboard.press("ArrowLeft");
 await page.keyboard.type("z");
-await pause(100);
+await idle(page);
 check(
   "inline rename keeps its keys",
   (await nameBox.inputValue()).startsWith("z") && (await nameBox.inputValue()).length > 1,
   await nameBox.inputValue(),
 );
 await page.keyboard.press("Escape");
-await pause(200);
+await idle(page);
 
 check("no page errors", errors.length === 0, errors.slice(0, 2).join("; "));
 await browser.close();

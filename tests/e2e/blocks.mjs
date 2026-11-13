@@ -2,6 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -28,16 +29,17 @@ const errors = [];
 
 async function run(scheme) {
   const page = await (await browser.newContext({ viewport: { width: 1320, height: 800 }, colorScheme: scheme })).newPage();
+  await watchIdle(page);
   watchPageErrors(page, errors);
   const pause = (ms) => page.waitForTimeout(ms);
   const open = async (name) => {
     await page.evaluate((target) => window.waymark.open(target), name);
-    await pause(400);
+    await idle(page);
   };
   const label = (text) => `${text} (${scheme})`;
   await page.goto(`${app.url}?note=Tall`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(500);
+  await idle(page);
 
   const head = () =>
     page.evaluate(() => {
@@ -95,12 +97,12 @@ async function run(scheme) {
   const titleBefore = await page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().height);
   await page.mouse.move(700, 400);
   await page.mouse.wheel(0, 900);
-  await pause(250);
+  await idle(page);
   const stuck = await head();
   check(label("the header stays in view while its rows scroll"), stuck.top === 0 && stuck.onTop, JSON.stringify(stuck));
   check(label("a row is under it, not over it"), stuck.onTop);
   await page.mouse.wheel(0, 6000);
-  await pause(250);
+  await idle(page);
   check(label("it leaves with its table"), (await head()).top < 0, String((await head()).top));
   check(
     label("nothing else changed size"),
@@ -109,12 +111,12 @@ async function run(scheme) {
 
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(500);
+  await idle(page);
   await page.locator(".scroller").evaluate((s) => {
     const table = s.querySelector(".table-wrap").getBoundingClientRect();
     s.scrollTop += table.top - s.getBoundingClientRect().top + 500;
   });
-  await pause(300);
+  await idle(page);
   const editing = await head();
   check(label("the header stays in view in Edit too"), editing.top === 0 && editing.onTop, JSON.stringify(editing));
   const outlinedEdit = await edge();
@@ -134,12 +136,12 @@ async function run(scheme) {
   check(label("no table control sits on the stuck header"), grips === 0, String(grips));
   await page.locator(".scroller td").nth(40).click();
   await page.keyboard.type("x");
-  await pause(500);
+  await idle(page);
   check(label("typing in a cell leaves the header in view"), (await head()).top === 0, String((await head()).top));
   await page.keyboard.press("Backspace");
-  await pause(700);
+  await idle(page);
   await page.keyboard.press("Meta+e");
-  await pause(400);
+  await idle(page);
 
   await open("Breaks.md");
   const brs = (selector) =>
@@ -157,7 +159,7 @@ async function run(scheme) {
   check(label("a table cell's break stays one break"), (await brs(".doc td")) === 1, String(await brs(".doc td")));
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(400);
+  await idle(page);
   const editLines = await page.locator(".cm-line").allTextContents();
   check(
     label("Edit shows the same lines Read does"),
@@ -171,7 +173,7 @@ async function run(scheme) {
     String(await page.locator(".cm-table-widget [data-row] br").count()),
   );
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
   await open("Picking.md");
   const spanned = () => page.locator(".doc .is-spanned").evaluateAll((cells) => cells.map((c) => c.textContent));
   const pick = (from, fromAt, to, toAt) =>
@@ -302,7 +304,7 @@ async function run(scheme) {
   );
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(500);
+  await idle(page);
   const editChips = await page.evaluate(() => {
     const codes = [...document.querySelectorAll(".cm-inline-code")];
     const plain = getComputedStyle(codes.find((c) => !c.closest(".cm-callout"))).backgroundColor;
@@ -310,7 +312,7 @@ async function run(scheme) {
   });
   check(label("the same holds in Edit"), editChips.length >= 8 && editChips.every((same) => !same), JSON.stringify(editChips));
   await page.keyboard.press("Meta+e");
-  await pause(300);
+  await idle(page);
   await page.close();
 }
 
