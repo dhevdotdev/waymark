@@ -6,6 +6,13 @@ import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
+// Usage: node tests/e2e/tables.mjs [part], where part is 1, 2 or 3.
+const part = process.argv[2] === undefined ? undefined : Number(process.argv[2]);
+if (part !== undefined && ![1, 2, 3].includes(part)) {
+  console.error(`No part ${process.argv[2]}: give 1, 2 or 3, or nothing for all of them.`);
+  process.exit(2);
+}
+
 const results = [];
 const check = (name, ok, detail = "") => results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail !== "" ? `  (${detail})` : ""}`);
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -161,7 +168,7 @@ const undoExact = async (name, expected, label) => {
   check(`undo returns the exact file after: ${label}`, (await disk(name)) === expected);
 };
 
-try {
+async function clarity() {
   /* Clarity */
   await open("Plot");
   const quiet = await positions();
@@ -312,7 +319,9 @@ try {
     JSON.stringify(emptyLook),
   );
   check("a blank cell shows no stray word under the pointer", emptyLook.ghost === "none", emptyLook.ghost);
+}
 
+async function geometryGate(schemes) {
   /* The geometry gate: every control, in every state, at every width, in both themes, measured from the table's real box. */
   const auditGeometry = () =>
     page.evaluate(() => {
@@ -380,7 +389,7 @@ try {
   };
   for (const width of [1400, 900, 560]) {
     await page.setViewportSize({ width, height: 800 });
-    for (const scheme of ["light", "dark"]) {
+    for (const scheme of schemes) {
       await page.emulateMedia({ colorScheme: scheme });
       for (const name of ["Plot", "LongLast", "OneColumn", "Wide", "Headed"]) {
         const where = `${name} at ${width} in ${scheme}`;
@@ -414,6 +423,9 @@ try {
   }
   await page.emulateMedia({ colorScheme: "light" });
   await page.setViewportSize({ width: 1400, height: 900 });
+}
+
+async function addControlsAtRest() {
   await open("Plot");
   const restLook = await page.evaluate(() => {
     const add = document.querySelector(".cm-table-add.is-row");
@@ -455,7 +467,9 @@ try {
   await idle(page);
   const namedOpacity = await page.evaluate(() => getComputedStyle(document.querySelector(".cm-table-add.is-row span")).opacity);
   check("hovering Add row names it", Number(namedOpacity) > 0.95, namedOpacity);
+}
 
+async function headerRow() {
   /* The header row's shape */
   await open("Awkward");
   const headerShape = await page.evaluate(() => {
@@ -481,7 +495,9 @@ try {
     heads.map((h) => Math.round(h.getBoundingClientRect().height)),
   );
   check("a blank header is as tall as a filled one in Read too", new Set(headerHeights).size === 1, headerHeights.join());
+}
 
+async function selectingText() {
   /* Selecting text in a cell */
   await open("Plot");
   await cell(2, 1).click({ button: "right" });
@@ -523,7 +539,9 @@ try {
     dragged.length >= 4 && "Legumes".startsWith(dragged),
     dragged,
   );
+}
 
+async function deletingATable() {
   /* Deleting a table */
   const deleteByMenu = async (table = 0) => {
     await cell(1, 0, table).hover();
@@ -613,7 +631,9 @@ try {
     (await page.locator(".cm-table-widget .is-acted-on").count()) ===
       (await page.locator(".cm-table-widget :is(th, td)").count()),
   );
+}
 
+async function newTables() {
   /* New tables */
   await open("Blank");
   await page.keyboard.press(`${MOD}+a`);
@@ -661,7 +681,9 @@ try {
     "choosing it inserts a table and starts typing",
     (await page.locator(".cm-table-widget").count()) === 1 && (await activeCell()) === "0,0",
   );
+}
 
+async function feedback() {
   /* Feedback */
   await open("Plot");
   await aim(3, 0);
@@ -761,7 +783,9 @@ try {
   const blockedItem = await page.locator('.context-item:has-text("Move column left") .context-hint').textContent();
   check("a blocked menu item says why", /first/i.test(blockedItem), blockedItem);
   await page.keyboard.press("Escape");
+}
 
+async function dragging() {
   /* Dragging */
   const drag = async (kind, from, to) => {
     const handle = kind === "row" ? rowGrip() : columnGrip();
@@ -807,7 +831,9 @@ try {
     (await disk("Plot")).slice(40, 150),
   );
   await undoExact("Plot", PLOT, "drag column");
+}
 
+async function keyboardActions() {
   /* Every action from the keyboard */
   const keyActions = [
     ["Insert row above", `${MOD}+Alt+ArrowUp`, "2,1", (t) => t.split("\n").length === PLOT.split("\n").length + 1],
@@ -838,7 +864,9 @@ try {
     await undoExact("Plot", PLOT, label);
     check(`each action is one undo step: ${label}`, (await activeCell()).includes(","), await activeCell());
   }
+}
 
+async function keyboardMenus() {
   /* Menus from the keyboard */
   await open("Plot");
   await cell(2, 1).click();
@@ -1033,7 +1061,9 @@ try {
   );
   await settle().catch(() => {});
   check("and the file is untouched", (await disk("Plot")) === PLOT, await disk("Plot"));
+}
 
+async function semantics() {
   /* Semantics */
   await open("Plot");
   const grid = await page.evaluate(() => {
@@ -1068,7 +1098,9 @@ try {
     grid.headerRole === "columnheader" && grid.header === "Crop" && grid.label === null,
     JSON.stringify(grid),
   );
+}
 
+async function contrast() {
   /* Contrast */
   await open("Plot");
   await aim(1, 1);
@@ -1132,7 +1164,9 @@ try {
     contrast.every((c) => c.ring >= 3 && c.ringOnTint >= 3),
     JSON.stringify(contrast.map((c) => [c.theme, Math.round(c.ring * 100) / 100])),
   );
+}
 
+async function fidelity() {
   /* Fidelity */
   await open("Awkward");
   await cell(1, 1).click();
@@ -1225,7 +1259,9 @@ try {
   });
   await pause(60);
   check("composition is left alone", (await activeCell()) === "1,0" && (await page.locator(".cm-table-widget tr").count()) === 4);
+}
 
+async function tableWidth() {
   /* Width */
   await open("Wide");
   await aim(1, 1);
@@ -1362,7 +1398,9 @@ try {
   }));
   check("a failed write from a table is visible", failedState.state === "failed", JSON.stringify(failedState));
   await page.unroute("**/*");
+}
 
+async function corners() {
   /* The table clips to its rounded corners, so a focused corner cell has to round the same corner by the same amount. */
   const cornerRadii = (row, column) =>
     cell(row, column).evaluate((focused) => {
@@ -1397,7 +1435,17 @@ try {
   await open("Single");
   const alone = await cornerRadii(0, 0);
   check("a header-only single cell rounds all four corners", roundsOnly(alone, ["tl", "tr", "bl", "br"]), JSON.stringify(alone));
+}
 
+/** Three parts that take about as long as each other, so CI can run them side by side. With no part, all of them run. */
+const PARTS = [
+  [clarity, () => geometryGate(["light"]), addControlsAtRest, headerRow, selectingText, newTables],
+  [() => geometryGate(["dark"]), deletingATable, dragging],
+  [feedback, keyboardActions, keyboardMenus, semantics, contrast, fidelity, tableWidth, corners],
+];
+
+try {
+  for (const section of part ? PARTS[part - 1] : PARTS.flat()) await section();
   check("no page errors", errors.length === 0, errors.join(" | "));
 } catch (e) {
   check("the run finished", false, String(e).split("\n")[0]);

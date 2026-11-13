@@ -42,8 +42,10 @@ jobs:
     container: mcr.microsoft.com/playwright:v1.65.0-noble
     strategy:
       fail-fast: false
+      # A job spends about a minute before its suites start and is billed in whole minutes. Seven shards of about 160 s each
+      # end every job inside four minutes; six would cross into a fifth.
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7]
     steps:
       - run: command -v git || (apt-get update -qq && apt-get install -y -qq git)
       - uses: actions/checkout@v7
