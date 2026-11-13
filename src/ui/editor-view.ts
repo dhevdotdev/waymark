@@ -15,6 +15,7 @@ import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, V
 import { previewBlocks } from "./editor-blocks";
 import { drawnCaret } from "./editor-caret";
 import { findPanel } from "./editor-find";
+import { editorFolds, type FoldAction, type FoldOptions, foldAction, foldSaved } from "./editor-folds";
 import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { lineKeys } from "./editor-keys";
 import { icons } from "./icons";
@@ -37,7 +38,7 @@ export interface EditorStats {
   selected: number;
 }
 
-export interface EditorOptions extends InsertOptions, PreviewOptions {
+export interface EditorOptions extends InsertOptions, PreviewOptions, FoldOptions {
   /** Loads code grammars the text needs. Resolves true if any were new. */
   prepareCode: (text: string) => Promise<boolean>;
   text: string;
@@ -60,6 +61,8 @@ export interface EditorHandle {
   placeCursorAt(x: number, y: number): void;
   /** Turns the selected text into a link, as the formatting bubble does. False when nothing is selected here. */
   linkSelection(): boolean;
+  /** Folds or unfolds sections under headings. */
+  fold(action: FoldAction): boolean;
   /** Stops typing while text is being moved somewhere safe. */
   setFrozen(frozen: boolean): void;
   /** Draws again after code colours changed. */
@@ -328,6 +331,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
         livePreview(options),
+        editorFolds(options),
         blocks.extension,
         editorInsert(options),
         tableEditor({ renderInline: options.renderInline, openWikilink: options.openWikilink, frontmatterEnd }),
@@ -379,6 +383,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       ],
     }),
   });
+  foldSaved(view, options.folded);
   options.onStats(stats(view.state));
   /* CodeMirror's find bar only searches again when a key is released, so a held Backspace left old matches lit. */
   return {
@@ -400,6 +405,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
     },
     linkSelection() {
       return !view.state.selection.main.empty && view.hasFocus && !view.state.readOnly && addLink(view);
+    },
+    fold(action) {
+      foldAction(view, action);
+      return true;
     },
     setFrozen(frozen) {
       if (frozen) focusedBeforeFreeze = view.hasFocus;

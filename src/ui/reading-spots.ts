@@ -1,4 +1,5 @@
 import type { PrefStore } from "../prefs";
+import { revealFolded } from "./reading-folds";
 
 export interface ScrollAnchor {
   line: number;
@@ -26,6 +27,7 @@ export function readingAnchor(scroller: HTMLElement): ScrollAnchor | null {
 export function showReadingLine(scroller: HTMLElement, { line, offset }: ScrollAnchor): void {
   const block = readingBlocks(scroller).findLast((candidate) => Number(candidate.dataset.line) <= line);
   if (!block) return;
+  revealFolded(block);
   const box = block.getBoundingClientRect();
   scroller.scrollTop += box.top - scroller.getBoundingClientRect().top - Math.max(offset, -box.height);
 }

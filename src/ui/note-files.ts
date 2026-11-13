@@ -7,6 +7,7 @@ import type { ForgottenTab, Workspace } from "../vault/workspace";
 import type { Bookmarks } from "./bookmarks";
 import { type MenuItem, showContextMenu } from "./context-menu";
 import type { FileTree } from "./file-tree";
+import { FoldStore } from "./fold-store";
 import { icons } from "./icons";
 import { nameInPlace } from "./inline-name";
 import type { NoteEditing } from "./note-editing";
@@ -366,6 +367,7 @@ export class NoteFiles {
       workspace.replaceNote(from, to);
       renameRecent(prefs, root, from, to);
       moveSpot(prefs, root, from, to);
+      new FoldStore(prefs, root).move(from, to);
       this.host.bookmarks.noteMoved(from, to);
     }
     const { count, failed } = await this.applyLinkUpdates(planned, moved);

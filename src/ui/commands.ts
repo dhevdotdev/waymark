@@ -23,10 +23,13 @@ export interface Command {
 }
 
 const SHIFTED: Record<string, string> = { "{": "[", "}": "]", "+": "=" };
+/** Option changes what these keys type, such as “ for [, so with it held the key's place names it. */
+const BY_PLACE: Record<string, string> = { Backslash: "\\", BracketLeft: "[", BracketRight: "]" };
 
 /** The chord a key press spells, in the same form as `Command.keys`. */
 export function chordOf(e: KeyboardEvent): string {
-  const key = e.code === "Backslash" ? "\\" : (SHIFTED[e.key] ?? e.key.toLowerCase());
+  const placed = e.code === "Backslash" || e.altKey ? BY_PLACE[e.code] : undefined;
+  const key = placed ?? SHIFTED[e.key] ?? e.key.toLowerCase();
   return [e.ctrlKey && "ctrl", e.metaKey && "mod", e.altKey && "alt", e.shiftKey && "shift", key].filter(Boolean).join("+");
 }
 

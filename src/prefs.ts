@@ -10,6 +10,8 @@ interface VaultState {
   recent?: { path: string; at: number }[];
   /** Where reading stopped in each note. Read through ReadingSpots, which validates it. */
   spots?: Record<string, { line: number; offset: number; at: number } | undefined>;
+  /** Folded headings in each note, by heading key. Read through FoldStore, which validates them. */
+  folds?: Record<string, unknown>;
   /** Saved notes and headings. Read through Bookmarks, which validates them. */
   bookmarks?: unknown[];
   bookmarksClosed?: boolean;

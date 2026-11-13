@@ -1,4 +1,5 @@
 import { instantly } from "./instant";
+import { revealFolded } from "./reading-folds";
 
 /** Text ranges under `root` that contain `needle`, ignoring case. Skips diagram sources and UI chrome. */
 export function findRanges(root: Element, needle: string, limit = 2000): Range[] {
@@ -46,8 +47,9 @@ export function paint(name: string, ranges: Range[]): void {
   for (const range of ranges) highlight.add(range);
 }
 
-/** Opens a collapsed callout so a match inside it can be seen. */
+/** Unfolds the section and opens the collapsed callout around a match, so it can be seen. */
 function reveal(range: Range): void {
+  revealFolded(range.startContainer);
   const el = range.startContainer.parentElement;
   const callout = el?.closest<HTMLElement>('.callout[data-fold="closed"]');
   if (!callout) return;

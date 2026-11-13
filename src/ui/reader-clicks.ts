@@ -5,6 +5,7 @@ import { markTarget } from "./note-view";
 import { lightbox } from "./overlays";
 import type { RailSection } from "./panel-sections";
 import type { Reader } from "./reader";
+import { revealFolded } from "./reading-folds";
 import { glideTo, yieldGlideTo } from "./scroll-glide";
 import { bindSwipeNavigation } from "./swipe-navigation";
 
@@ -61,10 +62,11 @@ function routes(r: Reader, shell: HTMLElement): Route[] {
       (el, e) => {
         e.preventDefault();
         const heading = document.getElementById(el.dataset.target!);
-        if (heading)
-          glideTo(r.els.scroller, heading, (inMs) => {
-            if (isPointerAction()) markTarget(heading, inMs);
-          });
+        if (!heading) return;
+        revealFolded(heading);
+        glideTo(r.els.scroller, heading, (inMs) => {
+          if (isPointerAction()) markTarget(heading, inMs);
+        });
       },
     ],
     ["a.wikilink, a.wikilink-plain, .nav-item[data-path]", (el, e) => followLink(r, shell, el, e)],

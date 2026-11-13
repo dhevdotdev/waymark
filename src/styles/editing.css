@@ -1221,3 +1221,13 @@ button.task-box:focus-visible {
 .reader:has(.findbar) :is(.edit-state, .pane-meta) {
   visibility: hidden;
 }
+
+/* A heading's own marks take the margin while its line is being edited, so its fold control steps aside for them. */
+.doc-editing .cm-line:has(.cm-hang.is-shown) .fold-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+/* The blank line after a folded section leads to the next heading, so it keeps that gap rather than a heading's own. */
+.doc-editing .cm-folded + .cm-blank {
+  line-height: 16px;
+}
