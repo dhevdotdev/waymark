@@ -42,6 +42,8 @@ export const KATEX_OPTIONS = { throwOnError: false, output: "htmlAndMathml", tru
 
 /** Drawn along its length when a task is checked. Added after sanitising, which drops SVG geometry. */
 export const TASK_TICK = `<svg class="task-tick" viewBox="0 0 16 16" aria-hidden="true"><path pathLength="1" d="M4.2 8.3l2.5 2.5 5.1-5.4"/></svg>`;
+/** The chevron of a collapsible callout. Added after sanitising too. */
+export const CALLOUT_CHEVRON = `<svg class="callout-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 
 export function createMarkdown(): MarkdownIt {
   const md = markdownit({ html: true, linkify: true, typographer: false });
@@ -76,9 +78,7 @@ export function createMarkdown(): MarkdownIt {
     const head = c.fold
       ? `<button class="callout-title" type="button" aria-expanded="${c.fold === "+"}">`
       : `<div class="callout-title">`;
-    const headEnd = c.fold
-      ? `<svg class="callout-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>`
-      : `</div>`;
+    const headEnd = c.fold ? `</button>` : `</div>`;
     return `<div class="callout" data-callout="${kind}" data-type="${escapeAttr(c.type)}"${c.fold ? ` data-fold="${c.fold === "+" ? "open" : "closed"}"` : ""}>${head}<span class="callout-icon" aria-hidden="true"></span><span class="callout-label">${title}</span>${headEnd}<div class="callout-body"><div class="callout-content">`;
   };
   md.renderer.rules.blockquote_close = (tokens, i, opts, _env, self) => {
