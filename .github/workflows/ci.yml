@@ -53,7 +53,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/e2e.mjs ${{ matrix.shard }}
+      - run: node scripts/e2e.mjs ${{ matrix.shard }} ${{ strategy.job-total }}
 
   secrets:
     runs-on: ubuntu-latest
