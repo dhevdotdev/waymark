@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { webkit } from "playwright";
+import { idle, watchIdle } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -57,14 +58,19 @@ const browser = await webkit.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
 watchPageErrors(page, errors);
+await watchIdle(page);
 const pause = (ms) => page.waitForTimeout(ms);
 const file = (name) => path.join(app.vault, `${name}.md`);
 const disk = (name) => readFile(file(name), "utf8");
 const saved = () =>
   page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "saved", null, { timeout: 5000 });
+/* An edit marks the note unsaved at once and autosave writes 400 ms later. A step that should change nothing still gets 650 ms to show a stray write. */
 const settle = async () => {
-  await pause(650);
+  await page
+    .waitForFunction(() => document.querySelector(".edit-state")?.dataset.state !== "saved", null, { timeout: 650 })
+    .catch(() => {});
   await saved();
+  await idle(page);
 };
 
 async function open(name) {
@@ -72,10 +78,10 @@ async function open(name) {
   await writeFile(file(name), FILES[name]);
   await page.goto(`${app.url}?note=${encodeURIComponent(name)}`);
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
-  await pause(350);
+  await idle(page);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
-  await pause(300);
+  await idle(page);
 }
 
 const cell = (row, column, table = 0) =>
@@ -93,15 +99,15 @@ const activeCell = () =>
 const item = (label) => page.locator(`.context-item:has-text("${label}")`);
 const menuPick = async (grip, label) => {
   await grip.click();
-  await pause(120);
+  await idle(page);
   await item(label).click();
-  await pause(120);
+  await idle(page);
 };
 
 /** Hovers a cell so the controls for its row and column are on screen. */
 const aim = async (row, column) => {
   await cell(row, column).hover();
-  await pause(120);
+  await idle(page);
 };
 
 const geometry = () =>
@@ -216,7 +222,7 @@ try {
   );
   check("hover and focus move nothing", (await positions()) === quiet);
   await cell(1, 1).click();
-  await pause(120);
+  await idle(page);
   check(
     "focusing a cell moves nothing else on the page",
     (await page.evaluate(() => document.querySelector(".cm-line:last-of-type").getBoundingClientRect().top)) > 0 &&
@@ -224,14 +230,18 @@ try {
   );
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await pause(100);
+  await idle(page);
 
   for (const selector of CONTROLS) {
     await open("Plot");
     await aim(1, 1);
     const control = page.locator(selector);
     await control.hover();
-    await pause(800);
+    await page
+      .locator(".tooltip")
+      .first()
+      .waitFor({ timeout: 5000 })
+      .catch(() => {});
     const name = await control.getAttribute("aria-label");
     const tip = await page
       .locator(".tooltip")
@@ -248,7 +258,7 @@ try {
   await open("Plot");
   await aim(2, 1);
   await rowGrip().hover();
-  await pause(120);
+  await idle(page);
   const rowHighlight = await page.evaluate(() => ({
     target: document.querySelectorAll('.cm-table-widget .is-acted-on[data-row="2"]').length,
     other: document.querySelectorAll('.cm-table-widget .is-acted-on:not([data-row="2"])').length,
@@ -262,7 +272,7 @@ try {
     JSON.stringify(rowHighlight),
   );
   await rowGrip().click();
-  await pause(150);
+  await idle(page);
   const rowMenu = await page.evaluate(() => {
     const menu = document.querySelector(".context-menu").getBoundingClientRect();
     const row = document.querySelector('.cm-table-widget [data-row="2"]').parentElement.getBoundingClientRect();
@@ -274,10 +284,10 @@ try {
   check("the target stays highlighted while its menu is open", rowMenu.highlighted === 3, String(rowMenu.highlighted));
   check("menus do not cover their target: row", rowMenu.apart);
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
   await aim(1, 1);
   await columnGrip().click();
-  await pause(150);
+  await idle(page);
   const columnMenu = await page.evaluate(() => {
     const menu = document.querySelector(".context-menu").getBoundingClientRect();
     const column = document.querySelector('.cm-table-widget [data-row="0"][data-column="1"]').getBoundingClientRect();
@@ -289,7 +299,7 @@ try {
   await open("Awkward");
   const blankBefore = await cell(2, 2).evaluate((el) => getComputedStyle(el).backgroundColor);
   await cell(2, 2).hover();
-  await pause(220);
+  await idle(page);
   const emptyLook = await page.evaluate(() => {
     const emptyHeader = document.querySelector('.cm-table-widget [data-row="0"][data-column="3"]');
     const emptyCell = document.querySelector('.cm-table-widget [data-row="2"][data-column="2"]');
@@ -390,10 +400,10 @@ try {
         await page.keyboard.press("Enter");
         await aim(1, 0);
         await rowGrip().click();
-        await pause(120);
+        await idle(page);
         judge(`row menu open, ${where}`, await auditGeometry());
         await page.keyboard.press("Escape");
-        await pause(150);
+        await idle(page);
         await aim(1, 0);
         await addRow().click();
         await page.evaluate(() => {
@@ -415,7 +425,7 @@ try {
     return { add: getComputedStyle(add).backgroundColor, side: getComputedStyle(side).backgroundColor };
   });
   await aim(1, 0);
-  await pause(200);
+  await idle(page);
   const shownLook = await page.evaluate(() => {
     const add = document.querySelector(".cm-table-add.is-row");
     const side = document.querySelector(".cm-table-add.is-column");
@@ -433,7 +443,7 @@ try {
     JSON.stringify({ restLook, shownLook }),
   );
   await addColumn().hover();
-  await pause(220);
+  await idle(page);
   check(
     "hovering an add control fills only that control",
     await page.evaluate(() => {
@@ -446,7 +456,7 @@ try {
     }),
   );
   await addRow().hover();
-  await pause(450);
+  await idle(page);
   const namedOpacity = await page.evaluate(() => getComputedStyle(document.querySelector(".cm-table-add.is-row span")).opacity);
   check("hovering Add row names it", Number(namedOpacity) > 0.95, namedOpacity);
 
@@ -470,7 +480,7 @@ try {
   );
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(250);
+  await idle(page);
   const headerHeights = await page.$$eval(".doc table th", (heads) =>
     heads.map((h) => Math.round(h.getBoundingClientRect().height)),
   );
@@ -479,7 +489,7 @@ try {
   /* Selecting text in a cell */
   await open("Plot");
   await cell(2, 1).click({ button: "right" });
-  await pause(150);
+  await idle(page);
   const rightClicked = await page.evaluate(() => {
     const selection = getSelection();
     return {
@@ -495,10 +505,10 @@ try {
   );
   check("a right-click still opens the menu", (await page.locator(".context-menu").count()) === 1);
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
   await open("Plot");
   await cell(2, 1).dblclick({ position: { x: 40, y: 20 } });
-  await pause(120);
+  await idle(page);
   check(
     "a double-click selects the word",
     (await page.evaluate(() => getSelection().toString())) === "Legumes",
@@ -510,7 +520,7 @@ try {
   await page.mouse.down();
   await page.mouse.move(dragBox.x + 70, dragBox.y + 20, { steps: 8 });
   await page.mouse.up();
-  await pause(120);
+  await idle(page);
   const dragged = await page.evaluate(() => getSelection().toString());
   check(
     "dragging across text in a cell that had no focus selects it",
@@ -521,21 +531,21 @@ try {
   /* Deleting a table */
   const deleteByMenu = async (table = 0) => {
     await cell(1, 0, table).hover();
-    await pause(120);
+    await idle(page);
     await page.locator(".cm-table-widget").nth(table).locator(".cm-table-grip.is-table").click();
-    await pause(120);
+    await idle(page);
     await item("Delete table").click();
-    await pause(120);
+    await idle(page);
   };
   const deleteByPalette = async (table = 0) => {
     await cell(1, 0, table).click();
     await pause(80);
     await page.keyboard.press("Meta+k");
-    await pause(150);
+    await idle(page);
     await page.keyboard.type(">delete table");
-    await pause(150);
+    await idle(page);
     await page.keyboard.press("Enter");
-    await pause(150);
+    await idle(page);
   };
   const removal = async (label, name, how, table, expected) => {
     await open(name);
@@ -579,29 +589,29 @@ try {
   await open("Plot");
   await page.locator(".cm-line", { hasText: "Rotate the beds" }).click();
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">delete table");
-  await pause(200);
+  await idle(page);
   check(
     "the palette offers Delete table only with the cursor in a table",
     (await page.locator('.palette-row:has-text("Delete table")').count()) === 0,
   );
   await page.keyboard.press("Escape");
-  await pause(120);
+  await idle(page);
   await cell(1, 0).click();
   await page.keyboard.press("Meta+k");
-  await pause(150);
+  await idle(page);
   await page.keyboard.type(">delete table");
-  await pause(200);
+  await idle(page);
   check(
     "the palette offers Delete table with the cursor in a cell",
     (await page.locator('.palette-row:has-text("Delete table")').count()) === 1,
   );
   await page.keyboard.press("Escape");
-  await pause(150);
+  await idle(page);
   await aim(1, 0);
   await page.locator(".cm-table-grip.is-table").hover();
-  await pause(150);
+  await idle(page);
   check(
     "hovering the table handle marks the whole table",
     (await page.locator(".cm-table-widget .is-acted-on").count()) ===
@@ -613,9 +623,9 @@ try {
   await page.keyboard.press(`${MOD}+a`);
   await page.keyboard.press("ArrowRight");
   await page.keyboard.type("/table");
-  await pause(200);
+  await idle(page);
   await page.keyboard.press("Enter");
-  await pause(300);
+  await idle(page);
   const fresh = await page.evaluate(() => ({
     row: document.activeElement.dataset.row,
     column: document.activeElement.dataset.column,
@@ -642,7 +652,7 @@ try {
     return { x: r.left + 30, y: r.top + r.height / 2 };
   });
   await page.mouse.click(line.x, line.y, { button: "right" });
-  await pause(150);
+  await idle(page);
   const offered = await page.locator(".context-item").allTextContents();
   check(
     "an empty line offers Table on right-click",
@@ -650,7 +660,7 @@ try {
     offered.join(),
   );
   await item("Table").click();
-  await pause(300);
+  await idle(page);
   check(
     "choosing it inserts a table and starts typing",
     (await page.locator(".cm-table-widget").count()) === 1 && (await activeCell()) === "0,0",
@@ -673,7 +683,7 @@ try {
   await settle();
   check("typing right after an action is not held back", (await disk("Plot")).includes("| now |"));
   await page.keyboard.press(`${MOD}+z`);
-  await pause(150);
+  await idle(page);
   await page.keyboard.press(`${MOD}+z`);
   await settle();
   check("add row undoes in steps: the text, then the row", (await disk("Plot")) === PLOT);
@@ -729,10 +739,10 @@ try {
 
   await open("Single");
   await cell(0, 0).click({ timeout: 5000 });
-  await pause(100);
+  await idle(page);
   check("a header-only table can be clicked and grown", (await activeCell()) === "0,0", await activeCell());
   await page.keyboard.press(`${MOD}+Alt+Backspace`);
-  await pause(120);
+  await idle(page);
   const why = await page
     .locator(".toast")
     .last()
@@ -741,17 +751,17 @@ try {
   check("an impossible action says why", /needs one column/.test(why), why);
   check("the impossible action changes nothing", (await disk("Single")) === FILES.Single);
   await addRow().click();
-  await pause(250);
+  await idle(page);
   check("a header-only table can be clicked and grown: add row", (await page.locator(".cm-table-widget tr").count()) === 2);
 
   await open("Plot");
   await aim(1, 1);
   await columnGrip().click();
-  await pause(120);
+  await idle(page);
   await page.keyboard.press("Escape");
   await aim(1, 0);
   await columnGrip().click();
-  await pause(120);
+  await idle(page);
   const blockedItem = await page.locator('.context-item:has-text("Move column left") .context-hint').textContent();
   check("a blocked menu item says why", /first/i.test(blockedItem), blockedItem);
   await page.keyboard.press("Escape");
@@ -839,7 +849,7 @@ try {
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Shift+F10");
-  await pause(120);
+  await idle(page);
   const menuFocus = () => page.evaluate(() => document.activeElement?.textContent ?? "");
   check(
     "menus work from the keyboard: opens with the first item focused",
@@ -853,12 +863,12 @@ try {
   await page.keyboard.press("Home");
   check("menus work from the keyboard: Home", (await menuFocus()).startsWith("Insert row above"), await menuFocus());
   await page.keyboard.press("Escape");
-  await pause(120);
+  await idle(page);
   check("Escape returns focus to where it came from", (await activeCell()) === "2,1", await activeCell());
   const caret = await page.evaluate(() => getSelection().anchorOffset);
   check("Escape returns the caret to where it was", caret === "Legumes".length - 1, String(caret));
   await page.keyboard.press("Shift+F10");
-  await pause(120);
+  await idle(page);
   await page.keyboard.press("a");
   await page.keyboard.press("a");
   check(
@@ -867,7 +877,7 @@ try {
     await menuFocus(),
   );
   await page.keyboard.press("Enter");
-  await pause(120);
+  await idle(page);
   check("alignment works from the keyboard", (await activeCell()) === "2,1", await activeCell());
   await settle();
   check("alignment reaches the file", (await disk("Plot")).includes("| :---: |"));
@@ -966,7 +976,7 @@ try {
   await page.locator(".cm-line", { hasText: "Keep the notes" }).click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Backspace");
-  await pause(150);
+  await idle(page);
   await settle();
   check(
     "Backspace after a table never pulls the next line into it",
@@ -1019,7 +1029,7 @@ try {
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Delete");
-  await pause(150);
+  await idle(page);
   check(
     "Delete on the blank line under a table never pulls the next line into it",
     (await page.locator(".cm-table-widget tr").count()) === 4 && (await caretOnLine("Keep the notes after the table.")),
@@ -1135,7 +1145,7 @@ try {
   await pause(60);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await pause(700);
+  await settle();
   check("opening and clicking through writes nothing", (await disk("Awkward")) === AWKWARD);
   await cell(1, 3).click();
   await page.keyboard.type("y");
@@ -1158,7 +1168,7 @@ try {
     await pause(50);
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
-    await pause(600);
+    await settle();
     check(`odd tables keep their bytes: ${name}`, (await disk(name)) === FILES[name]);
   }
   await open("Bare");
@@ -1173,7 +1183,7 @@ try {
 
   await open("Last");
   await page.mouse.click(700, 620);
-  await pause(120);
+  await idle(page);
   await page.keyboard.type("Z");
   await settle();
   check(
@@ -1182,7 +1192,7 @@ try {
     JSON.stringify((await disk("Last")).slice(-20)),
   );
   await page.keyboard.press(`${MOD}+z`);
-  await pause(150);
+  await idle(page);
   await page.keyboard.press(`${MOD}+z`);
   await settle();
   check(
@@ -1193,7 +1203,7 @@ try {
   await open("First");
   await cell(0, 0).click();
   await page.keyboard.press("ArrowUp");
-  await pause(100);
+  await idle(page);
   await page.keyboard.type("Q");
   await settle();
   check(
@@ -1252,7 +1262,7 @@ try {
     JSON.stringify(Object.values(wideControls).map((c) => c.overlaps)),
   );
   await addColumn().click();
-  await pause(250);
+  await idle(page);
   check("the add-column bar works on a wide table", (await page.locator(".cm-table-widget th").count()) === 13);
   check(
     "the new column is scrolled into view",
@@ -1289,12 +1299,12 @@ try {
   await open("Long");
   await page.locator(".cm-content").click({ position: { x: 100, y: 200 } });
   await page.keyboard.press(DOC_END);
-  await pause(200);
+  await idle(page);
   await page.locator(".cm-line", { hasText: "End." }).click();
   await page.keyboard.press("Home");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await pause(200);
+  await idle(page);
   const unobscured = await page.evaluate(() => {
     const cell = document.activeElement;
     const r = cell.getBoundingClientRect();
@@ -1308,7 +1318,7 @@ try {
   await page.keyboard.press("Meta+=");
   await page.keyboard.press("Meta+=");
   await page.keyboard.press("Meta+=");
-  await pause(350);
+  await idle(page);
   await aim(2, 1);
   const larger = await geometry();
   const biggerRow = await page.evaluate(() => {
@@ -1323,17 +1333,17 @@ try {
     JSON.stringify(biggerRow),
   );
   await page.keyboard.press("Meta+0");
-  await pause(200);
+  await idle(page);
 
   await page.evaluate(() => document.activeElement?.blur?.());
   await open("Plot");
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".doc-title");
-  await pause(250);
+  await idle(page);
   const readHeads = await page.$$eval(".doc table th", (heads) => heads.map((h) => Math.round(h.getBoundingClientRect().left)));
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-table-widget");
-  await pause(250);
+  await idle(page);
   const editHeads = await page.$$eval(".cm-table-widget th", (heads) =>
     heads.map((h) => Math.round(h.getBoundingClientRect().left)),
   );
@@ -1347,7 +1357,9 @@ try {
   await cell(1, 0).click();
   await page.keyboard.press("End");
   await page.keyboard.type("q");
-  await pause(1500);
+  await page
+    .waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "failed", null, { timeout: 5000 })
+    .catch(() => {});
   const failedState = await page.evaluate(() => ({
     state: document.querySelector(".edit-state")?.dataset.state,
     banner: document.querySelector(".edit-banner, [class*='banner']:not([hidden])")?.textContent ?? "",
