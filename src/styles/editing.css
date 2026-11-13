@@ -1221,3 +1221,57 @@ button.task-box:focus-visible {
 .reader:has(.findbar) :is(.edit-state, .pane-meta) {
   visibility: hidden;
 }
+
+/*
+ * The fold chevron in Edit, drawn by the heading line itself so nothing sits where the caret rests. Its box is the
+ * Read chevron's 22px square, with a margin box one cap tall on the baseline, so it centres on the capitals. Hidden
+ * overflow puts its baseline at the bottom of that margin box rather than on an empty line inside it.
+ */
+.doc-editing .cm-fold-head::before {
+  content: "";
+  display: inline-block;
+  inline-size: 22px;
+  block-size: 22px;
+  margin-block: calc((1cap - 22px) / 2);
+  margin-inline: -26px 4px;
+  overflow: hidden;
+  vertical-align: baseline;
+  background: var(--ink-4);
+  -webkit-mask: var(--fold-chevron) center / 14px 14px no-repeat;
+  mask: var(--fold-chevron) center / 14px 14px no-repeat;
+  --fold-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 4l4 4-4 4'/%3E%3C/svg%3E");
+  opacity: 0;
+  rotate: 90deg;
+  transition:
+    opacity var(--t-hover) var(--ease-out),
+    background-color var(--t-hover) var(--ease-out),
+    rotate var(--t-hover) var(--ease-out);
+}
+.doc-editing .cm-fold-head.is-folded::before {
+  opacity: 1;
+  rotate: 0deg;
+}
+@media (hover: hover) and (pointer: fine) {
+  .doc-editing .cm-line:hover .cm-fold-head::before {
+    opacity: 1;
+  }
+  .doc-editing .cm-fold-head.is-hot::before {
+    background-color: var(--ink);
+  }
+}
+/* A heading's own marks take the margin while its line is being edited, so its fold control steps aside for them. */
+.doc-editing .cm-line:has(.cm-hang.is-shown) .cm-fold-head::before {
+  opacity: 0;
+}
+:root[data-input="keyboard"] .doc-editing .cm-fold-head::before {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-editing .cm-fold-head::before {
+    transition-property: opacity, background-color;
+  }
+}
+/* The blank line after a folded section leads to the next heading, so it keeps that gap rather than a heading's own. */
+.doc-editing .cm-folded + .cm-blank {
+  line-height: 16px;
+}

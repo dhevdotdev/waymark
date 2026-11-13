@@ -55,7 +55,7 @@ export class Reader {
   current = "";
 
   readonly els: ShellElements;
-  private readonly noteView: NoteView;
+  readonly noteView: NoteView;
   readonly trail: TrailActions;
   private graph: GraphView | null = null;
   private renderSeq = 0;
@@ -72,7 +72,7 @@ export class Reader {
     });
     const { els } = this;
 
-    this.noteView = new NoteView(els, vault, deps.name, toast);
+    this.noteView = new NoteView(els, vault, deps, toast);
     this.trail = new TrailActions(els, {
       tab: () => this.tab,
       label: (view) => this.viewLabel(view),
@@ -122,6 +122,7 @@ export class Reader {
       highlighter: deps.highlighter,
       toast,
       notePath: () => this.notePath,
+      folds: this.noteView.foldStore,
       reshow: () => this.show({ keepScroll: true }),
       incomingCommits: () => this.sync.panel.status?.behind ?? 0,
       open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),

@@ -91,6 +91,113 @@
   margin-top: var(--s4);
 }
 
+/*
+ * Folding a section under its heading, in Read and Edit. Each control sits in a box that runs from the heading's
+ * baseline to its cap height, so it centres on the capitals of the first line at every heading size.
+ */
+.fold-anchor {
+  position: relative;
+  display: inline-block;
+  inline-size: 0;
+  block-size: 1cap;
+  vertical-align: baseline;
+}
+.fold-toggle {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 4px;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--ink-4);
+  opacity: 0;
+  cursor: default;
+  transition:
+    opacity var(--t-hover) var(--ease-out),
+    color var(--t-hover) var(--ease-out);
+}
+.fold-toggle svg {
+  inline-size: 14px;
+  block-size: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  rotate: 90deg;
+  transition: rotate var(--t-hover) var(--ease-out);
+}
+.fold-toggle[aria-expanded="false"] svg {
+  rotate: 0deg;
+}
+.fold-toggle[aria-expanded="false"],
+.fold-toggle:focus-visible {
+  opacity: 1;
+}
+.fold-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+:root[data-input="keyboard"] :is(.fold-toggle, .fold-toggle svg) {
+  transition: none;
+}
+.fold-tail {
+  position: relative;
+  display: none;
+  inline-size: 22px;
+  block-size: 1cap;
+  margin-inline-start: 0.45em;
+  vertical-align: baseline;
+}
+.doc [data-folded] > .fold-tail,
+.doc-editing .fold-tail {
+  display: inline-block;
+}
+/* Three dots drawn rather than typed, so they sit on the middle of the mark whatever the face. */
+.fold-more {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 0;
+  translate: 0 -50%;
+  inline-size: 22px;
+  block-size: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-chip);
+  background-color: var(--selected);
+  background-image:
+    radial-gradient(circle, var(--ink-3) 1.1px, transparent 1.6px),
+    radial-gradient(circle, var(--ink-3) 1.1px, transparent 1.6px), radial-gradient(circle, var(--ink-3) 1.1px, transparent 1.6px);
+  background-size: 4px 4px;
+  background-position:
+    5px 50%,
+    9px 50%,
+    13px 50%;
+  background-repeat: no-repeat;
+  cursor: default;
+  transition: background-color var(--t-hover) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .doc :is(h1, h2, h3, h4, h5, h6):hover > .fold-anchor > .fold-toggle {
+    opacity: 1;
+  }
+  .fold-toggle:hover {
+    color: var(--ink);
+  }
+  .fold-more:hover {
+    background-color: var(--row-hover);
+  }
+}
+.doc.doc > [data-fold-hidden] {
+  display: none;
+}
+
 .doc strong {
   font-weight: 640;
   color: var(--ink);
@@ -1061,6 +1168,16 @@ button.callout-title:focus-visible {
 .doc.doc > .backlinks {
   margin-top: var(--s7);
 }
+/* After a folded section the next heading keeps the space it has after text, whatever block was folded away. */
+.doc.doc > [data-fold-hidden] + h2 {
+  margin-top: 2.5rem;
+}
+.doc.doc > [data-fold-hidden] + h3 {
+  margin-top: 1.75rem;
+}
+.doc.doc > [data-fold-hidden] + :is(h4, h5, h6) {
+  margin-top: var(--s5);
+}
 
 .doc.is-revision {
   padding-top: var(--s4);
@@ -1074,7 +1191,8 @@ button.callout-title:focus-visible {
     background: var(--row-hover);
   }
   .callout-body,
-  .callout-chevron {
+  .callout-chevron,
+  .fold-toggle svg {
     transition: none;
   }
 }

@@ -51,6 +51,7 @@ export class Inspector {
   ) {
     this.history = new NoteHistory(host);
     els.reader.append(this.floating.root);
+    els.scroller.addEventListener("foldchange", () => this.floating.markFolds());
     const expand = els.shell.querySelector<HTMLElement>(".rail-graph-open")!;
     expand.append(this.expandArrows.svg);
     expand.addEventListener("click", () => this.expandArrows.snap("together"));

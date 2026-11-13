@@ -19,6 +19,7 @@ export interface EditingHost {
   els: ShellElements;
   vault: VaultStore;
   notePath: () => string;
+  folds: { get: (path: string) => string[]; set: (path: string, keys: string[]) => void };
   reshow: () => Promise<void>;
   toast: (message: string) => void;
   incomingCommits: () => number;
@@ -125,6 +126,10 @@ export class NoteEditing {
     return this.session?.editor.linkSelection() ?? false;
   }
 
+  fold(action: "toggle" | "all" | "none"): boolean {
+    return this.session?.editor.fold(action) ?? false;
+  }
+
   get isOpen(): boolean {
     return this.session !== null;
   }
@@ -194,6 +199,8 @@ export class NoteEditing {
           headingsOf: (target) => this.headingsOf(target),
           addFile: (file) => this.addFile(file, session.path),
           today: () => new Date().toLocaleDateString("en-CA"),
+          folded: this.host.folds.get(path),
+          onFolds: (keys) => this.host.folds.set(session.path, keys),
         }),
       };
       scroller.replaceChildren(page);

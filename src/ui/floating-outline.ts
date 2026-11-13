@@ -35,6 +35,16 @@ export class FloatingOutline {
     });
     this.root.replaceChildren(...this.links);
     this.root.hidden = this.links.length < 2;
+    this.markFolds();
+  }
+
+  /** Shows which sections are folded, and dims the headings folded away inside them. */
+  markFolds(): void {
+    for (const link of this.links) {
+      const heading = document.getElementById(link.dataset.target!);
+      link.classList.toggle("is-folded", heading?.hasAttribute("data-folded") ?? false);
+      link.classList.toggle("is-hidden", heading?.hasAttribute("data-fold-hidden") ?? false);
+    }
   }
 
   /** Marks the heading being read. */
@@ -44,7 +54,7 @@ export class FloatingOutline {
     let current = 0;
     this.links.forEach((link, i) => {
       const heading = document.getElementById(link.dataset.target!);
-      if (heading && heading.getBoundingClientRect().top <= line) current = i;
+      if (heading && !heading.hasAttribute("data-fold-hidden") && heading.getBoundingClientRect().top <= line) current = i;
     });
     const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4 && scroller.scrollTop > 0;
     this.setActive(atEnd ? this.links.length - 1 : current);

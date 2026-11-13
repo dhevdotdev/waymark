@@ -3,10 +3,13 @@ import { headingKey } from "../vault/index";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
+import { FoldStore } from "./fold-store";
 import { isPointerAction } from "./input-origin";
 import { ringMatch } from "./match-ring";
 import { reducedMotion } from "./media";
 import { type Entrance, PageMotion } from "./page-motion";
+import type { ReaderDeps } from "./reader-types";
+import { ReadingFolds, revealFolded } from "./reading-folds";
 import type { ShellElements } from "./shell";
 import { watchTableFit } from "./table-fit";
 import { watchTableSelection } from "./table-selection";
@@ -36,13 +39,19 @@ export function markTarget(target: HTMLElement, delay = 0): void {
 /** The reading column: the rendered note, its header and its backlinks. */
 export class NoteView {
   private readonly motion: PageMotion;
+  private readonly vaultName: string;
+  readonly foldStore: FoldStore;
+  readonly folds: ReadingFolds;
 
   constructor(
     private readonly els: ShellElements,
     private readonly vault: VaultStore,
-    private readonly vaultName: string,
+    deps: Pick<ReaderDeps, "name" | "prefs" | "root">,
     private readonly toast: (message: string) => void,
   ) {
+    this.vaultName = deps.name;
+    this.foldStore = new FoldStore(deps.prefs, deps.root);
+    this.folds = new ReadingFolds(this.foldStore, els.scroller);
     this.motion = new PageMotion(els.scroller);
     watchTableFit(els.scroller);
     watchTableSelection(els.scroller);
@@ -56,6 +65,7 @@ export class NoteView {
     const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
     if (this.motion.leave(entrance) && !midFade) doc.classList.add("doc-enter");
     doc.append(this.heading(path), body);
+    this.folds.mount(doc, path, this.vault.texts.get(path) ?? "");
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);
     this.showPaneHead(path, `${Math.max(1, Math.round(this.vault.wordCount(path) / WORDS_PER_MINUTE))} min read`);
@@ -91,6 +101,7 @@ export class NoteView {
       if (!quiet && !anchor.startsWith("^")) this.toast(`This note has no heading “${anchor}”. Showing the top instead.`);
       return;
     }
+    revealFolded(target, true);
     target.scrollIntoView({ block: "start" });
     if (quiet) return;
     this.els.scroller.querySelector(".is-target")?.classList.remove("is-target");

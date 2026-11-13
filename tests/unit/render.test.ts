@@ -51,6 +51,9 @@ describe("renderNote", () => {
     expect([...terms.querySelectorAll("li strong")].map((t) => t.textContent)).toEqual(["One:", "Two:"]);
     expect(folded.getAttribute("data-fold")).toBe("closed");
     expect(folded.querySelector(".callout-label")!.textContent).toBe("Hidden");
+    const chevron = folded.querySelector("button.callout-title > svg.callout-chevron");
+    expect(chevron?.getAttribute("viewBox")).toBe("0 0 16 16");
+    expect(chevron?.querySelector("path")?.getAttribute("d")).toBe("M6 4l4 4-4 4");
   });
 
   it("embeds vault images and flags missing ones", async () => {

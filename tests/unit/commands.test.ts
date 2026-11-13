@@ -11,6 +11,8 @@ describe("chordOf", () => {
     [{ key: "{", metaKey: true, shiftKey: true }, "mod+shift+["],
     [{ key: "+", metaKey: true, shiftKey: true }, "mod+shift+="],
     [{ key: "«", code: "Backslash", metaKey: true, altKey: true }, "mod+alt+\\"],
+    [{ key: "“", code: "BracketLeft", metaKey: true, altKey: true }, "mod+alt+["],
+    [{ key: "’", code: "BracketRight", metaKey: true, altKey: true, shiftKey: true }, "mod+alt+shift+]"],
     [{ key: "Tab", ctrlKey: true }, "ctrl+tab"],
   ])("%o", (init, chord) => {
     expect(chordOf(key(init))).toBe(chord);

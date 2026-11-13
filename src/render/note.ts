@@ -3,7 +3,7 @@ import type { VaultIndex } from "../vault/index";
 import { stripComments } from "./comments";
 import type { Highlighter } from "./highlight";
 import { reserveImageSpace } from "./image-sizes";
-import { createMarkdown, type RenderEnv, TASK_TICK } from "./markdown";
+import { CALLOUT_CHEVRON, createMarkdown, type RenderEnv, TASK_TICK } from "./markdown";
 import { sanitize } from "./sanitize";
 
 const md = createMarkdown();
@@ -50,6 +50,7 @@ export async function renderNote(
   const html = md.render(text, env as never);
   const fragment = sanitize(html);
   for (const box of fragment.querySelectorAll(".task-box")) box.innerHTML = TASK_TICK;
+  for (const title of fragment.querySelectorAll("button.callout-title")) title.insertAdjacentHTML("beforeend", CALLOUT_CHEVRON);
   for (const box of fragment.querySelectorAll<HTMLElement>("[data-task-line]")) {
     const [nonce, line] = box.dataset.taskLine!.split(":");
     if (nonce === taskNonce) box.dataset.taskLine = line;

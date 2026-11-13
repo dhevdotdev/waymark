@@ -49,6 +49,7 @@ export function readerCommands(r: Reader): Command[] {
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
   const { tree } = r.sidebar;
+  const inEditor = () => document.activeElement?.closest(".cm-content") != null;
   const sortButton = () => r.els.shell.querySelector<HTMLElement>('[data-act="sort-files"]');
   tree.fileTimes = async (paths) => {
     try {
@@ -284,6 +285,36 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌥⌘\\",
       keywords: "linked notes properties",
       run: () => r.inspector.toggle(),
+    },
+    {
+      id: "fold-toggle",
+      label: "Fold or unfold this section",
+      keys: ["mod+alt+["],
+      hint: "⌥⌘[",
+      keywords: "collapse expand heading",
+      inField: inEditor,
+      needsNote: true,
+      run: () => r.editing.fold("toggle") || r.noteView.folds.toggleCurrent(),
+    },
+    {
+      id: "fold-all",
+      label: "Fold all sections",
+      keys: ["mod+alt+shift+["],
+      hint: "⌥⇧⌘[",
+      keywords: "collapse headings outline",
+      inField: inEditor,
+      needsNote: true,
+      run: () => r.editing.fold("all") || r.noteView.folds.setAll(true),
+    },
+    {
+      id: "unfold-all",
+      label: "Unfold all sections",
+      keys: ["mod+alt+shift+]"],
+      hint: "⌥⇧⌘]",
+      keywords: "expand headings",
+      inField: inEditor,
+      needsNote: true,
+      run: () => r.editing.fold("none") || r.noteView.folds.setAll(false),
     },
     { id: "rail-links", run: () => r.inspector.choose("links") },
     { id: "rail-info", run: () => r.inspector.choose("info") },

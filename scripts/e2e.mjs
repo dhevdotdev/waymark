@@ -26,6 +26,8 @@ const RUNS = [
   [["panel-motion"], 22],
   [["spatial-motion"], 21],
   [["spatial-motion", "reduced"], 21],
+  [["folding"], 20],
+  [["folding", "reduced"], 20],
   [["surfaces"], 18],
   [["caret"], 17],
   [["surfaces", "reduced"], 16],
