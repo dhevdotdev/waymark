@@ -2,8 +2,8 @@ import { foldable, noteSections, type Section } from "../vault/sections";
 import type { FoldStore } from "./fold-store";
 import { isPointerAction } from "./input-origin";
 
-/** The chevron and the trailing mark a folded heading shows, shared by Read and Edit. */
-export const FOLD_CHEVRON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
+/** The chevron beside a heading. Edit draws the same one as its heading line's ::before. */
+const FOLD_CHEVRON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
 
 interface Fold {
   section: Section;

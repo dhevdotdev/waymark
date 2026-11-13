@@ -247,6 +247,29 @@ try {
     !(await page.evaluate(() => document.querySelector(".cm-content").textContent.includes("zebrafish"))),
   );
 
+  /** A press on the chevron Edit draws in the margin beside a heading's first line. */
+  const chevronPress = (text) =>
+    page.evaluate((heading) => {
+      const head = [...document.querySelectorAll(".cm-fold-head")].find((h) => h.textContent === heading);
+      const start = head.getClientRects()[0];
+      const at = { bubbles: true, button: 0, clientX: start.left - 15, clientY: (start.top + start.bottom) / 2 };
+      head.dispatchEvent(new MouseEvent("mousedown", at));
+      head.dispatchEvent(new MouseEvent("mouseup", at));
+    }, text);
+  const editFolds = () => page.evaluate(() => [...document.querySelectorAll(".cm-line.cm-folded")].map((l) => l.textContent));
+  const line = () => page.locator(".status-stats").textContent();
+  const lineBefore = await line();
+  await chevronPress("## Setup");
+  await pause(100);
+  check(
+    "a press on Edit's chevron folds its section and leaves the cursor alone",
+    (await editFolds()).includes("## Setup") && (await line()) === lineBefore,
+    `${JSON.stringify(await editFolds())} ${await line()}`,
+  );
+  await chevronPress("## Setup");
+  await pause(100);
+  check("and a second press unfolds it", !(await editFolds()).includes("## Setup"), JSON.stringify(await editFolds()));
+
   await cursorOn("Usage paragraph 2");
   await page.keyboard.press("Meta+Alt+BracketLeft");
   await pause(100);

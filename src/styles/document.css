@@ -184,8 +184,7 @@
   transition: background-color var(--t-hover) var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
-  .doc :is(h1, h2, h3, h4, h5, h6):hover > .fold-anchor > .fold-toggle,
-  .doc-editing .cm-line:hover .fold-toggle {
+  .doc :is(h1, h2, h3, h4, h5, h6):hover > .fold-anchor > .fold-toggle {
     opacity: 1;
   }
   .fold-toggle:hover {
