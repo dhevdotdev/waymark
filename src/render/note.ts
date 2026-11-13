@@ -4,6 +4,7 @@ import { stripComments } from "./comments";
 import type { Highlighter } from "./highlight";
 import { reserveImageSpace } from "./image-sizes";
 import { CALLOUT_CHEVRON, createMarkdown, type RenderEnv, TASK_TICK } from "./markdown";
+import { withMath } from "./math";
 import { sanitize } from "./sanitize";
 
 const md = createMarkdown();
@@ -37,17 +38,20 @@ export async function renderNote(
   const g0 = performance.now();
   await deps.highlighter.prepare(text);
   const grammarMs = performance.now() - g0;
-  const env: RenderEnv = {
-    index: deps.index,
-    currentPath: path,
-    assetUrl: deps.assetUrl,
-    highlight: deps.highlighter.highlight,
-    headings: [],
-    taskLineOffset: options.interactive ? offset : null,
-    taskNonce,
-    strictLineBreaks: deps.strictLineBreaks,
+  const pass = () => {
+    const env: RenderEnv = {
+      index: deps.index,
+      currentPath: path,
+      assetUrl: deps.assetUrl,
+      highlight: deps.highlighter.highlight,
+      headings: [],
+      taskLineOffset: options.interactive ? offset : null,
+      taskNonce,
+      strictLineBreaks: deps.strictLineBreaks,
+    };
+    return { env, html: md.render(text, env as never) };
   };
-  const html = md.render(text, env as never);
+  const { env, html } = await withMath(pass);
   const fragment = sanitize(html);
   for (const box of fragment.querySelectorAll(".task-box")) box.innerHTML = TASK_TICK;
   for (const title of fragment.querySelectorAll("button.callout-title")) title.insertAdjacentHTML("beforeend", CALLOUT_CHEVRON);

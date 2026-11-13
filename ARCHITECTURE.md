@@ -47,6 +47,7 @@ Pure TypeScript with no DOM, tested directly.
 1. `show` takes a sequence number. If a newer navigation starts while this one awaits, the older one stops.
 2. `VaultStore.read` returns the text.
 3. `renderNote` turns Markdown into a sanitised fragment. `sanitize.ts` is the trust boundary for note content.
+   KaTeX stays out of the startup bundle. `src/render/math.ts` loads it the first time a render meets math and renders that note again before it is shown, so math is never seen as source. A note without math never loads it.
 4. `NoteView` mounts it, then the tab strip, trail, tree and inspector update.
 5. Diagrams render last, so a slow Mermaid block never delays the text.
 

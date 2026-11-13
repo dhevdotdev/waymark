@@ -1,8 +1,8 @@
-import katex from "katex";
 import markdownit, { type MarkdownIt, type StateCore, type StateInline, type Token } from "markdown-it";
 import mark from "markdown-it-mark";
 import texmath from "markdown-it-texmath";
 import { headingId, headingKey, isAttachmentTarget, localTarget, type VaultIndex } from "../vault/index";
+import { KATEX_OPTIONS, mathEngine } from "./math";
 
 export interface RenderEnv {
   [key: string]: unknown;
@@ -38,8 +38,6 @@ export const CALLOUT_ALIASES: Record<string, string> = {
 const TASK_MARKER = /^\[([ xX])\](?:\s+|$)/;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
-export const KATEX_OPTIONS = { throwOnError: false, output: "htmlAndMathml", trust: false } as const;
-
 /** Drawn along its length when a task is checked. Added after sanitising, which drops SVG geometry. */
 export const TASK_TICK = `<svg class="task-tick" viewBox="0 0 16 16" aria-hidden="true"><path pathLength="1" d="M4.2 8.3l2.5 2.5 5.1-5.4"/></svg>`;
 /** The chevron of a collapsible callout. Added after sanitising too. */
@@ -49,7 +47,7 @@ export function createMarkdown(): MarkdownIt {
   const md = markdownit({ html: true, linkify: true, typographer: false });
   md.use(mark);
   md.use(texmath, {
-    engine: katex,
+    engine: mathEngine,
     delimiters: "dollars",
     katexOptions: KATEX_OPTIONS,
   });

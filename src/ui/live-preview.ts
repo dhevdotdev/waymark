@@ -5,12 +5,11 @@ import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import type { CodeToken } from "../render/highlight";
 import { applyImageSize, knownImageSize } from "../render/image-sizes";
 import { CALLOUT_ALIASES, TASK_TICK } from "../render/markdown";
-import { MathWidget } from "./editor-blocks";
+import { INLINE_MATH, MathWidget } from "./editor-blocks";
 
 const FRONTMATTER = /^---\n[\s\S]*?\n---(?:\n|$)/;
 const WIKILINK = /(?<!!)\[\[([^\]\n|#]*)(#[^\]\n|]*)?(?:\|([^\]\n]*))?\]\]/g;
 const EMBED = /!\[\[([^\]\n|#]+)(?:[|#][^\]\n]*)?\]\]|!\[[^\]\n]*\]\(([^)\s]+)\)/g;
-const INLINE_MATH = /(?<![\\\d$])\$(?!\$)([^\s\\$]|\S.*?[^\s\\])\$(?![\d$])/g;
 const HEADING = /^(?:ATX|Setext)Heading(\d)$/;
 const INLINE_STYLE: Record<string, string> = { Emphasis: "cm-em", StrongEmphasis: "cm-strong", Strikethrough: "cm-strike" };
 const HIDDEN_MARK = new Set(["EmphasisMark", "StrikethroughMark"]);

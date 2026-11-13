@@ -2,13 +2,16 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { type EditorState, type Extension, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import katex from "katex";
 import { renderDiagrams } from "../render/diagrams";
-import { KATEX_OPTIONS } from "../render/markdown";
+import { drawMath, loadMath } from "../render/math";
 
 const PARSE_BUDGET_MS = 200;
 const DIAGRAM_HEIGHT_GUESS = 260;
 const DISPLAY_MATH = /^ {0,3}\$\$([^$]*?[^\\])\$\$[ \t]*$/gm;
+const FENCED_CODE = /^ {0,3}(`{3,}|~{3,})[\s\S]*?(?:^ {0,3}\1|(?![\s\S]))/gm;
+const CODE_SPAN = /(`+)[^\n]*?\1/g;
+/** Run one line at a time: the lookbehind is slow over a whole note in WebKit without its JIT. */
+export const INLINE_MATH = /(?<![\\\d$])\$(?!\$)([^\s\\$]|\S.*?[^\s\\])\$(?![\d$])/g;
 
 interface Block {
   from: number;
@@ -56,15 +59,33 @@ export class MathWidget extends WidgetType {
   eq(other: MathWidget): boolean {
     return other.tex === this.tex && other.display === this.display;
   }
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const element = document.createElement(this.display ? "div" : "span");
     element.className = this.display ? "cm-preview-block cm-math-block" : "cm-math-inline";
-    katex.render(this.tex, element, { ...KATEX_OPTIONS, displayMode: this.display });
+    if (drawMath(element, this.tex, this.display)) return element;
+    element.textContent = this.tex;
+    void loadMath().then(() => {
+      element.textContent = "";
+      if (drawMath(element, this.tex, this.display)) view.requestMeasure();
+      else element.textContent = this.tex;
+    });
     return element;
   }
   ignoreEvent(): boolean {
     return false;
   }
+}
+
+/** Whether the editor will draw math in `text`, so KaTeX can load before the editor's first paint. */
+export function editorHasMath(text: string): boolean {
+  if (!text.includes("$")) return false;
+  const prose = text.replace(FENCED_CODE, "").replace(CODE_SPAN, "");
+  if (new RegExp(DISPLAY_MATH.source, "m").test(prose)) return true;
+  return prose.split("\n").some((line) => line.includes("$") && new RegExp(INLINE_MATH.source).test(line));
+}
+
+export async function prepareEditorMath(text: string): Promise<void> {
+  if (editorHasMath(text)) await loadMath();
 }
 
 /** A quoted diagram has a prefix on every line, so it stays as text. */

@@ -162,9 +162,9 @@ export class NoteEditing {
         toast("This note mixes Windows and Unix line endings, so editing it here could rewrite every line.");
         return;
       }
-      const { createEditor } = await import("./editor-view");
+      const { createEditor, prepareEditorMath } = await import("./editor-view");
       const { highlighter } = this.host;
-      await highlighter.prepare(text);
+      await Promise.all([highlighter.prepare(text), prepareEditorMath(text)]);
       if (notePath() !== path) return;
       const { scroller } = els;
       const anchor = readingAnchor(scroller);
