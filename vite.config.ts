@@ -210,8 +210,22 @@ function devVault(root: string | undefined): Plugin {
   };
 }
 
+/**
+ * markdown-it-texmath falls back to `require("katex")` when it is given no engine. Waymark always gives it one that
+ * loads KaTeX on demand, so the fallback must not put KaTeX back into the startup code.
+ */
+function texmathWithoutKatex(): Plugin {
+  const stub = "\0texmath-katex";
+  return {
+    name: "texmath-without-katex",
+    enforce: "pre",
+    resolveId: (id, importer) => (id === "katex" && importer?.includes("markdown-it-texmath") ? stub : null),
+    load: (id) => (id === stub ? "export default {};" : null),
+  };
+}
+
 export default defineConfig({
-  plugins: [devVault(process.env.WAYMARK_VAULT)],
+  plugins: [devVault(process.env.WAYMARK_VAULT), texmathWithoutKatex()],
   clearScreen: false,
   server: { port: 5178, strictPort: true },
 });

@@ -22,6 +22,8 @@ import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { tableEditor } from "./table-editor";
 
+export { prepareEditorMath } from "./editor-blocks";
+
 const STATUS_BAR_ROOM = 34;
 const BUBBLE_GAP = { x: 0, y: 6 };
 
