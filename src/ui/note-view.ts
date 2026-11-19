@@ -65,8 +65,8 @@ export class NoteView {
     /* A second link followed during the fade must not dip the page again. */
     const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
     if (this.motion.leave(entrance) && !midFade) doc.classList.add("doc-enter");
-    this.markOwnTitle(doc, path, body);
-    doc.append(this.heading(path), body);
+    if (this.markOwnTitle(doc, path, body)) doc.append(body);
+    else doc.append(this.heading(path), body);
     this.folds.mount(doc, path, this.vault.texts.get(path) ?? "");
     this.els.scroller.replaceChildren(doc);
     this.appendBacklinks(doc, path);
@@ -132,12 +132,13 @@ export class NoteView {
     this.els.scroller.replaceChildren(box);
   }
 
-  /** A note whose first heading already says its name shows that heading as the title, once. */
-  private markOwnTitle(doc: HTMLElement, path: string, body: DocumentFragment): void {
+  /** A note whose first heading already says its name shows that heading as the title, in place of the name. */
+  private markOwnTitle(doc: HTMLElement, path: string, body: DocumentFragment): boolean {
     const first = body.firstElementChild;
     const owns = first?.tagName === "H1" && opensWithTitle(this.vault.texts.get(path) ?? "", this.vault.index.title(path));
     doc.classList.toggle("has-own-title", owns);
-    if (owns) first.classList.add("doc-own-title");
+    if (owns) first.classList.add("doc-title", "doc-own-title");
+    return owns;
   }
 
   private heading(path: string): HTMLElement {
