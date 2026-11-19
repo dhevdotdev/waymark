@@ -1,8 +1,10 @@
 // Zen mode: one shortcut hides the app around the note and brings back exactly what was there.
 // Usage: node tests/e2e/zen.mjs [reduced]
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { webkit } from "playwright";
 import { NOTES } from "./fixture-vault.mjs";
-import { idle, watchIdle } from "./idle.mjs";
+import { idle, watchIdle, writesSettled } from "./idle.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
 import { serveFixture } from "./serve.mjs";
 
@@ -12,6 +14,7 @@ const results = [];
 const check = (name, ok, detail = "") =>
   results.push(`${ok ? "PASS" : "FAIL"}  ${mode}${name}${detail !== "" ? `  (${detail})` : ""}`);
 const app = await serveFixture();
+await writeFile(path.join(app.vault, "Zen conflict.md"), "# Zen conflict\n\nbase text\n");
 const browser = await webkit.launch();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 860 },
@@ -104,7 +107,7 @@ try {
 
   await key("Meta+k");
   check("the palette opens over zen", (await page.locator(".palette").count()) === 1);
-  await page.keyboard.type("zen");
+  await page.keyboard.type(">zen");
   await idle(page);
   check(
     "the palette names the way out",
@@ -137,20 +140,15 @@ try {
   check("⌘\\ in zen leaves it and shows the sidebar", !(await isZen()) && asked.sidebar && asked.rail, JSON.stringify(asked));
 
   await key(ZEN);
+  /* The dev server has no Git, so the sync warning is set by hand. */
   await page.evaluate(() => {
-    document.querySelector(".edit-state").dataset.state = "conflict";
     document.querySelector(".sync-btn").dataset.tone = "warn";
   });
   check(
-    "a save that failed still shows",
-    await page.evaluate(() => getComputedStyle(document.querySelector(".edit-state")).visibility === "visible"),
-  );
-  check(
-    "so does a sync that needs attention",
+    "a sync that needs attention still shows",
     await page.evaluate(() => getComputedStyle(document.querySelector(".sync-btn")).visibility === "visible"),
   );
   await page.evaluate(() => {
-    document.querySelector(".edit-state").dataset.state = "saved";
     document.querySelector(".sync-btn").dataset.tone = "off";
   });
 
@@ -184,6 +182,30 @@ try {
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
   await idle(page);
   check("a new launch shows the whole window", !(await isZen()) && (await layout()).rail);
+
+  await page.evaluate(() => window.waymark.reader.open("Zen conflict.md"));
+  await idle(page);
+  await key("Meta+e");
+  await page.waitForSelector(".cm-content");
+  await writesSettled(page, 200);
+  await key(ZEN);
+  await writeFile(path.join(app.vault, "Zen conflict.md"), "# Zen conflict\n\ntheirs text\n");
+  await page.locator(".cm-line", { hasText: "base text" }).click();
+  await page.keyboard.type("mine ");
+  await page.waitForFunction(() => document.querySelector(".edit-state")?.dataset.state === "conflict", null, {
+    timeout: 5000,
+  });
+  await idle(page);
+  const banner = await page.evaluate(() => {
+    const el = document.querySelector(".edit-banner");
+    return { visibility: getComputedStyle(el).visibility, width: Math.round(el.getBoundingClientRect().width) };
+  });
+  check(
+    "a save that failed still shows its notice in zen",
+    (await isZen()) && banner.visibility === "visible" && banner.width > 0,
+    JSON.stringify(banner),
+  );
+  check("with its way to resolve it", await page.locator('.edit-banner button:has-text("Compare")').isVisible());
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {
   check("the suite finished", false, `${error.message.split("\n").slice(0, 3).join(" ")} | ${errors[0] ?? ""}`);

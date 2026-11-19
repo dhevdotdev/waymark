@@ -121,7 +121,7 @@ kbd {
 .shell.is-zen :is(.pane-head, .statusbar) {
   visibility: hidden;
 }
-.shell.is-zen .edit-state:is([data-state="conflict"], [data-state="missing"], [data-state="failed"]),
+.shell.is-zen .edit-banner,
 .shell.is-zen .sync-btn[data-tone="warn"] {
   visibility: visible;
 }
