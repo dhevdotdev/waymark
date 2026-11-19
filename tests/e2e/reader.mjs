@@ -935,6 +935,17 @@ const scrollNoteTo = async (y) => {
   return scrollTop();
 };
 await scrollNoteTo(160);
+await page.keyboard.press("ArrowRight");
+check(
+  "Right on an open stop goes to its first side branch",
+  (await focusedRow()) === (await sideRow.textContent()) && (await firstStop.getAttribute("aria-expanded")) === "true",
+);
+await page.keyboard.press("ArrowLeft");
+check("Left on a side branch goes back to the stop it left from", (await focusedRow()) === (await firstStop.textContent()));
+const trailPlaces = await page.$$eval(".trail-row", (rows) =>
+  rows.map((r) => `${r.getAttribute("aria-level")}:${r.getAttribute("aria-posinset")}/${r.getAttribute("aria-setsize")}`).join(),
+);
+check("each stop says where it sits among the stops beside it", trailPlaces === "1:1/2,2:1/1,1:2/2", trailPlaces);
 await page.locator(".trail-row:not(.is-current)").last().click();
 await idle(page);
 await page.keyboard.press("Meta+[");
