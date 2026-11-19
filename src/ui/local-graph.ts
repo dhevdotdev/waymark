@@ -8,7 +8,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
-import { resolveColor } from "./colors";
+import { resolveColors } from "./colors";
 import { groupColor } from "./graph-paint";
 
 export interface Neighbour {
@@ -23,6 +23,8 @@ interface Node extends SimulationNodeDatum, Partial<Neighbour> {
   id: string;
   center?: boolean;
 }
+
+type Palette = Record<"dot" | "rule" | "accent" | "paper" | "ink", string>;
 
 type Link = SimulationLinkDatum<Node> & { source: Node | string; target: Node | string; between: boolean };
 
@@ -46,7 +48,8 @@ export class LocalGraph {
   private summary = "";
   private frame = 0;
   private previous = new Map<string, { x: number; y: number }>();
-  private colors!: Record<"dot" | "rule" | "accent" | "paper" | "ink", string>;
+  /** Resolved once per theme, because resolving makes the browser work out the page's styles again. */
+  private colors: Palette | null = null;
   private hues = new Map<number, string>();
   private centreGroup = -1;
 
@@ -102,6 +105,8 @@ export class LocalGraph {
   }
 
   refreshTheme(): void {
+    this.colors = null;
+    this.hues.clear();
     this.readColors();
     this.draw();
   }
@@ -190,16 +195,21 @@ export class LocalGraph {
   }
 
   private readColors(): void {
-    this.colors = {
-      dot: resolveColor("var(--ink-4)"),
-      rule: resolveColor("var(--rule-strong)"),
-      accent: resolveColor("var(--accent)"),
-      paper: resolveColor("var(--paper)"),
-      ink: resolveColor("var(--ink)"),
-    };
-    this.hues.clear();
-    for (const d of this.nodes)
-      if (!d.center && !this.hues.has(d.group!)) this.hues.set(d.group!, resolveColor(groupColor(d.group!)));
+    if (!this.colors) {
+      const [dot, rule, accent, paper, ink] = resolveColors([
+        "var(--ink-4)",
+        "var(--rule-strong)",
+        "var(--accent)",
+        "var(--paper)",
+        "var(--ink)",
+      ]);
+      this.colors = { dot, rule, accent, paper, ink };
+    }
+    const groups = new Set<number>();
+    for (const d of this.nodes) if (!d.center && !this.hues.has(d.group!)) groups.add(d.group!);
+    const missing = [...groups];
+    const resolved = resolveColors(missing.map(groupColor));
+    for (const [i, group] of missing.entries()) this.hues.set(group, resolved[i]);
   }
 
   private resize(): void {
@@ -229,8 +239,8 @@ export class LocalGraph {
     ctx.clearRect(0, 0, w, h);
     const hot = this.hover && !this.hover.center ? this.hover : null;
 
-    this.drawLinks(hot);
-    this.drawNodes(hot);
+    this.drawLinks(hot, c);
+    this.drawNodes(hot, c);
 
     ctx.globalAlpha = 1;
     ctx.fillStyle = c.ink;
@@ -239,8 +249,8 @@ export class LocalGraph {
     ctx.fill();
   }
 
-  private drawLinks(hot: Node | null): void {
-    const { ctx, colors: c } = this;
+  private drawLinks(hot: Node | null, c: Palette): void {
+    const { ctx } = this;
     for (const l of this.links) {
       const s = l.source as Node,
         t = l.target as Node;
@@ -263,8 +273,8 @@ export class LocalGraph {
     }
   }
 
-  private drawNodes(hot: Node | null): void {
-    const { ctx, colors: c } = this;
+  private drawNodes(hot: Node | null, c: Palette): void {
+    const { ctx } = this;
     for (const d of this.nodes) {
       if (d.center) continue;
       const on = d === hot;
