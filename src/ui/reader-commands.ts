@@ -13,6 +13,7 @@ import { viewExists } from "./restore-tabs";
 import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
 import { focusedTable } from "./table-focus";
+import { VaultSwitcher } from "./vault-switcher";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -48,6 +49,15 @@ export function readerCommands(r: Reader): Command[] {
     exists: (view) => viewExists(r.vault.index, view),
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
+  const vaults = new VaultSwitcher({
+    recent: () => prefs.value.recentVaults,
+    current: deps.root,
+    exists: (paths) => native.existingFolders(paths),
+    switchTo: deps.switchVault,
+    openAnother: deps.openAnotherVault,
+    forget: deps.forgetVault,
+    toast,
+  });
   const { tree } = r.sidebar;
   const inEditor = () => document.activeElement?.closest(".cm-content") != null;
   const sortButton = () => r.els.shell.querySelector<HTMLElement>('[data-act="sort-files"]');
@@ -406,6 +416,13 @@ export function readerCommands(r: Reader): Command[] {
     },
     { id: "reveal", label: "Reveal note in Finder", desktop: true, needsNote: true, run: () => void native.reveal(r.current) },
     { id: "terminal", label: "Open vault in Terminal", desktop: true, run: () => void native.openTerminal() },
+    {
+      id: "switch-vault",
+      label: "Switch vault…",
+      keywords: "recent open folder change",
+      desktop: true,
+      run: () => void vaults.open(),
+    },
     { id: "open-vault", label: "Open another vault…", desktop: true, run: () => deps.openAnotherVault() },
     { id: "close-vault", label: "Close vault", desktop: true, run: () => deps.closeVault() },
     {

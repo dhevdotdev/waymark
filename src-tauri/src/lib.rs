@@ -68,6 +68,12 @@ async fn open_vault(
     Ok(vault::info(&root))
 }
 
+/// Which of these folders are still there, so the vault switcher can mark a recent vault that has gone.
+#[tauri::command]
+async fn existing_folders(paths: Vec<String>) -> CmdResult<Vec<bool>> {
+    blocking(move || Ok(paths.iter().map(|p| Path::new(p).is_dir()).collect())).await
+}
+
 /// Watches the vault for edits made by other apps. `.git` and `.obsidian`
 /// churn is ignored; Git state is refreshed separately.
 fn watch(
@@ -561,6 +567,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             open_vault,
+            existing_folders,
             list_files,
             read_text,
             file_stats,

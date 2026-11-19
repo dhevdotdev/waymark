@@ -22,6 +22,9 @@ export interface ReaderDeps {
   setAppearance: (appearance: Appearance) => void;
   setFamily: (id: string) => void;
   openAnotherVault: () => void;
+  /** Saves everything, then opens this vault in place of the current one. */
+  switchVault: (path: string) => void;
+  forgetVault: (path: string) => void;
   closeVault: () => void;
 }
 
