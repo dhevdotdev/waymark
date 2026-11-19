@@ -44,12 +44,12 @@
 .doc.has-own-title > .doc-head {
   display: none;
 }
-.doc-title {
+/* Outranks the `.doc h1` rule below, so the title stays a size above every heading in the note. */
+.doc .doc-title {
   font-size: var(--text-title);
   line-height: 1.12;
   font-weight: 560;
   letter-spacing: -0.012em;
-  margin: 0;
   text-wrap: balance;
   font-variant-numeric: lining-nums;
 }
@@ -1070,10 +1070,8 @@ button.callout-title:focus-visible {
 @container reader (max-width: 640px) {
   .doc {
     --gutter: 30px;
+    --text-title: 1.75rem;
     padding-top: var(--s6);
-  }
-  .doc-title {
-    font-size: 1.75rem;
   }
 }
 .diagram:has(.diagram-svg) .diagram-source {

@@ -134,7 +134,7 @@ The note body is a CSS grid, and grid items never collapse margins. Every gap is
 | Group | Values |
 |---|---|
 | Faces | Source Serif 4 (reading), Inter (UI), JetBrains Mono (code). All are bundled, so Waymark fetches no fonts. |
-| Reading sizes | Body 17px/1.65 · small (callouts, tables) 15px · code 13px/1.6 · h2 22px · title 34px |
+| Reading sizes | Body 17px/1.65 · small (callouts, tables) 15px · code 13px/1.6 · h2 22px · h1 28px · title 34px at weight 560, a step above any heading in the note, and 28px in a column under 640px. A first heading that stands in for the title takes the title's size in Read and Edit |
 | UI sizes | 13px controls, 11px metadata |
 | Geometry | Measure 37rem, wide extra 5rem, gutter 2.5rem (1.25rem below 640px) |
 | Space | 4px base: 4, 8, 12, 16, 24, 32, 48, 72 |
