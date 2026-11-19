@@ -65,10 +65,16 @@ export class TabActions {
     else this.host.toast(`${nameOf(result.view)} is no longer in the vault, so its tab can't come back.`);
   }
 
-  /** Arrow keys move along the strip and select as they go, wrapping at the ends. */
+  /** Arrow keys move along the strip and select as they go, wrapping at the ends. Delete closes the tab. */
   private onKey(e: KeyboardEvent): void {
     if (!(e.target as HTMLElement).closest(".tab") || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const { activeIndex, tabs } = this.host.workspace;
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      e.stopPropagation();
+      this.host.close(activeIndex);
+      return;
+    }
     const last = tabs.length - 1;
     const targets: Record<string, number> = {
       ArrowLeft: activeIndex === 0 ? last : activeIndex - 1,

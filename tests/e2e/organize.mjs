@@ -486,7 +486,6 @@ try {
         stops: [...document.querySelectorAll(".tab")].map((t) => t.tabIndex).join(),
         active: document.querySelector(".tab.is-active .tab-title").textContent,
         focusIsActiveTab: document.activeElement === document.querySelector(".tab.is-active"),
-        focusIsClose: document.activeElement?.matches("[data-tab-close]") ?? false,
       }));
     check("only the active tab is a Tab stop", (await strip()).stops === "0,-1,-1", (await strip()).stops);
     await page.keyboard.press("Tab");
@@ -513,23 +512,40 @@ try {
     );
     await page.waitForFunction(() => document.querySelector(".doc")?.textContent.length > 0);
 
-    await page.locator(".tab.is-active [data-tab-close]").focus();
     const closeStyle = await page.locator(".tab.is-active [data-tab-close]").evaluate((b) => ({
       opacity: getComputedStyle(b).opacity,
       transition: getComputedStyle(b).transitionDuration,
     }));
     check(
-      "a focused close control is fully visible at once",
+      "a focused tab shows its close control fully at once",
       closeStyle.opacity === "1" && /^0s/.test(closeStyle.transition),
       JSON.stringify(closeStyle),
     );
+    const semantics = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll(".tab")];
+      const panel = document.getElementById("note-panel");
+      return {
+        strip: document.querySelector(".tabs").getAttribute("aria-label"),
+        controls: tabs.every(
+          (t) => document.getElementById(t.getAttribute("aria-controls"))?.getAttribute("role") === "tabpanel",
+        ),
+        labelled: panel.getAttribute("aria-labelledby") === document.querySelector(".tab.is-active").id,
+        closeOutOfOrder: tabs.every((t) => t.querySelector("[data-tab-close]")?.tabIndex === -1),
+      };
+    });
+    check(
+      "the strip is named, each tab names its panel, and the panel names the active tab",
+      semantics.strip === "Tabs" && semantics.controls && semantics.labelled,
+      JSON.stringify(semantics),
+    );
+    check("a close control is never a Tab stop", semantics.closeOutOfOrder);
     await page.evaluate(() => window.waymark.reader.renderTabs());
-    check("a redraw keeps focus on the close control", (await strip()).focusIsClose);
-    await page.keyboard.press("Enter");
+    check("a redraw keeps focus on the active tab", (await strip()).focusIsActiveTab);
+    await page.keyboard.press("Backspace");
     await idle(page);
     const closed = await strip();
     check(
-      "closing from the keyboard moves focus to the tab that takes over",
+      "Delete closes the focused tab and focus moves to the tab that takes over",
       closed.focusIsActiveTab && closed.stops.split(",").length === 2,
       JSON.stringify(closed),
     );

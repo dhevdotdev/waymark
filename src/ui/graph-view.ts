@@ -86,6 +86,9 @@ export class GraphView {
       },
     });
     this.root.querySelector(".graph-stage")!.append(this.canvas.canvas, this.canvas.announcer);
+    this.root.id = "graph-panel";
+    this.root.setAttribute("role", "tabpanel");
+    this.root.setAttribute("aria-label", "Graph");
     this.strip = this.root.querySelector<HTMLElement>(".graph-groups")!;
     parent.append(this.root);
     this.root.querySelector(".graph-leave")!.append(this.leaveArrows.svg);
