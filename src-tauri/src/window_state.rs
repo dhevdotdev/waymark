@@ -190,7 +190,8 @@ fn snapshot<R: Runtime>(window: &Window<R>, previous: Option<Saved>) -> Option<S
 }
 
 pub fn on_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
-    if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+    if window.label() == "main" && matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_))
+    {
         note_change(window);
     }
 }

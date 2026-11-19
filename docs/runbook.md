@@ -14,7 +14,7 @@ Start with `pnpm run health`. It reports the tools, dependencies and port this c
 
 ## The native self-test
 
-`pnpm test:native` builds the app and runs `tests/native/run.mjs`, which launches the binary four times against disposable vaults: `read`, `git`, `diverged` and `blocked`. Reports go to a temporary folder and failures are printed.
+`pnpm test:native` builds the app with the `selftest` Cargo feature and runs `tests/native/run.mjs`, which launches the binary four times against disposable vaults: `read`, `git`, `diverged` and `blocked`. Reports go to a temporary folder and failures are printed. Only that feature compiles the self-test commands in, so a plain `pnpm tauri build` ships without them, and `pnpm install:app` refuses a bundle built with them.
 
 A run never takes focus and shows no window, so it can run while someone is using the Mac. The app starts with the prohibited activation policy, and WebKit's hidden-page timer throttling is turned off, so timings stay real. A page that is never drawn gets no animation frames, no CSS animations and no editor measuring, so the few checks that need them are reported as inconclusive rather than passed.
 

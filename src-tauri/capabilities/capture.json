@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "capture",
+  "description": "Quick capture window: it hands its text to the main window through events",
+  "windows": ["capture"],
+  "permissions": ["core:event:default"]
+}

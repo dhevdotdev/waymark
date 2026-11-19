@@ -409,10 +409,18 @@ try {
               (b) => b.textContent.includes(mark) && b.children.length <= 8 && b.getBoundingClientRect().height < 200,
             ) ?? blocks.find((b) => b.textContent.includes(mark));
           if (!block) return null;
-          const inset = Number.parseFloat(getComputedStyle(block).paddingTop) || 0;
-          return Math.round(
-            block.getBoundingClientRect().top + scroller.scrollTop + (block.classList.contains("cm-line") ? inset : 0),
-          );
+          /* Where the mark's first letter is drawn, so a box's padding above its text is not counted as a move. */
+          let at = block.textContent.indexOf(mark);
+          const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node && at >= node.length) {
+            at -= node.length;
+            node = walker.nextNode();
+          }
+          const letter = document.createRange();
+          letter.setStart(node, at);
+          letter.setEnd(node, at + 1);
+          return Math.round(letter.getBoundingClientRect().top + scroller.scrollTop);
         });
       },
       [selector, MARKS],

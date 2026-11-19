@@ -17,7 +17,8 @@ guardDrops();
 async function boot(): Promise<void> {
   if (!isDesktop) return app.start(devVaultSource(), params.get("note") ?? undefined);
   const { invoke } = await import("@tauri-apps/api/core");
-  const selftest = await invoke<{ vault: string; mode: string; drawn: boolean } | null>("selftest_config");
+  // Only a build with the `selftest` feature has this command, so a release build lands in the catch.
+  const selftest = await invoke<{ vault: string; mode: string; drawn: boolean } | null>("selftest_config").catch(() => null);
   if (!selftest) return app.start();
   const log = (line: string) => void invoke("selftest_log", { line });
   window.addEventListener("error", (e) => log(`error: ${e.message}`));

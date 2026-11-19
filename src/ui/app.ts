@@ -1,10 +1,13 @@
-import { desktopVaultSource, isDesktop, native } from "../platform";
+import { type CaptureRequest, desktopVaultSource, isDesktop, native } from "../platform";
 import { PrefStore, type Prefs } from "../prefs";
 import { Highlighter } from "../render/highlight";
 import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
+import { noteNamed, type OpenRequest, vaultHolding } from "../vault/open-request";
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { bindAppMenu } from "./app-menu";
+import { saveCapture } from "./capture-save";
+import { startCaptureShortcut } from "./capture-shortcut";
 import { resolveColor } from "./colors";
 import { toast } from "./overlays";
 import { type Metrics, Reader } from "./reader";
@@ -24,6 +27,8 @@ export class App {
   private readonly prefs = new PrefStore();
   private readonly highlighter = new Highlighter();
   private codeFamily = "";
+  private root: string | null = null;
+  private requests: Promise<void> = Promise.resolve();
 
   constructor(private readonly host: HTMLElement) {}
 
@@ -62,12 +67,77 @@ export class App {
       await this.prefs.flush();
     });
 
+    if (isDesktop && !this.prefs.ephemeral) {
+      void startCaptureShortcut(this.prefs.value.captureShortcut);
+      await native.onCaptureSave((request) => void this.answerCapture(request));
+    }
+    const early = override ? [] : await native.takeOpenRequests().catch(() => []);
+    const first = this.vaultAsked(early) ?? this.prefs.value.lastVault;
     if (devSource) await this.loadVault(devSource, "dev", "Vault", initial);
     else if (override) await this.openVault(override);
-    else if (this.prefs.value.lastVault)
-      await this.openVault(this.prefs.value.lastVault).catch((err: Error) => this.welcome(err.message));
+    else if (first) await this.openVault(first).catch((err: Error) => this.welcome(err.message));
     else this.welcome();
     this.metrics.startMs = performance.now() - t0;
+    if (override) return;
+    this.handleRequests(early);
+    await native.onOpenRequests(() => {
+      void native.takeOpenRequests().then((requests) => this.handleRequests(requests));
+    });
+  }
+
+  /** At a cold start, the vault a handed-over file is in opens first, so the last vault is not shown on the way. */
+  private vaultAsked(requests: OpenRequest[]): string | undefined {
+    for (const request of requests) {
+      if (request.kind === "file") return vaultHolding(request.path, this.prefs.value.recentVaults)?.root;
+    }
+    return undefined;
+  }
+
+  /** One at a time, in the order they came, so two quick links cannot race to switch vaults. */
+  private handleRequests(requests: OpenRequest[]): void {
+    for (const request of requests) {
+      this.requests = this.requests.then(() => this.openRequested(request)).catch((err: Error) => this.tell(err.message));
+    }
+  }
+
+  /** A request from outside only navigates. A file outside every known vault is refused, never opened in another one. */
+  private async openRequested(request: OpenRequest): Promise<void> {
+    if (request.kind === "refused") return this.tell(request.reason);
+    let path = request.path;
+    if (request.kind === "file") {
+      const known = [...(this.root ? [this.root] : []), ...this.prefs.value.recentVaults];
+      const held = vaultHolding(request.path, known);
+      if (!held) {
+        const name = request.path.slice(request.path.lastIndexOf("/") + 1);
+        return this.tell(`“${name}” is not in a vault Waymark knows, so it was not opened. Open its vault first.`);
+      }
+      if (held.root !== this.root) await this.openVault(held.root);
+      /* Leaving the vault was refused, because an edit could not be saved, and that refusal has been shown. */
+      if (held.root !== this.root) return;
+      path = held.path;
+    }
+    if (!this.reader) return this.tell("Open a vault first, then follow the link again.");
+    const found = noteNamed(this.reader.vault.index, path);
+    if (found.kind === "refused") return this.tell(found.reason);
+    await this.reader.open(found.path, { anchor: request.heading ?? undefined });
+  }
+
+  /** Saves what the capture window sends into the open vault, and tells it where the note went or why it did not. */
+  private async answerCapture({ id, text }: CaptureRequest): Promise<void> {
+    const reader = this.reader;
+    if (!text.trim()) return native.answerCapture({ id, problem: "There is nothing to save." });
+    if (!reader) return native.answerCapture({ id, problem: "Open a vault in Waymark first. Nothing was saved." });
+    try {
+      const host = { vault: reader.vault, notePath: reader.notePath, refresh: (paths: string[]) => reader.onVaultChanged(paths) };
+      await native.answerCapture({ id, saved: await saveCapture(host, text) });
+    } catch (error) {
+      await native.answerCapture({ id, problem: error instanceof Error ? error.message : "The note could not be saved." });
+    }
+  }
+
+  private tell(message: string): void {
+    if (this.reader) toast(message);
+    else this.welcome(message);
   }
 
   async openVault(path: string): Promise<void> {
@@ -78,6 +148,7 @@ export class App {
       p.recentVaults = [info.root, ...p.recentVaults.filter((r) => r !== info.root)].slice(0, MAX_RECENT_VAULTS);
     });
     await this.loadVault(desktopVaultSource(), info.root, info.name);
+    this.root = info.root;
   }
 
   setAppearance = (appearance: Prefs["appearance"]): void => {
@@ -107,6 +178,7 @@ export class App {
   private closeReader(): void {
     this.reader?.dispose();
     this.reader = null;
+    this.root = null;
   }
 
   private async loadVault(source: VaultSource, root: string, name: string, initial?: string): Promise<void> {

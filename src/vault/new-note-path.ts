@@ -26,6 +26,11 @@ export function linkedNotePath(target: string, place: NewNotePlace): LinkedNote 
   }
   const name = parts.join("/");
   if (written.startsWith("/") || parts.length > 1) return { kind: "path", path: `${name}.md` };
-  const folder = place.location === "current" ? place.here : place.location === "folder" ? place.folder : "";
+  const folder = newNoteFolder(place);
   return { kind: "path", path: folder ? `${folder}/${name}.md` : `${name}.md` };
+}
+
+/** The folder Obsidian's settings put a new note in. */
+export function newNoteFolder(place: NewNotePlace): string {
+  return place.location === "current" ? place.here : place.location === "folder" ? place.folder : "";
 }

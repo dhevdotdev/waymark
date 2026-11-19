@@ -1,0 +1,76 @@
+@import "@fontsource-variable/source-serif-4/opsz.css";
+@import "@fontsource-variable/inter/opsz.css";
+@import "./tokens.css";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: clip;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+}
+.capture {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: 20px 22px 12px;
+}
+.capture-field {
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: none;
+  color: var(--ink);
+  caret-color: var(--accent);
+  font-family: var(--font-read);
+  font-optical-sizing: auto;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.capture-field::placeholder {
+  color: var(--ink-3);
+}
+.capture-field::selection {
+  background: var(--select);
+}
+.capture-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-block-start: 8px;
+  font-size: var(--ui-small);
+  color: var(--ink-3);
+}
+.capture-status {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.capture[data-state="problem"] .capture-status {
+  color: var(--danger-ink);
+  white-space: normal;
+}
+.capture[data-state="saved"] .capture-status {
+  color: var(--ink-2);
+}
+.capture[data-state="saved"] .capture-keys {
+  display: none;
+}
+.capture[data-state="saved"] .capture-field {
+  color: var(--ink-3);
+}

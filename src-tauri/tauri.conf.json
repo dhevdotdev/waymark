@@ -46,6 +46,7 @@
     "active": true,
     "targets": ["app", "dmg"],
     "category": "public.app-category.productivity",
+    "fileAssociations": [{ "ext": ["md"], "name": "Markdown note", "role": "Editor", "rank": "Alternate" }],
     "copyright": "",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "macOS": { "minimumSystemVersion": "13.0" }

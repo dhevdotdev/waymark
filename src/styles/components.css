@@ -412,9 +412,60 @@
 .pop-toggles {
   padding-block: 6px 10px;
 }
+.pop-note.is-problem {
+  color: var(--danger-ink);
+}
+.capture-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+.capture-shortcut span {
+  flex: 1;
+}
+.shortcut-key {
+  min-inline-size: 72px;
+  block-size: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  cursor: default;
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    box-shadow var(--t-hover) ease,
+    scale var(--t-press) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .shortcut-key:not(.is-recording):hover {
+    background: color-mix(in oklab, var(--p-surface0) 75%, transparent);
+  }
+}
+.shortcut-key:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.shortcut-key.is-off,
+.shortcut-key.is-recording {
+  color: var(--ink-3);
+}
+.shortcut-key.is-recording {
+  background: var(--paper);
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
 .settings {
   width: 300px;
   transform-origin: top right;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .theme-grid {
   display: grid;
@@ -1847,7 +1898,8 @@
     .prop-remove,
     .edit-bubble-btn,
     .theme-swatch,
-    .start-action
+    .start-action,
+    .shortcut-key
   ):active:not(:disabled) {
   scale: var(--pop);
 }
@@ -1866,6 +1918,7 @@
     .prompt,
     .icon-btn,
     .seg-btn,
+    .shortcut-key,
     .tab,
     .toggle i,
     .task-box,

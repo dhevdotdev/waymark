@@ -228,4 +228,6 @@ export default defineConfig({
   plugins: [devVault(process.env.WAYMARK_VAULT), texmathWithoutKatex()],
   clearScreen: false,
   server: { port: 5178, strictPort: true },
+  /* The quick capture window loads its own small page, so it is ready at once and never pulls in the reader. */
+  build: { rollupOptions: { input: { index: "index.html", capture: "capture.html" } } },
 });

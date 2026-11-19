@@ -29,7 +29,7 @@ await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
 
 Ready means `metrics.indexMs` is set. Put your script in a scratch folder or the repository root, because the imports are relative.
 
-For the packaged app, build with `pnpm tauri build --bundles app`, then run `node tests/native/run.mjs <read|git|diverged|blocked>`.
+For the packaged app, build with `pnpm tauri build --bundles app --features selftest`, then run `node tests/native/run.mjs <read|git|diverged|blocked>`.
 
 ## Drive
 

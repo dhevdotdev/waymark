@@ -1,9 +1,11 @@
+mod capture;
 mod clipboard;
 mod dock_icon;
 mod folders;
 mod git;
 mod menu;
 mod navigation;
+mod open_requests;
 mod quit;
 mod selftest;
 mod trash;
@@ -531,8 +533,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(navigation::guard())
+        .plugin(capture::plugin())
         .manage(Vault::default())
         .manage(Watcher::default())
+        .manage(open_requests::Pending::default())
+        .manage(capture::Capture::default())
         .manage(Arc::new(trash::TrashLog::default()))
         .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -607,8 +612,14 @@ pub fn run() {
             write_prefs,
             dock_icon::set_dock_icon,
             window_state::show_window,
+            open_requests::take_open_requests,
+            capture::set_capture_shortcut,
+            capture::capture_close,
+            #[cfg(feature = "selftest")]
             selftest::selftest_config,
+            #[cfg(feature = "selftest")]
             selftest::selftest_report,
+            #[cfg(feature = "selftest")]
             selftest::selftest_log
         ])
         .build(tauri::generate_context!())
@@ -623,12 +634,14 @@ pub fn run() {
             quit::quit_after_saving(app);
         }
         RunEvent::WindowEvent {
+            label,
             event: WindowEvent::CloseRequested { api, .. },
             ..
         } => {
             api.prevent_close();
-            quit::quit_after_saving(app);
+            quit::close_requested(app, &label);
         }
+        RunEvent::Opened { urls } => open_requests::receive(app, &urls),
         _ => {}
     });
 }
