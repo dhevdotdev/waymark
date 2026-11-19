@@ -517,7 +517,7 @@ pub fn run() {
         .setup(|app| {
             menu::install(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
-                window_state::restore(&window);
+                window_state::show_when_themed(&window);
             }
             Ok(())
         })
@@ -599,6 +599,7 @@ pub fn run() {
             read_prefs,
             write_prefs,
             dock_icon::set_dock_icon,
+            window_state::show_window,
             selftest::selftest_config,
             selftest::selftest_report,
             selftest::selftest_log

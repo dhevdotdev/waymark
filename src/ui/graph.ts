@@ -595,12 +595,13 @@ export class GraphCanvas {
       this.opts.onOpen(this.hover.id, e.metaKey);
       return;
     }
-    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (!step || e.metaKey || e.altKey || e.ctrlKey) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 0, End: 0 }[e.key];
+    if (step === undefined || e.metaKey || e.altKey || e.ctrlKey) return;
     const list = traversalOrder(this.reachable());
     if (!list.length) return;
     e.preventDefault();
-    this.focusNode(list, nextIndex(list, this.hover, this.current, step));
+    const end = e.key === "Home" ? 0 : list.length - 1;
+    this.focusNode(list, step ? nextIndex(list, this.hover, this.current, step) : end);
   }
 
   private focusNode(list: GraphNode[], index: number): void {

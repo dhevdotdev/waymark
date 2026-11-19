@@ -23,8 +23,23 @@ const CHEVRON_CLEARANCE = 9;
 const ELBOW = 5;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** Each row's place among the rows that share its parent, as [position, count], from the rows' levels in order. */
+export function siblingPlaces(levels: readonly number[]): [number, number][] {
+  const groups: number[][] = [];
+  const open: number[] = [];
+  const placed = levels.map((level, i) => {
+    open.length = Math.min(open.length, level + 1);
+    open[level] ??= groups.push([]) - 1;
+    const group = groups[open[level]];
+    group.push(i);
+    return { group, position: group.length };
+  });
+  return placed.map(({ group, position }) => [position, group.length]);
+}
+
 const columnOf = (level: number) => FIRST_COLUMN + Math.min(level, DEEPEST_STEP) * STEP;
 const middleOf = (index: number) => index * ROW + ROW / 2;
+const levelOf = (row: HTMLElement | undefined) => Number(row?.getAttribute("aria-level") ?? 0);
 
 /** One tab's trail as a list: the current stop marked, side branches stepped in under the stop they left from. */
 export class TrailPanel {
@@ -90,9 +105,12 @@ export class TrailPanel {
       this.rows.delete(id);
     }
     let next = this.lines.nextElementSibling;
-    for (const entry of entries) {
+    const places = siblingPlaces(entries.map((e) => e.level));
+    for (const [i, entry] of entries.entries()) {
       const row = this.rows.get(entry.id) ?? this.createRow(entry.id);
       this.updateRow(row, entry, current, onPath);
+      row.setAttribute("aria-posinset", String(places[i][0]));
+      row.setAttribute("aria-setsize", String(places[i][1]));
       if (row === next) next = next.nextElementSibling;
       else this.root.insertBefore(row, next);
     }
@@ -249,7 +267,9 @@ export class TrailPanel {
     const rows = this.ordered();
     const at = rows.indexOf(row);
     const expanded = row.getAttribute("aria-expanded");
-    const moveTo = (i: number) => rows[Math.max(0, Math.min(i, rows.length - 1))].focus();
+    const moveTo = (i: number) => {
+      if (i >= 0) rows[Math.min(i, rows.length - 1)].focus();
+    };
     const actions: Record<string, () => void> = {
       ArrowDown: () => moveTo(at + 1),
       ArrowUp: () => moveTo(at - 1),
@@ -257,9 +277,11 @@ export class TrailPanel {
       End: () => moveTo(rows.length - 1),
       ArrowRight: () => {
         if (expanded === "false") this.on.toggle(id);
+        else if (expanded === "true" && levelOf(rows[at + 1]) > levelOf(row)) moveTo(at + 1);
       },
       ArrowLeft: () => {
         if (expanded === "true") this.on.toggle(id);
+        else moveTo(rows.findLastIndex((r, i) => i < at && levelOf(r) < levelOf(row)));
       },
       Enter: () => this.on.select(id, e.metaKey),
       Delete: () => this.on.remove(id),

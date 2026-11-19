@@ -15,13 +15,11 @@ const STRIP_CHROME = 42;
 
 const watchedStrips = new WeakSet<HTMLElement>();
 
-/** What holds focus in the strip. A redraw puts it back on the active tab, or on its close control if that held it. */
-function heldFocus(strip: HTMLElement, activeId: number | undefined): "tab" | "close" | null {
-  const focused = document.activeElement;
-  const tab = focused && strip.contains(focused) ? focused.closest<HTMLElement>(".tab") : null;
-  if (!tab) return null;
-  return focused?.matches("[data-tab-close]") && tab.dataset.tabId === String(activeId) ? "close" : "tab";
-}
+/** The tab that holds focus, which a redraw hands to the active tab. */
+const holdsFocus = (strip: HTMLElement) => !!document.activeElement?.closest(".tab") && strip.contains(document.activeElement);
+
+/** The panel each kind of tab shows. A note's names itself after the active tab; the graph's has its own name. */
+const PANEL = { note: "note-panel", graph: "graph-panel" } as const;
 
 /** The new-tab button rides at the end of the strip, so it moves with the tabs. */
 const NEW_TAB_KEY = -1;
@@ -68,7 +66,7 @@ export function renderTabStrip(strip: HTMLElement, workspace: Workspace, labelOf
   const before = tabsIn(strip);
   const was = placesOf(before, strip);
   const motion = isPointerAction() && before.size > 0 && (shapeChanged(before, workspace) || isSettling(strip));
-  const held = heldFocus(strip, workspace.tabs[workspace.activeIndex]?.id);
+  const held = holdsFocus(strip);
   const frag = document.createDocumentFragment();
   workspace.tabs.forEach((tab, i) => {
     const active = i === workspace.activeIndex;
@@ -77,16 +75,21 @@ export function renderTabStrip(strip: HTMLElement, workspace: Workspace, labelOf
     const el = document.createElement("div");
     el.className = `tab${active ? " is-active" : ""}`;
     el.setAttribute("role", "tab");
+    el.id = `tab-${tab.id}`;
     el.setAttribute("aria-selected", String(active));
+    el.setAttribute("aria-controls", view.kind === "graph" ? PANEL.graph : PANEL.note);
+    if (active && view.kind !== "graph") document.getElementById(PANEL.note)?.setAttribute("aria-labelledby", el.id);
     el.dataset.tab = String(i);
     el.dataset.tabId = String(tab.id);
     el.tabIndex = active ? 0 : -1;
     el.dataset.tip = title;
     el.classList.toggle("is-graph-tab", view.kind === "graph");
     el.classList.toggle("is-pinned", !!tab.pinned);
+    /* Delete closes the focused tab, so the close control is for the pointer and stays out of the Tab order. */
+    if (!tab.pinned) el.setAttribute("aria-keyshortcuts", "Backspace Delete");
     el.innerHTML = tab.pinned
       ? `<span class="tab-pin" aria-label="Pinned">${icons.pin}</span><span class="tab-title"></span>`
-      : `<button class="icon-btn tab-close" data-tab-close aria-label="Close tab" tabindex="${active ? 0 : -1}">${icons.close}</button><span class="tab-title"></span>`;
+      : `<button class="icon-btn tab-close" data-tab-close aria-hidden="true" tabindex="-1">${icons.close}</button><span class="tab-title"></span>`;
     el.querySelector(".tab-title")!.textContent = title;
     frag.append(el);
   });
@@ -100,10 +103,7 @@ export function renderTabStrip(strip: HTMLElement, workspace: Workspace, labelOf
   frag.append(plus);
   if (motion) frag.append(...strip.querySelectorAll(":scope > .tab-ghost"));
   strip.replaceChildren(frag);
-  if (held) {
-    const tab = strip.querySelector<HTMLElement>(".tab.is-active");
-    (held === "close" ? (tab?.querySelector<HTMLElement>("[data-tab-close]") ?? tab) : tab)?.focus({ preventScroll: true });
-  }
+  if (held) strip.querySelector<HTMLElement>(".tab.is-active")?.focus({ preventScroll: true });
   if (motion) {
     fitTabs(strip);
     settleTabs(strip, before, was);

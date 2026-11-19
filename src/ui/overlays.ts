@@ -4,7 +4,7 @@ import { holdModal } from "./modal-layer";
 
 /** While one of these is open it answers Escape itself, so the window must not act on the key too. */
 export const ESCAPE_IS_TAKEN =
-  ".lightbox, .sheet-overlay, .popover, .preview, .prompt-overlay, .prop-new, [data-editing-property]";
+  ".lightbox, .sheet-overlay, .popover, .preview, .prompt-overlay, .prop-new, [data-editing-property], .is-resizing";
 
 const TOAST_MS = 2600;
 const TOAST_WITH_ACTION_MS = 6000;

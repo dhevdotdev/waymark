@@ -35,9 +35,10 @@ export class PanelSections {
   ) {
     this.inner = shell.querySelector<HTMLElement>(".rail-inner")!;
     for (const section of SECTIONS) {
-      const handle = document.createElement("div");
+      const handle = document.createElement("button");
+      handle.type = "button";
       handle.className = "rail-section-resize";
-      handle.setAttribute("aria-hidden", "true");
+      handle.setAttribute("aria-label", section === "trail" ? "Trail height" : "Graph height");
       this.el(section).prepend(handle);
       bindEdgeDrag(handle, {
         shell,

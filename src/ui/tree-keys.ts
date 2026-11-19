@@ -1,4 +1,29 @@
+import { createTypeahead, isTypeaheadKey } from "./typeahead";
+
 export const ROW = ".tree-head, .nav-item";
+const ITEM = ".tree-folder, .nav-item";
+
+const setAttr = (el: Element, name: string, value: string) => {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+};
+
+/** Gives each row its place in the tree: its depth, and where it sits among the rows beside it. */
+function describeRows(container: Element, level: number): void {
+  const items = [...container.children].filter((child) => child.matches(ITEM));
+  items.forEach((item, i) => {
+    const row = item.matches(".nav-item") ? item : item.querySelector(":scope > .tree-head");
+    if (row) {
+      setAttr(row, "role", "treeitem");
+      setAttr(row, "aria-level", String(level));
+      setAttr(row, "aria-posinset", String(i + 1));
+      setAttr(row, "aria-setsize", String(items.length));
+    }
+    const inner = item.querySelector(":scope > .tree-body > .tree-inner");
+    if (inner) describeRows(inner, level + 1);
+  });
+}
+
+const labelOf = (row: HTMLElement) => row.querySelector(".tree-name, .nav-text")?.textContent ?? "";
 
 export function isShown(row: Element): boolean {
   if (row.classList.contains("is-naming")) return false;
@@ -8,7 +33,7 @@ export function isShown(row: Element): boolean {
   return true;
 }
 
-/** Arrow keys for the file list, which is a single Tab stop with one row holding it. */
+/** Arrow keys and typing for the file list, which is a single Tab stop with one row holding it. */
 export function bindTreeKeys(box: HTMLElement): void {
   const shownRows = () => [...box.querySelectorAll<HTMLElement>(ROW)].filter(isShown);
   let stop: HTMLElement | null = null;
@@ -22,6 +47,8 @@ export function bindTreeKeys(box: HTMLElement): void {
   let queued = false;
   const settle = () => {
     queued = false;
+    const tree = box.querySelector(".tree");
+    if (tree) describeRows(tree, 1);
     for (const row of box.querySelectorAll<HTMLElement>(ROW)) if (row !== stop) row.tabIndex = -1;
     if (stop?.isConnected && isShown(stop)) return;
     holdStop(box.querySelector<HTMLElement>(".nav-item.is-current") ?? shownRows()[0] ?? null);
@@ -61,11 +88,19 @@ export function bindTreeKeys(box: HTMLElement): void {
     return own?.parentElement?.closest(".tree-folder")?.querySelector<HTMLElement>(":scope > .tree-head") ?? undefined;
   };
 
+  const typeahead = createTypeahead();
   box.addEventListener("keydown", (e) => {
     const row = e.target as HTMLElement;
-    if (!row.matches(ROW) || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (!row.matches(ROW)) return;
     const rows = shownRows();
     const at = rows.indexOf(row);
+    if (isTypeaheadKey(e) && (e.key !== " " || typeahead.active())) {
+      const found = typeahead(e.key, rows.map(labelOf), at);
+      if (e.key === " " || found >= 0) e.preventDefault();
+      if (found >= 0) moveTo(rows[found]);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const open = row.getAttribute("aria-expanded") === "true";
     const actions: Record<string, () => boolean> = {
       ArrowDown: () => moveTo(rows[at + 1]),

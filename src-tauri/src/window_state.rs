@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::window::Color;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Runtime, WebviewWindow, Window,
     WindowEvent,
@@ -106,8 +107,39 @@ fn screens<R: Runtime>(window: &WebviewWindow<R>) -> Vec<Screen> {
         .unwrap_or_default()
 }
 
+/// How long launch waits for the page to ask to be shown before showing the window anyway.
+const SHOW_ANYWAY_AFTER: Duration = Duration::from_secs(2);
+static SHOWN: AtomicBool = AtomicBool::new(false);
+
+/// Keeps the window hidden until the page has applied the saved theme, so the first frame on screen is already in its
+/// colours. A self-test shows it at once, and a page that never asks is shown anyway after a moment.
+pub fn show_when_themed<R: Runtime>(window: &WebviewWindow<R>) {
+    if crate::selftest::unseen() {
+        reveal(window);
+        return;
+    }
+    let window = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(SHOW_ANYWAY_AFTER);
+        reveal(&window);
+    });
+}
+
+/// The page wears its theme: the window takes the page's colour and is shown.
+#[tauri::command]
+pub fn show_window<R: Runtime>(window: WebviewWindow<R>, paper: (u8, u8, u8)) {
+    let _ = window.set_background_color(Some(Color(paper.0, paper.1, paper.2, 255)));
+    reveal(&window);
+}
+
+fn reveal<R: Runtime>(window: &WebviewWindow<R>) {
+    if !SHOWN.swap(true, Ordering::SeqCst) {
+        restore(window);
+    }
+}
+
 /// Sets the window's place while it is still hidden, then shows it.
-pub fn restore<R: Runtime>(window: &WebviewWindow<R>) {
+fn restore<R: Runtime>(window: &WebviewWindow<R>) {
     if crate::selftest::unseen() {
         crate::selftest::show(window);
         return;

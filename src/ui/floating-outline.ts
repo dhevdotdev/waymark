@@ -63,7 +63,9 @@ export class FloatingOutline {
   private setActive(index: number): void {
     if (index === this.active) return;
     this.links[this.active]?.classList.remove("is-active");
+    this.links[this.active]?.removeAttribute("aria-current");
     this.links[index]?.classList.add("is-active");
+    this.links[index]?.setAttribute("aria-current", "location");
     this.active = index;
     this.links[index]?.scrollIntoView({ block: "nearest" });
   }

@@ -11,7 +11,7 @@ const LAYERS = {
   vault: [],
   render: ["vault"],
   platform: ["vault"],
-  prefs: ["platform"],
+  prefs: ["platform", "themes"],
   themes: [],
   ui: ["vault", "render", "platform", "prefs", "themes"],
   selftest: ["ui", "platform", "vault", "selftest-recovery", "selftest-organize"],

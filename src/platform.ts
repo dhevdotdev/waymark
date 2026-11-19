@@ -92,6 +92,8 @@ export const native = {
   clipboardText: () => (isDesktop ? call<string>("clipboard_text") : navigator.clipboard.readText()),
   copyText: (text: string) => (isDesktop ? call<void>("clipboard_write", { text }) : navigator.clipboard.writeText(text)),
   setDockIcon: (family: string) => call<void>("set_dock_icon", { family }),
+  /** Shows the window, which launch keeps hidden until the page has its theme, painted in the page's colour. */
+  showWindow: (paper: [number, number, number]) => call<void>("show_window", { paper }),
   async setWindowColor(color: [number, number, number]): Promise<void> {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().setBackgroundColor(color);

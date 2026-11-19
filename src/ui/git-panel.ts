@@ -8,6 +8,7 @@ import { isPointerAction } from "./input-origin";
 import { keepPlace } from "./keep-place";
 import { fadeOut } from "./overlays";
 import { plural } from "./plural";
+import { bindRoving, setStop } from "./roving";
 import type { Cue } from "./sound";
 import { autoStagePaths } from "./sync-status";
 
@@ -356,6 +357,8 @@ export class GitPanel {
 
     const tabs = el("div", "seg");
     tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", "Changes or history");
+    bindRoving(tabs, { items: () => [...tabs.querySelectorAll<HTMLElement>("[role=tab]")], select: (t) => t.click() });
     for (const [id, label] of [
       ["changes", `Changes${st.files.length ? ` ${st.files.length}` : ""}`],
       ["history", "History"],
@@ -364,6 +367,9 @@ export class GitPanel {
       t.setAttribute("role", "tab");
       t.dataset.control = `tab:${id}`;
       t.setAttribute("aria-selected", String(this.tab === id));
+      t.id = `sync-tab-${id}`;
+      setStop(t, this.tab === id);
+      t.setAttribute("aria-controls", "sync-tabpanel");
       t.onclick = () => {
         this.tab = id;
         if (id === "history") {
@@ -377,6 +383,9 @@ export class GitPanel {
     root.append(tabs);
 
     const body = el("div", "sync-body");
+    body.id = "sync-tabpanel";
+    body.setAttribute("role", "tabpanel");
+    body.setAttribute("aria-labelledby", `sync-tab-${this.tab}`);
     body.dataset.scrollKey = `${this.tab}:${this.historyPath}`;
     root.append(body);
     if (this.tab === "changes") this.renderChanges(body, st);

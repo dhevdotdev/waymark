@@ -278,6 +278,36 @@ check(
   !(await page.isVisible(".palette")) && (await page.inputValue(".search-field input")) === "harbour approach",
 );
 check("and shows its results", (await page.locator(".search-hit").count()) > 0);
+const combobox = () =>
+  page.evaluate(() => {
+    const input = document.querySelector(".search-field input");
+    const hits = [...document.querySelectorAll(".search-hit")];
+    return {
+      role: input.getAttribute("role"),
+      expanded: input.getAttribute("aria-expanded"),
+      list: document.getElementById(input.getAttribute("aria-controls"))?.getAttribute("role"),
+      active: input.getAttribute("aria-activedescendant"),
+      selected: hits.findIndex((h) => h.classList.contains("is-selected")),
+      selectedId: document.querySelector(".search-hit.is-selected")?.id,
+      hits: hits.length,
+      focusInField: document.activeElement === input,
+    };
+  });
+const field = await combobox();
+check(
+  "the search field is a combobox pointing at the highlighted result",
+  field.role === "combobox" && field.expanded === "true" && field.list === "listbox" && field.active === field.selectedId,
+  JSON.stringify(field),
+);
+await page.keyboard.press("PageDown");
+const paged = await combobox();
+check(
+  "Page Down moves the highlight a page at once and keeps typing in the field",
+  paged.selected >= Math.min(2, paged.hits - 1) && paged.active === paged.selectedId && paged.focusInField,
+  JSON.stringify(paged),
+);
+await page.keyboard.press("PageUp");
+check("Page Up comes back", (await combobox()).selected === 0);
 await page.keyboard.press("Escape");
 await idle(page);
 await page.keyboard.press("Meta+k");
@@ -627,6 +657,54 @@ await dragRailEdge(900);
 check("it stops at its narrowest", (await railWidth()) === 220, `${await railWidth()}`);
 await dragRailEdge(-(railAtStart - 220));
 check("it comes back to where it was", (await railWidth()) === railAtStart, `${await railWidth()}`);
+const edge = page.locator(".rail-resize");
+await edge.focus();
+const separator = await edge.evaluate((e) =>
+  ["role", "aria-label", "aria-orientation", "aria-valuemin", "aria-valuemax", "aria-valuenow"]
+    .map((a) => e.getAttribute(a))
+    .join(),
+);
+check(
+  "the panel's edge is a named separator that says its width",
+  separator === `separator,Inspector width,vertical,220,440,${railAtStart}`,
+  separator,
+);
+await page.keyboard.press("ArrowLeft");
+check("Left widens it a step from the keyboard", (await railWidth()) === railAtStart + 10, `${await railWidth()}`);
+await page.keyboard.press("Shift+ArrowLeft");
+check("Shift takes a bigger step", (await railWidth()) === railAtStart + 60, `${await railWidth()}`);
+check("a key's width is remembered", (await page.evaluate(() => window.waymark.prefs.value.railWidth)) === railAtStart + 60);
+await page.keyboard.press("ArrowRight");
+check("Right narrows it", (await railWidth()) === railAtStart + 50, `${await railWidth()}`);
+await page.keyboard.press("End");
+check("End takes it to its widest", (await railWidth()) === 440 && (await edge.getAttribute("aria-valuenow")) === "440");
+await page.keyboard.press("Home");
+check("Home takes it to its narrowest", (await railWidth()) === 220);
+await dragRailEdge(-(railAtStart - 220));
+const edgeBox = await edge.boundingBox();
+await page.mouse.move(edgeBox.x + 3, edgeBox.y + 200);
+await page.mouse.down();
+await page.mouse.move(edgeBox.x - 57, edgeBox.y + 200, { steps: 4 });
+const midDrag = await railWidth();
+await page.keyboard.press("Escape");
+const afterEscape = await railWidth();
+await page.mouse.up();
+await idle(page);
+check(
+  "Escape during a drag puts the width back and saves nothing",
+  midDrag === railAtStart + 60 &&
+    afterEscape === railAtStart &&
+    (await railWidth()) === railAtStart &&
+    (await page.evaluate(() => window.waymark.prefs.value.railWidth)) === railAtStart,
+  `${midDrag} ${afterEscape}`,
+);
+await page.mouse.move(edgeBox.x + 3, edgeBox.y + 200);
+await page.mouse.down({ button: "right" });
+await page.mouse.move(edgeBox.x - 57, edgeBox.y + 200, { steps: 4 });
+await page.mouse.up({ button: "right" });
+await page.keyboard.press("Escape");
+await idle(page);
+check("a right-button press does not resize", (await railWidth()) === railAtStart, `${await railWidth()}`);
 
 // Each tab keeps its own trail of followed links
 await page.evaluate(async () => {
@@ -857,6 +935,17 @@ check("Left folds a branching stop", (await firstStop.getAttribute("aria-expande
 await page.keyboard.press("ArrowRight");
 await idle(page);
 check("Right unfolds it", (await firstStop.getAttribute("aria-expanded")) === "true");
+await page.keyboard.press("ArrowRight");
+check(
+  "Right on an open stop goes to its first side branch",
+  (await focusedRow()) === (await sideRow.textContent()) && (await firstStop.getAttribute("aria-expanded")) === "true",
+);
+await page.keyboard.press("ArrowLeft");
+check("Left on a side branch goes back to the stop it left from", (await focusedRow()) === (await firstStop.textContent()));
+const trailPlaces = await page.$$eval(".trail-row", (rows) =>
+  rows.map((r) => `${r.getAttribute("aria-level")}:${r.getAttribute("aria-posinset")}/${r.getAttribute("aria-setsize")}`).join(),
+);
+check("each stop says where it sits among the stops beside it", trailPlaces === "1:1/2,2:1/1,1:2/2", trailPlaces);
 await page.keyboard.press("End");
 await page.keyboard.press("Enter");
 await idle(page);

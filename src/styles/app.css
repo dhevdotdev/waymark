@@ -247,6 +247,10 @@ kbd {
     opacity var(--t-menu) ease,
     scale var(--t-press) var(--ease-out);
 }
+/* A tab is dragged to reorder it, and the strip never scrolls, so a touch or pen press is always a drag. */
+.tab {
+  touch-action: none;
+}
 .tab + .tab::before {
   content: "";
   position: absolute;
@@ -613,6 +617,22 @@ kbd {
   overflow: clip auto;
   padding: 0 10px 32px;
   mask-image: linear-gradient(to bottom, black, black calc(100% - 28px), transparent);
+}
+.sidebar-resize,
+.rail-resize,
+.rail-section-resize {
+  padding: 0;
+  border: 0;
+  background: none;
+  appearance: none;
+}
+/* A focused edge shows the same hairline as a hovered one, at once, in place of the ring. */
+:is(.sidebar-resize, .rail-resize, .rail-section-resize):focus-visible {
+  outline: none;
+}
+:is(.sidebar-resize, .rail-resize, .rail-section-resize):focus-visible::after {
+  opacity: 1;
+  transition: none;
 }
 .sidebar-resize,
 .rail-resize {

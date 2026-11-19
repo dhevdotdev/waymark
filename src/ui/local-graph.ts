@@ -303,6 +303,9 @@ export class LocalGraph {
     } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
       e.preventDefault();
       this.setHover(list[(i - 1 + list.length) % list.length]);
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      this.setHover(list[e.key === "Home" ? 0 : list.length - 1]);
     } else if (e.key === "Enter" && this.hover) {
       e.preventDefault();
       this.onOpen(this.hover.id, e.metaKey);

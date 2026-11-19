@@ -28,6 +28,13 @@ describe("PrefStore.load", () => {
     expect((await load({ appearance: "neon", railPane: "elsewhere" })).appearance).toBe("system");
   });
 
+  it("rejects a value outside every fixed set, keeping the rest", async () => {
+    const prefs = await load({ fileSort: "size", keySound: "typewriter", keyVolume: "max", family: "solarized" });
+    expect([prefs.fileSort, prefs.keySound, prefs.keyVolume, prefs.family]).toEqual(["name", "tactile", "medium", "ember"]);
+    const kept = await load({ fileSort: "modified", keySound: "off", keyVolume: "loud", family: "gruvbox" });
+    expect([kept.fileSort, kept.keySound, kept.keyVolume, kept.family]).toEqual(["modified", "off", "loud", "gruvbox"]);
+  });
+
   it("moves a saved Outline tab to Links now that the inspector has no outline", async () => {
     expect((await load({ railPane: "outline" })).railPane).toBe("links");
   });

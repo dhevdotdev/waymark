@@ -12,6 +12,12 @@ const treeIcon = (svg: string) => svg.replace("<svg", '<svg class="tree-icon"');
 /** Long enough for a sort by date to read file times before the rebuild it waits on. */
 const EDIT_WINDOW_MS = 1000;
 
+function markCurrent(row: HTMLElement | undefined, on: boolean): void {
+  row?.classList.toggle("is-current", on);
+  if (on) row?.setAttribute("aria-current", "page");
+  else row?.removeAttribute("aria-current");
+}
+
 /** The folder tree in the sidebar. Rows are built once per index and updated in place. */
 export class FileTree {
   private readonly folders = new Map<string, HTMLElement>();
@@ -107,12 +113,14 @@ export class FileTree {
     this.notes.clear();
     const tree = document.createElement("div");
     tree.className = "tree";
+    tree.setAttribute("role", "tree");
+    tree.setAttribute("aria-label", "Files");
     if (this.leading) tree.append(this.leading);
     tree.append(...this.children(buildTree([...index.notes, ...index.bases], this.noteOrder(index)), 0, index));
     this.box.replaceChildren(tree);
     this.box.scrollTop = keep;
     this.builtFor = index;
-    this.notes.get(this.current)?.classList.add("is-current");
+    markCurrent(this.notes.get(this.current), true);
   }
 
   /** Sets the order before the first draw. */
@@ -266,11 +274,11 @@ export class FileTree {
   /** Marks the open note and, when the note has changed, opens its folders and brings it into view. */
   private reveal(path: string, bringIntoView = true): void {
     if (path === this.current) return;
-    this.notes.get(this.current)?.classList.remove("is-current");
+    markCurrent(this.notes.get(this.current), false);
     this.current = path;
     const row = this.notes.get(path);
     if (!row) return;
-    row.classList.add("is-current");
+    markCurrent(row, true);
     this.expandTo(path, row, bringIntoView);
     this.onChange();
   }
