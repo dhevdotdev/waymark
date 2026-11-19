@@ -1,5 +1,6 @@
 /** The sync panel's fixed text and small building blocks. */
 
+import { holdModal } from "./modal-layer";
 import { fadeOut } from "./overlays";
 
 export const EXPLAIN: Record<string, { title: string; body: string; terminal?: boolean; retry?: string }> = {
@@ -112,6 +113,7 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   const overlay = el("div", "overlay sheet-overlay");
   const sheet = el("div", "sheet");
   sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
   const head = el("header", "sheet-head");
   const titles = el("div", "sheet-titles");
   const heading = el("h2", "sheet-title");
@@ -135,21 +137,15 @@ export function openSheet(title: string, subtitle: string, content: HTMLElement)
   const dismiss = () => {
     activeSheet = null;
     fadeOut(overlay);
-    window.removeEventListener("keydown", onKey, true);
+    release();
   };
   activeSheet = { fill, dismiss };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      dismiss();
-    }
-  };
   close.onclick = dismiss;
   overlay.addEventListener("pointerdown", (e) => {
     if (e.target === overlay) dismiss();
   });
-  window.addEventListener("keydown", onKey, true);
   document.body.append(overlay);
+  const release = holdModal(overlay, { escape: dismiss });
   fill(title, subtitle, content);
 }
 

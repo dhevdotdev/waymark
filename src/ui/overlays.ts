@@ -1,8 +1,10 @@
 import { icons } from "./icons";
 import { isPointerAction } from "./input-origin";
+import { holdModal } from "./modal-layer";
 
 /** While one of these is open it answers Escape itself, so the window must not act on the key too. */
-export const ESCAPE_IS_TAKEN = ".lightbox, .sheet-overlay, .popover, .prompt-overlay, .prop-new, [data-editing-property]";
+export const ESCAPE_IS_TAKEN =
+  ".lightbox, .sheet-overlay, .popover, .preview, .prompt-overlay, .prop-new, [data-editing-property]";
 
 const TOAST_MS = 2600;
 const TOAST_WITH_ACTION_MS = 6000;
@@ -44,7 +46,6 @@ export function toast(message: string, action?: { label: string; run: () => void
 }
 
 export function lightbox(content: Element): void {
-  const returnFocus = document.activeElement;
   const box = document.createElement("div");
   box.className = "overlay lightbox";
   box.setAttribute("role", "dialog");
@@ -66,25 +67,15 @@ export function lightbox(content: Element): void {
   box.append(sheet, closer);
   const close = () => {
     fadeOut(box);
-    window.removeEventListener("keydown", onKey, true);
-    if (returnFocus instanceof HTMLElement) returnFocus.focus({ preventScroll: true });
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      close();
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-      closer.focus();
-    }
+    release();
   };
   /* A press, as on the other sheets, so a drag that starts inside and ends outside closes nothing. */
   box.addEventListener("pointerdown", (e) => {
     if (e.target === box) close();
   });
   closer.addEventListener("click", close);
-  window.addEventListener("keydown", onKey, true);
   document.body.append(box);
+  const release = holdModal(box, { controls: () => [closer], escape: close });
   closer.focus({ preventScroll: true });
 }
 
