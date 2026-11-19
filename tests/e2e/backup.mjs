@@ -50,7 +50,7 @@ await page.route(/\/src\/platform\.ts/, async (route) => {
   if (!response) return;
   await route.fulfill({ response, body: `${await response.text()}\n;Object.assign(git, window.__fakeGit ?? {});\n` });
 });
-await page.route(/\/src\/ui\/(sync-controller|settings|note-history|reader)\.ts/, async (route) => {
+await page.route(/\/src\/ui\/(sync-controller|settings|note-history|reader|reader-commands)\.ts/, async (route) => {
   const response = await fetchRoute(route);
   if (!response) return;
   const body = (await response.text()).replace(
