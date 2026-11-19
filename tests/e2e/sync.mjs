@@ -290,6 +290,36 @@ try {
     await refreshNow();
     await pause(60);
     check("a tab whose count changed keeps focus", /^Changes 3/.test((await focusKey()).text), JSON.stringify(await focusKey()));
+    const syncTabs = () =>
+      page.evaluate(() => {
+        const body = document.querySelector(".sync-body");
+        const tabs = [...document.querySelectorAll('.sync-sheet [role="tab"]')];
+        return {
+          focus: document.activeElement.id,
+          stops: tabs.map((t) => t.getAttribute("tabindex") ?? "auto").join(),
+          panel: `${body.getAttribute("role")}:${body.getAttribute("aria-labelledby")}`,
+          controls: tabs.every((t) => t.getAttribute("aria-controls") === body.id),
+        };
+      });
+    await page.keyboard.press("ArrowRight");
+    await idle(page);
+    const onHistory = await syncTabs();
+    check(
+      "Right moves to History, shows it and keeps one Tab stop",
+      onHistory.focus === "sync-tab-history" &&
+        onHistory.stops === "-1,auto" &&
+        onHistory.panel === "tabpanel:sync-tab-history" &&
+        onHistory.controls,
+      JSON.stringify(onHistory),
+    );
+    await page.keyboard.press("Home");
+    await idle(page);
+    const backOnChanges = await syncTabs();
+    check(
+      "Home comes back to Changes",
+      backOnChanges.focus === "sync-tab-changes" && backOnChanges.panel === "tabpanel:sync-tab-changes",
+      JSON.stringify(backOnChanges),
+    );
 
     await page.locator(".change-act").nth(2).focus();
     await page.evaluate(() => {
