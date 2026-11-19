@@ -193,6 +193,7 @@ export class TrailPanel {
         );
         line.classList.toggle("is-on-path", onPath.has(entry.id));
         line.classList.toggle("is-jump", entry.jumped);
+        line.dataset.to = String(entry.id);
         return line;
       });
     this.lines.replaceChildren(...paths);
