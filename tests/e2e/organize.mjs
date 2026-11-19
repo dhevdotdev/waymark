@@ -419,6 +419,50 @@ try {
     await page.evaluate(() => document.activeElement?.blur());
     await redrawWithout([]);
     check("a rebuild does not pull focus into the tree", (await focusedRow()) === "BODY", await focusedRow());
+    await idle(page);
+    const described = await page.evaluate(() => {
+      const tree = document.querySelector(".sidebar .tree");
+      const rows = [...tree.querySelectorAll(".tree-head, .nav-item")];
+      const wrong = rows.filter((row) => {
+        const item = row.matches(".nav-item") ? row : row.parentElement;
+        const siblings = [...item.parentElement.children].filter((c) => c.matches(".tree-folder, .nav-item"));
+        let level = 1;
+        for (let el = item.parentElement; el !== tree; el = el.parentElement) if (el.matches(".tree-inner")) level++;
+        return (
+          row.getAttribute("role") !== "treeitem" ||
+          row.getAttribute("aria-level") !== String(level) ||
+          row.getAttribute("aria-posinset") !== String(siblings.indexOf(item) + 1) ||
+          row.getAttribute("aria-setsize") !== String(siblings.length)
+        );
+      });
+      return { role: tree.getAttribute("role"), label: tree.getAttribute("aria-label"), rows: rows.length, wrong: wrong.length };
+    });
+    check(
+      "the file list is a named tree whose rows know their depth and place",
+      described.role === "tree" && described.label === "Files" && described.rows > 5 && described.wrong === 0,
+      JSON.stringify(described),
+    );
+    const current = await page.$$eval(".sidebar .tree [aria-current]", (rows) =>
+      rows.map((r) => `${r.dataset.path}=${r.getAttribute("aria-current")}`),
+    );
+    check(
+      "the open note's row, and only it, is marked current",
+      current.length === 1 && current[0] === `${await page.evaluate(() => window.waymark.reader.current)}=page`,
+      current.join(),
+    );
+    await page.locator('.nav-item[data-path="Sorted/Apple.md"]').focus();
+    await page.keyboard.type("ch");
+    check("typing a name moves to its row", (await focusedRow()) === "Sorted/Cherry.md", await focusedRow());
+    await page.keyboard.press("b");
+    await page.waitForTimeout(600);
+    await page.keyboard.press("a");
+    const afterPause = await page.evaluate(() => document.activeElement.querySelector(".tree-name, .nav-text")?.textContent);
+    check(
+      "a pause starts a new name instead of adding to it",
+      (await focusedRow()) !== "Sorted/Banana.md" && /^a/i.test(afterPause ?? ""),
+      afterPause,
+    );
+    check("typing selects without opening", (await page.evaluate(() => window.waymark.reader.current)) !== "Sorted/Cherry.md");
     await page.evaluate(() => {
       const { reader } = window.waymark;
       reader.sidebar.renderTree(reader.vault.index, reader.current);

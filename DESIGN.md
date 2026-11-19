@@ -181,7 +181,7 @@ With text selected in the note editor, ⌘K makes it a link, the same as the bub
 
 ## The file list and the keyboard
 
-The file list is one Tab stop. Up and Down move between rows, Right opens a folder and then enters it, Left closes it and then goes to its parent, Enter opens, and Home and End reach the ends. Closed folders are skipped. The focus ring is drawn inside the row, because folder contents are clipped for their open and close animation.
+The file list is one Tab stop. Up and Down move between rows, Right opens a folder and then enters it, Left closes it and then goes to its parent, Enter opens, and Home and End reach the ends. Closed folders are skipped. Typing the start of a name moves to the next row that begins with it, letters typed without a pause add up, and the same letter again steps through the matches, as in Finder; it selects and never opens. The focus ring is drawn inside the row, because folder contents are clipped for their open and close animation.
 
 It behaves like Finder's sidebar. A click on a row opens it and makes the list the keyboard target, and so does a click on empty space in the list, which hands the keys to the open note's row. Arrows move a selection without opening, because every opened note becomes a stop in the tab's trail and back history, and Enter or Space opens the selected row. The selected row takes the neutral selection fill, apart from the open note's accent tint, whether or not the focus ring shows, and a click draws no ring. The selection moves instantly. An arrow with no row to reach keeps its default, so it never swallows a scroll.
 
