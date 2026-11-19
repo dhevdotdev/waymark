@@ -169,7 +169,9 @@ fn build(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .hidden_title(true)
         .visible(false)
         .build()?;
-    hide_window_buttons(&window);
+    /* AppKit throws when a window is touched off the main thread, and the shortcut command runs on a worker. */
+    let target = window.clone();
+    window.run_on_main_thread(move || hide_window_buttons(&target))?;
     Ok(window)
 }
 
