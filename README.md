@@ -2,9 +2,15 @@
 
 A Mac client for an Obsidian vault kept in Git. Notes stay ordinary Markdown files. Waymark reads them, edits them as plain text with a live preview, and syncs through your own `git`.
 
-## Install the build
+Waymark is a personal project, built for one vault and for the fun of building it. There are no releases, and it runs on macOS only. Issues and ideas are welcome, but there is no support promise.
+
+## Build and install
+
+Waymark builds from source. You need macOS, [Node](https://nodejs.org) with [pnpm](https://pnpm.io), and [Rust](https://rustup.rs).
 
 ```sh
+pnpm bootstrap
+pnpm tauri build --bundles app
 cp -R src-tauri/target/release/bundle/macos/Waymark.app /Applications/
 open /Applications/Waymark.app
 ```
@@ -72,3 +78,7 @@ All of these use a generated fixture vault, so no real notes are needed.
 ## Credits
 
 The typing sounds are recordings from the [Keyboard Sound Dataset](https://zenodo.org/records/16564409) (MIT, Sony) and [typing.wav by Dustin_Davis](https://freesound.org/people/Dustin_Davis/sounds/399603/) (CC0), as edited by [Switchtone](https://github.com/gabrimatic/switchtone) (MIT). The notices are in `public/licenses/key-sounds.txt`.
+
+## Licence
+
+[MIT](LICENSE).
