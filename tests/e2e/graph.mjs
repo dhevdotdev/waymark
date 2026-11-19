@@ -212,6 +212,51 @@ check(
 );
 await page.click('[data-gmode="vault"]');
 await pause(200);
+const scopeState = () =>
+  page.evaluate(() => {
+    const tabs = [...document.querySelectorAll("[data-gmode]")];
+    const depth = [...document.querySelectorAll("[data-depth]")];
+    return {
+      roles: [...tabs, ...depth].map((b) => b.getAttribute("role")).join(),
+      selected: tabs.map((t) => t.getAttribute("aria-selected")).join(),
+      stops: tabs.map((t) => t.getAttribute("tabindex") ?? "auto").join(),
+      checked: depth.map((d) => d.getAttribute("aria-checked")).join(),
+      stage: document.querySelector(".graph-stage").getAttribute("aria-labelledby"),
+      focus: document.activeElement?.dataset.gmode ?? document.activeElement?.dataset.depth,
+    };
+  });
+const vaultScope = await scopeState();
+check(
+  "the scope is a tab list and the depth a single choice",
+  vaultScope.roles === "tab,tab,radio,radio,radio" &&
+    vaultScope.selected === "false,true" &&
+    vaultScope.stops === "-1,auto" &&
+    vaultScope.stage === "graph-scope-vault",
+  JSON.stringify(vaultScope),
+);
+await page.locator('[data-gmode="vault"]').focus();
+await page.keyboard.press("ArrowLeft");
+await pause(200);
+const localScope = await scopeState();
+check(
+  "Left on the scope selects This note and keeps focus on it",
+  localScope.selected === "true,false" && localScope.focus === "local" && localScope.stage === "graph-scope-local",
+  JSON.stringify(localScope),
+);
+const chosenDepth = page.locator('[data-depth][aria-checked="true"]');
+const depthBefore = await chosenDepth.getAttribute("data-depth");
+await chosenDepth.focus();
+await page.keyboard.press("End");
+await pause(200);
+const deepest = await scopeState();
+check(
+  "End on the depth chooses the deepest and moves focus there",
+  deepest.checked === "false,false,true" && deepest.focus === "3",
+  JSON.stringify(deepest),
+);
+await page.locator(`[data-depth="${depthBefore}"]`).click();
+await page.locator('[data-gmode="vault"]').click();
+await pause(200);
 
 /* Camera */
 await parkMouse();
@@ -462,6 +507,14 @@ check("the previous arrow comes back", (await announced()) === first);
 const total = Number(first.match(/ of ([\d,]+)/)[1].replace(",", ""));
 for (let i = 0; i < total; i++) await page.keyboard.press("ArrowRight");
 check("traversal wraps after every note", (await announced()) === first, String(total));
+await page.keyboard.press("End");
+const announcedAt = (n) => new RegExp(`(^|\\D)${n.toLocaleString()} of ${total.toLocaleString()}`);
+check("End reaches the last note", announcedAt(total).test(await announced()), await announced());
+await page.keyboard.press("Home");
+check("Home reaches the first note", announcedAt(1).test(await announced()), await announced());
+await page.keyboard.press("ArrowLeft");
+check("and the arrows carry on from there", announcedAt(total).test(await announced()), await announced());
+await page.keyboard.press("ArrowRight");
 
 await clearFrames();
 const before = (await frames()).length;

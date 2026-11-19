@@ -10,6 +10,7 @@ import { isPointerAction } from "./input-origin";
 import { reducedMotion } from "./media";
 import { MorphArrows } from "./morph-arrows";
 import { plural } from "./plural";
+import { bindRoving, setStop } from "./roving";
 
 export type GraphTabView = Extract<View, { kind: "graph" }>;
 
@@ -17,14 +18,21 @@ const ZOOM_STEP = 1.3;
 /** How far the camera dives into the note a graph is left for. */
 const DIVE = 2.4;
 
+/** Marks the chosen one of a tab list or radio group, and makes it the group's Tab stop. */
+function choose(button: HTMLElement, state: "aria-selected" | "aria-checked", on: boolean): void {
+  button.classList.toggle("is-on", on);
+  button.setAttribute(state, String(on));
+  setStop(button, on);
+}
+
 /** A graph leaving the window, which opening the graph again takes back from where it is. */
 let departing: GraphView | null = null;
 
 const TEMPLATE = `
-  <div class="graph-stage"></div>
+  <div class="graph-stage" id="graph-stage" role="tabpanel"></div>
   <div class="graph-toolbar">
-    <div class="seg" role="tablist"><button class="seg-btn" data-gmode="local">This note</button><button class="seg-btn" data-gmode="vault">Whole vault</button></div>
-    <div class="graph-depth" role="group" aria-label="Link depth"><div class="seg"><button class="seg-btn" data-depth="1">1 step</button><button class="seg-btn" data-depth="2">2 steps</button><button class="seg-btn" data-depth="3">3 steps</button></div></div>
+    <div class="seg graph-scope" role="tablist" aria-label="Graph scope"><button class="seg-btn" role="tab" id="graph-scope-local" aria-controls="graph-stage" data-gmode="local">This note</button><button class="seg-btn" role="tab" id="graph-scope-vault" aria-controls="graph-stage" data-gmode="vault">Whole vault</button></div>
+    <div class="graph-depth" role="radiogroup" aria-label="Link depth"><div class="seg"><button class="seg-btn" role="radio" data-depth="1">1 step</button><button class="seg-btn" role="radio" data-depth="2">2 steps</button><button class="seg-btn" role="radio" data-depth="3">3 steps</button></div></div>
     <span class="graph-stats"></span>
     <div class="graph-filter">${icons.search}<input type="text" placeholder="Highlight notes" aria-label="Highlight notes by name" spellcheck="false" /></div>
     <div class="graph-zoom"><button class="icon-btn" data-gz="out" aria-label="Zoom out">${icons.minus}</button><button class="icon-btn" data-gz="fit" aria-label="Fit to view">${icons.fit}</button><button class="icon-btn" data-gz="in" aria-label="Zoom in">${icons.plus}</button></div>
@@ -78,6 +86,9 @@ export class GraphView {
     private readonly host: GraphViewHost,
   ) {
     this.root.className = "graph-view";
+    this.root.id = "graph-panel";
+    this.root.setAttribute("role", "tabpanel");
+    this.root.setAttribute("aria-label", "Graph");
     this.root.innerHTML = TEMPLATE;
     this.canvas = new GraphCanvas({
       onOpen: (id, newTab) => {
@@ -86,9 +97,6 @@ export class GraphView {
       },
     });
     this.root.querySelector(".graph-stage")!.append(this.canvas.canvas, this.canvas.announcer);
-    this.root.id = "graph-panel";
-    this.root.setAttribute("role", "tabpanel");
-    this.root.setAttribute("aria-label", "Graph");
     this.strip = this.root.querySelector<HTMLElement>(".graph-groups")!;
     parent.append(this.root);
     this.root.querySelector(".graph-leave")!.append(this.leaveArrows.svg);
@@ -200,9 +208,10 @@ export class GraphView {
     this.blooming = false;
     this.pulling = false;
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-gmode]"))
-      b.classList.toggle("is-on", b.dataset.gmode === scope);
+      choose(b, "aria-selected", b.dataset.gmode === scope);
     for (const b of this.root.querySelectorAll<HTMLElement>("[data-depth]"))
-      b.classList.toggle("is-on", Number(b.dataset.depth) === this.depth);
+      choose(b, "aria-checked", Number(b.dataset.depth) === this.depth);
+    this.root.querySelector(".graph-stage")!.setAttribute("aria-labelledby", `graph-scope-${scope}`);
     this.root.querySelector<HTMLElement>(".graph-depth")!.hidden = scope !== "local";
     this.root.querySelector(".graph-stats")!.textContent =
       `${plural(data.nodes.length, "note")} · ${plural(data.links.length, "link")}`;
@@ -230,6 +239,8 @@ export class GraphView {
 
   private bind(): void {
     this.root.addEventListener("click", (e) => this.onClick(e.target as HTMLElement));
+    for (const group of this.root.querySelectorAll<HTMLElement>(".graph-scope, .graph-depth"))
+      bindRoving(group, { items: () => [...group.querySelectorAll<HTMLElement>(".seg-btn")], select: (b) => b.click() });
     this.root
       .querySelector("input")!
       .addEventListener("input", (e) => this.canvas.setFilter((e.target as HTMLInputElement).value));
