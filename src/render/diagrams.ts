@@ -1,4 +1,5 @@
 import type { MermaidConfig } from "mermaid";
+import { sanitizeDiagram } from "./sanitize";
 
 type Mermaid = typeof import("mermaid").default;
 let mermaidPromise: Promise<Mermaid> | null = null;
@@ -102,20 +103,20 @@ const EXPAND_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2
 const sourceOf = (figure: HTMLElement) => figure.querySelector(".diagram-source")?.textContent ?? "";
 
 /** Drawn diagrams by source. Colours are theme variables, so one drawing holds for every theme. */
-const drawn = new Map<string, string>();
+const drawn = new Map<string, DocumentFragment>();
 const MAX_REMEMBERED = 200;
 
-function remember(source: string, svg: string): void {
+function remember(source: string, svg: DocumentFragment): void {
   drawn.set(source, svg);
   if (drawn.size > MAX_REMEMBERED) drawn.delete(drawn.keys().next().value!);
 }
 
-function place(figure: HTMLElement, svg: string): void {
+function place(figure: HTMLElement, svg: DocumentFragment): void {
   figure.querySelector(".diagram-svg")?.remove();
   figure.querySelector(".diagram-expand")?.remove();
   const holder = document.createElement("div");
   holder.className = "diagram-svg";
-  holder.innerHTML = svg;
+  holder.append(svg.cloneNode(true));
   const button = document.createElement("button");
   button.type = "button";
   button.className = "diagram-expand";
@@ -208,7 +209,7 @@ export async function renderDiagrams(root: ParentNode): Promise<void> {
     const source = sourceOf(figure);
     try {
       const { svg } = await mermaid.render(`mmd-${++seq}`, source);
-      const themed = bindColours(svg);
+      const themed = sanitizeDiagram(bindColours(svg));
       remember(source, themed);
       place(figure, themed);
       figure.style.minBlockSize = "";

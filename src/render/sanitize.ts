@@ -115,3 +115,59 @@ export function sanitize(html: string): DocumentFragment {
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\/@vault\/file\?|vault:\/\/)/i,
   });
 }
+
+let diagramPurifier: ReturnType<typeof DOMPurify> | null = null;
+
+/** Its own instance, because the note hooks would strip the data attributes a diagram draws with. */
+function purifierForDiagrams(): ReturnType<typeof DOMPurify> {
+  if (diagramPurifier) return diagramPurifier;
+  const purifier = DOMPurify(window);
+  if (!purifier.isSupported) throw new Error("HTML sanitizer unavailable; refusing to draw the diagram");
+  purifier.addHook("uponSanitizeAttribute", (node, data) => {
+    if (LOADING_ATTRS.has(data.attrName) && !isNavigation(node) && !LOCAL_LOAD.test(data.attrValue)) {
+      data.keepAttr = false;
+    }
+  });
+  diagramPurifier = purifier;
+  return purifier;
+}
+
+const DIAGRAM_FORBID_TAGS = ["iframe", "form", "input", "textarea", "select", "object", "embed", "link", "meta", "base"];
+const DIAGRAM_FORBID_ATTR = ["srcset", "action", "formaction", "ping"];
+
+/**
+ * Mermaid sanitises its own output, and this is the second line behind it. The sanitizer drops
+ * HTML inside SVG, so each HTML label is lifted out, cleaned as HTML and put back in its place.
+ */
+export function sanitizeDiagram(svg: string): DocumentFragment {
+  const purifier = purifierForDiagrams();
+  const parsed = document.createElement("template");
+  parsed.innerHTML = svg;
+  const labels = [...parsed.content.querySelectorAll("foreignObject")].map((label, i) => {
+    const html = label.innerHTML;
+    label.replaceChildren();
+    label.setAttribute("data-label", String(i));
+    return html;
+  });
+  const clean = purifier.sanitize(parsed.innerHTML, {
+    RETURN_DOM_FRAGMENT: true,
+    USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ["foreignObject"],
+    ADD_ATTR: ["role"],
+    FORBID_TAGS: DIAGRAM_FORBID_TAGS,
+    FORBID_ATTR: DIAGRAM_FORBID_ATTR,
+  });
+  for (const label of clean.querySelectorAll("foreignObject[data-label]")) {
+    const html = labels[Number(label.getAttribute("data-label"))] ?? "";
+    label.removeAttribute("data-label");
+    label.append(
+      purifier.sanitize(html, {
+        RETURN_DOM_FRAGMENT: true,
+        USE_PROFILES: { html: true, mathMl: true },
+        FORBID_TAGS: [...DIAGRAM_FORBID_TAGS, "style"],
+        FORBID_ATTR: DIAGRAM_FORBID_ATTR,
+      }),
+    );
+  }
+  return clean;
+}
