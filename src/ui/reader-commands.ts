@@ -110,7 +110,7 @@ export function readerCommands(r: Reader): Command[] {
     expanded(true);
     showContextMenu(box.right, box.bottom + 4, r.files.noteMenu(r.current), {
       alignEnd: true,
-      keyboard: !isPointerAction(),
+      label: "Note",
       onClose: () => expanded(false),
     });
   };

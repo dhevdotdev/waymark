@@ -179,17 +179,20 @@ export class TableControls {
       kind === "row"
         ? besideRow((cell.parentElement as HTMLElement).getBoundingClientRect(), this.rowGrip.getBoundingClientRect().left)
         : besideColumn(this.columnBox(at));
-    showContextMenu(0, 0, this.items(kind, at, keyboard), { place, keyboard, onClose: () => this.clearHighlight() });
+    showContextMenu(0, 0, this.items(kind, at, keyboard), {
+      place,
+      label: kind === "row" ? "Row" : "Column",
+      onClose: () => this.clearHighlight(),
+    });
   }
 
   private openTableMenu(): void {
     this.highlightTable();
     const table = this.host.root.querySelector("table")!.getBoundingClientRect();
     const left = this.tableGrip.getBoundingClientRect().left;
-    const keyboard = document.activeElement === this.tableGrip;
     showContextMenu(0, 0, this.tableItems(false), {
       place: besideRow(table, left),
-      keyboard,
+      label: "Table",
       onClose: () => this.clearHighlight(),
     });
   }
@@ -200,7 +203,7 @@ export class TableControls {
     if (!cell) return;
     const row = (cell.parentElement as HTMLElement).getBoundingClientRect();
     const place = besideRow(row, pointerX ?? cell.getBoundingClientRect().left);
-    showContextMenu(0, 0, this.items("cell", at, keyboard), { place, keyboard });
+    showContextMenu(0, 0, this.items("cell", at, keyboard), { place, label: "Cell" });
   }
 
   private bindDrag(grip: HTMLElement, kind: TargetKind): void {

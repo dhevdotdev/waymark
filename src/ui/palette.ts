@@ -1,5 +1,6 @@
 import { fuzzy, highlightMarks } from "./fuzzy";
 import { markKeyboardOrigin } from "./input-origin";
+import { holdModal } from "./modal-layer";
 
 export interface PaletteItem {
   id: string;
@@ -37,7 +38,7 @@ export class Palette {
   private items: PaletteItem[] = [];
   private shown: PaletteItem[] = [];
   private selected = 0;
-  private returnFocus: Element | null = null;
+  private release: ((restoreFocus?: boolean) => void) | null = null;
 
   constructor(
     private source: (query: string) => PaletteItem[],
@@ -54,11 +55,10 @@ export class Palette {
       this.input.select();
       return;
     }
-    this.returnFocus = document.activeElement;
     const root = document.createElement("div");
     root.className = "overlay palette-overlay";
     root.innerHTML = `
-      <div class="palette" role="dialog" aria-label="Command palette">
+      <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
         <div class="palette-field">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
           <input type="text" spellcheck="false" autocomplete="off" placeholder="${this.look.placeholder}" aria-label="Search notes and commands" role="combobox" aria-expanded="true" aria-controls="palette-list" />
@@ -89,6 +89,7 @@ export class Palette {
       if (row && Number(row.dataset.index) !== this.selected) this.select(Number(row.dataset.index), false);
     });
     document.body.append(root);
+    this.release = holdModal(root, { controls: () => [this.input] });
     this.input.value = prefill;
     this.input.focus();
     this.update();
@@ -109,7 +110,8 @@ export class Palette {
     this.root = null;
     root.classList.add("is-leaving");
     setTimeout(() => root.remove(), 200);
-    if (restoreFocus && this.returnFocus instanceof HTMLElement) this.returnFocus.focus({ preventScroll: true });
+    this.release?.(restoreFocus);
+    this.release = null;
   }
 
   private update(): void {
@@ -173,6 +175,7 @@ export class Palette {
 
   private select(i: number, scroll: boolean): void {
     this.selected = Math.max(0, Math.min(i, this.shown.length - 1));
+    this.input.removeAttribute("aria-activedescendant");
     for (const row of this.list.querySelectorAll<HTMLElement>(".palette-row")) {
       const on = Number(row.dataset.index) === this.selected;
       row.classList.toggle("is-selected", on);
@@ -184,8 +187,23 @@ export class Palette {
     }
   }
 
+  /** How many rows fit in the list, so PageUp and PageDown move by what is on screen. */
+  private page(): number {
+    const row = this.list.querySelector<HTMLElement>(".palette-row");
+    return row ? Math.max(1, Math.floor(this.list.clientHeight / row.offsetHeight) - 1) : 1;
+  }
+
   private onKey(e: KeyboardEvent): void {
-    if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "n")) {
+    const jumps: Record<string, () => number> = {
+      PageDown: () => this.selected + this.page(),
+      PageUp: () => this.selected - this.page(),
+      Home: () => 0,
+      End: () => this.shown.length - 1,
+    };
+    if (e.key in jumps && !e.shiftKey && this.shown.length) {
+      e.preventDefault();
+      this.select(jumps[e.key](), true);
+    } else if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "n")) {
       e.preventDefault();
       this.select(this.selected + 1, true);
     } else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "p")) {

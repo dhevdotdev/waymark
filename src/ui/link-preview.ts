@@ -7,8 +7,9 @@ const CLOSE_DELAY_MS = 250;
 const EXCERPT_CHARS = 2000;
 const PREVIEW_WIDTH = 472;
 const PREVIEW_ROOM = 360;
+const LINK = ".doc a.wikilink[data-path]";
 
-/** The excerpt that appears when the pointer rests on a link inside a note. */
+/** The excerpt that appears when the pointer rests on a link inside a note, or the keyboard reaches one. Escape closes it. */
 export class LinkPreview {
   private timer = 0;
   private box: HTMLElement | null = null;
@@ -19,19 +20,40 @@ export class LinkPreview {
   ) {
     root.addEventListener("pointerover", (e) => this.onOver(e));
     root.addEventListener("pointerout", (e) => this.onOut(e));
+    root.addEventListener("focusin", (e) => {
+      const link = e.target instanceof HTMLElement && e.target.matches(`${LINK}:focus-visible`) ? e.target : null;
+      if (link) this.wait(link);
+    });
+    root.addEventListener("focusout", (e) => {
+      if ((e.target as HTMLElement).closest(LINK)) this.hide();
+    });
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && (this.box || this.timer)) this.hide();
+      },
+      true,
+    );
   }
 
   hide(): void {
     clearTimeout(this.timer);
+    this.timer = 0;
     this.box?.remove();
     this.box = null;
   }
 
   private onOver(e: PointerEvent): void {
-    const link = (e.target as HTMLElement).closest<HTMLElement>(".doc a.wikilink[data-path]");
-    if (!link || link.closest(".preview")) return;
+    const link = (e.target as HTMLElement).closest<HTMLElement>(LINK);
+    if (link && !link.closest(".preview")) this.wait(link);
+  }
+
+  private wait(link: HTMLElement): void {
     clearTimeout(this.timer);
-    this.timer = window.setTimeout(() => void this.show(link), OPEN_DELAY_MS);
+    this.timer = window.setTimeout(() => {
+      this.timer = 0;
+      void this.show(link);
+    }, OPEN_DELAY_MS);
   }
 
   private onOut(e: PointerEvent): void {
@@ -52,15 +74,18 @@ export class LinkPreview {
       .split(/\n(?=## )/)[0]
       .slice(0, EXCERPT_CHARS);
     const rendered = await renderNote(excerpt, path, this.host.renderContext());
-    if (!link.matches(":hover")) return;
+    if (!link.matches(":hover") && document.activeElement !== link) return;
     this.hide();
 
     const box = document.createElement("div");
     box.className = "preview";
+    box.setAttribute("role", "region");
+    box.setAttribute("aria-labelledby", "preview-title");
     const doc = document.createElement("div");
     doc.className = "doc is-preview";
     const title = document.createElement("div");
     title.className = "preview-title";
+    title.id = "preview-title";
     title.textContent = this.host.vault.index.title(path);
     doc.append(title, rendered.fragment);
     for (const diagram of doc.querySelectorAll(".diagram")) diagram.remove();

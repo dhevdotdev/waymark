@@ -290,6 +290,60 @@ check("keyboard focus on a link shows it too", !focused || (await tooltip.count(
 await page.keyboard.press("Escape");
 await page.evaluate(() => document.activeElement?.blur());
 
+/* A control's tooltip is a real tooltip, reached by the keyboard too, and only adds what the control's name lacks. */
+const keyFocus = async (selector) => {
+  await page.keyboard.press("Shift");
+  await page.evaluate((s) => document.querySelector(s).focus(), selector);
+};
+await keyFocus('[data-act="settings"]');
+await page.locator(".tooltip").waitFor({ timeout: 2000 });
+const described = await page.evaluate(() => {
+  const button = document.querySelector('[data-act="settings"]');
+  const tip = document.querySelector(".tooltip");
+  const by = button.getAttribute("aria-describedby");
+  return { role: tip.getAttribute("role"), says: by && document.getElementById(by)?.textContent };
+});
+check("keyboard focus on a control shows its tooltip", described.role === "tooltip", JSON.stringify(described));
+check("the control is described by the shortcut its name lacks", described.says === "⌘,", JSON.stringify(described));
+await keyFocus('[data-act="sidebar"]');
+await page.locator(".tooltip").waitFor({ timeout: 2000 });
+const sidebarTip = await page.evaluate(() => {
+  const by = document.querySelector('[data-act="sidebar"]').getAttribute("aria-describedby");
+  return by && document.getElementById(by)?.textContent;
+});
+check("a tooltip that says more than the name describes it whole", sidebarTip === "Sidebar⌘\\", String(sidebarTip));
+check(
+  "the description goes with the tooltip",
+  (await page.locator('[data-act="settings"]').getAttribute("aria-describedby")) === null,
+);
+await page.evaluate(() => document.activeElement?.blur());
+check("leaving the control hides it", (await page.locator(".tooltip").count()) === 0);
+
+/* A note link previews for the keyboard as well as the pointer. */
+await keyFocus(".doc a.wikilink[data-path]");
+const preview = page.locator(".preview");
+await preview.waitFor({ timeout: 2000 }).catch(() => {});
+const region = await page.evaluate(() => {
+  const box = document.querySelector(".preview");
+  const by = box?.getAttribute("aria-labelledby");
+  return box && { role: box.getAttribute("role"), name: by && document.getElementById(by)?.textContent };
+});
+check(
+  "keyboard focus on a note link opens its preview",
+  region?.role === "region" && region.name === "Other",
+  JSON.stringify(region),
+);
+await page.keyboard.press("Escape");
+check("Escape closes the preview", (await preview.count()) === 0);
+check(
+  "and leaves focus on the link",
+  await page.evaluate(() => document.activeElement?.matches(".doc a.wikilink[data-path]") === true),
+);
+await keyFocus(".doc a.wikilink[data-path]");
+await preview.waitFor({ timeout: 2000 }).catch(() => {});
+await page.evaluate(() => document.activeElement?.blur());
+check("moving focus off the link closes the preview", (await preview.count()) === 0);
+
 await away();
 await page.keyboard.press("Meta+e");
 await page.waitForSelector(".cm-content");

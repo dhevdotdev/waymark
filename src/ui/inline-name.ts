@@ -27,24 +27,26 @@ export function nameInPlace(row: HTMLElement, options: InlineNameOptions): Promi
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (result: string | null) => {
+    /* A key ends the edit with focus on the row, so the list keeps the keys; a click away leaves focus where it went. */
+    const finish = (result: string | null, byKey = false) => {
       if (settled) return;
       settled = true;
       editor.replaceWith(row);
+      if (byKey) row.focus({ preventScroll: true });
       resolve(result);
     };
     const typed = () => input.value.trim();
     const accepted = () => typed() !== "" && typed() !== value;
     input.addEventListener("keydown", (e) => {
       e.stopPropagation();
-      if (e.key === "Escape") finish(null);
+      if (e.key === "Escape") finish(null, true);
       if (e.key !== "Enter") return;
       e.preventDefault();
-      if (!accepted()) return finish(null);
+      if (!accepted()) return finish(null, true);
       const reason = problem(typed());
       input.classList.toggle("is-problem", reason !== null);
       if (reason) toast(reason);
-      else finish(typed());
+      else finish(typed(), true);
     });
     input.addEventListener("blur", () => finish(accepted() && problem(typed()) === null ? typed() : null));
     row.replaceWith(editor);
