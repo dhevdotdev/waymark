@@ -21,7 +21,7 @@ export interface SwitcherHost {
 
 const home = (path: string) => path.replace(/^\/Users\/[^/]+(?=\/|$)/, "~");
 
-/** Recent vaults, the open one first, each saying whether it can be opened. */
+/** Recent vaults, most recent first and the open one last, so Return goes back to the vault before. */
 export function vaultChoices(recent: string[], current: string, exists: boolean[]): VaultChoice[] {
   const choices = recent.map((path, i): VaultChoice => {
     const cut = path.replace(/\/+$/, "");
@@ -33,7 +33,7 @@ export function vaultChoices(recent: string[], current: string, exists: boolean[
       state: path === current ? "current" : exists[i] === false ? "missing" : "available",
     };
   });
-  return [...choices.filter((c) => c.state === "current"), ...choices.filter((c) => c.state !== "current")];
+  return [...choices.filter((c) => c.state !== "current"), ...choices.filter((c) => c.state === "current")];
 }
 
 const DETAIL: Record<VaultChoice["state"], (choice: VaultChoice) => string> = {

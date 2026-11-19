@@ -12,12 +12,12 @@ describe("vaultChoices", () => {
     expect(choice).toEqual({ path: NOTES, name: "notes", place: "~/Documents", state: "available" });
   });
 
-  it("puts the open vault first and marks it", () => {
-    const choices = vaultChoices([WORK, NOTES, GONE], NOTES, [true, true, true]);
+  it("keeps the most recent first and puts the open vault last, marked", () => {
+    const choices = vaultChoices([NOTES, WORK, GONE], NOTES, [true, true, true]);
     expect(choices.map((c) => [c.name, c.state])).toEqual([
-      ["notes", "current"],
       ["work", "available"],
       ["old", "available"],
+      ["notes", "current"],
     ]);
   });
 
@@ -72,11 +72,20 @@ describe("VaultSwitcher", () => {
     const { switcher } = setUp();
     await switcher.open();
     expect(rows()).toEqual([
-      ["notes", "Open now"],
       ["work", "~"],
       ["old", "Folder not found"],
+      ["notes", "Open now"],
       ["Open another vault…", ""],
     ]);
+  });
+
+  it("goes back to the vault before on Return", async () => {
+    const { host, switcher } = setUp();
+    await switcher.open();
+    document
+      .querySelector(".palette input")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(host.switchTo).toHaveBeenCalledWith(WORK);
   });
 
   it("switches to an available vault", async () => {
@@ -115,6 +124,6 @@ describe("VaultSwitcher", () => {
   it("still lists every vault when the folders cannot be checked", async () => {
     const { switcher } = setUp(() => Promise.reject(new Error("no IPC")));
     await switcher.open();
-    expect(rows()[2]).toEqual(["old", "/Volumes/Stick"]);
+    expect(rows()[1]).toEqual(["old", "/Volumes/Stick"]);
   });
 });
