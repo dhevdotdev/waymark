@@ -1,7 +1,7 @@
 import markdownit, { type MarkdownIt, type StateCore, type StateInline, type Token } from "markdown-it";
 import mark from "markdown-it-mark";
 import texmath from "markdown-it-texmath";
-import { headingId, headingKey, isAttachmentTarget, localTarget, type VaultIndex } from "../vault/index";
+import { folderOf, headingId, headingKey, isAttachmentTarget, joinPath, localTarget, type VaultIndex } from "../vault/index";
 import { KATEX_OPTIONS, mathEngine } from "./math";
 
 export interface RenderEnv {
@@ -138,7 +138,13 @@ function linkInsideVault(token: Token, href: string, env: RenderEnv): void {
     token.attrSet("data-candidates", JSON.stringify(note.candidates));
   } else {
     token.attrSet("class", "wikilink is-missing");
-    token.attrSet("title", `No note at “${local.path}”`);
+    const at = local.path.startsWith("/") ? local.path : joinPath(folderOf(currentPath), local.path);
+    if (at === null) token.attrSet("title", `No note at “${local.path}”`);
+    else {
+      token.attrSet("href", "#");
+      token.attrSet("data-missing", `/${at.replace(/^\/+/, "")}`);
+      token.attrSet("aria-description", "Creates this note");
+    }
   }
 }
 
@@ -300,7 +306,7 @@ function renderWikilink(md: MarkdownIt, token: Token, env: RenderEnv): string {
   if (res.kind === "ambiguous") {
     return `<a class="wikilink is-ambiguous" href="#" data-candidates="${escapeAttr(JSON.stringify(res.candidates))}"${anchorAttr} title="${res.candidates.length} notes share this name">${md.utils.escapeHtml(label)}</a>`;
   }
-  return `<span class="wikilink is-missing" title="No note named “${escapeAttr(target)}”">${md.utils.escapeHtml(label)}</span>`;
+  return `<a class="wikilink is-missing" href="#" data-missing="${escapeAttr(target)}" aria-description="Creates this note">${md.utils.escapeHtml(label)}</a>`;
 }
 
 function renderFence(md: MarkdownIt, token: Token, env: RenderEnv): string {

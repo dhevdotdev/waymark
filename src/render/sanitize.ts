@@ -25,6 +25,7 @@ const RENDERER_DATA = new Set([
   "data-external",
   "data-attachment",
   "data-task-line",
+  "data-missing",
 ]);
 
 /** The only thing a frame may show. Note HTML can copy the app's markup, so this looks at the file, not the wrapper. */

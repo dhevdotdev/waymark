@@ -21,7 +21,29 @@ describe("renderNote", () => {
     expect(links.map((l) => l.textContent)).toEqual(["A", "see", "Local", "Nope", "B"]);
     expect(links[1].getAttribute("data-anchor")).toBe("Part two");
     expect(links[3].classList.contains("is-missing")).toBe(true);
+    expect(links[3].getAttribute("data-missing")).toBe("Nope");
+    expect(links[3].tagName).toBe("A");
     expect(JSON.parse(links[4].getAttribute("data-candidates")!)).toEqual(["Inbox/B.md", "Notes/B.md"]);
+  });
+
+  it("offers to create the note a missing link names, keeping only the target", async () => {
+    const { div } = await render("[[Areas/New#Part|see]] [[Gone#^block]] [x](Sub/New.md) [y](/Top.md) [z](../../Out.md)");
+    const [folder, block, relative, rooted, outside] = div.querySelectorAll("p a");
+    expect(folder.getAttribute("data-missing")).toBe("Areas/New");
+    expect(folder.textContent).toBe("see");
+    expect(folder.hasAttribute("data-anchor")).toBe(false);
+    expect(block.getAttribute("data-missing")).toBe("Gone");
+    expect(relative.getAttribute("data-missing")).toBe("/Notes/Sub/New.md");
+    expect(rooted.getAttribute("data-missing")).toBe("/Top.md");
+    expect(outside.classList.contains("is-missing")).toBe(true);
+    expect(outside.hasAttribute("data-missing")).toBe(false);
+  });
+
+  it("leaves a missing attachment inert", async () => {
+    const { div } = await render("[[report.pdf]]");
+    const link = div.querySelector(".is-missing");
+    expect(link?.tagName).toBe("SPAN");
+    expect(link?.hasAttribute("data-missing")).toBe(false);
   });
 
   it("embeds an image written with its folder", async () => {
@@ -39,7 +61,7 @@ describe("renderNote", () => {
     expect(a.getAttribute("data-anchor")).toBe("Part");
     expect(b.getAttribute("data-path")).toBe("Notes/B.md");
     expect(c.classList.contains("is-missing")).toBe(true);
-    expect(c.hasAttribute("href")).toBe(false);
+    expect(c.getAttribute("data-missing")).toBe("/Nope.md");
     expect(d.getAttribute("data-attachment")).toBe("Attachments/pic.png");
     expect(e.classList.contains("external")).toBe(true);
   });

@@ -33,6 +33,7 @@ const RUNS = [
   [["caret"], 16],
   [["surfaces", "reduced"], 16],
   [["blocks"], 15],
+  [["missing-links"], 15],
   [["spatial-motion"], 15],
   [["sync"], 15],
   [["graph", "reduced"], 13],

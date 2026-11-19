@@ -125,7 +125,7 @@ export class Reader {
       folds: this.noteView.foldStore,
       reshow: () => this.show({ keepScroll: true }),
       incomingCommits: () => this.sync.panel.status?.behind ?? 0,
-      open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
+      followWikilink: (link, newTab) => this.files.followWikilink(link, newTab),
       openUrl: (url) => void native.openExternal(url),
       renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
       rename: (path, name) => this.files.renameTo(path, name),
@@ -169,6 +169,7 @@ export class Reader {
       toast,
       notePath: () => this.notePath,
       open: (path, newTab) => this.open(path, { newTab, focus: true }),
+      follow: (path, newTab, anchor) => this.open(path, { newTab, focus: true, anchor, via: "link" }),
       redraw: () => this.redraw(),
       syncBusy: () => this.sync.busy,
     });
@@ -371,13 +372,6 @@ export class Reader {
     this.graph?.leaving();
     if (this.tab.trail.canBack) void this.go(-1);
     else this.closeTab(this.workspace.activeIndex);
-  }
-
-  openSyncPanel(origin: "click" | "other"): void {
-    if (origin === "other") {
-      if (isDesktop) this.sync.panel.open();
-    } else if (isDesktop) this.sync.panel.toggle(this.els.sync);
-    else toast("Git sync runs in the desktop app");
   }
 
   openSettings(): void {
@@ -630,6 +624,7 @@ export class Reader {
     const { trail } = this.tab;
     this.renderTabs();
     this.trail.render();
+    this.files.shown(this.onBlank ? "" : this.current);
     shell.classList.toggle("is-graph", this.onGraph);
     shell.classList.toggle("is-blank", this.onBlank);
     shell.classList.toggle("is-base", this.onBase);

@@ -2,7 +2,9 @@ import { isDesktop, native } from "../platform";
 import type { PrefStore } from "../prefs";
 import { isBaseFile } from "../vault/index";
 import { linkMoves, nameProblem, rewriteLinks } from "../vault/link-rewrite";
+import { linkedNotePath } from "../vault/new-note-path";
 import type { VaultStore } from "../vault/store";
+import type { View } from "../vault/trail";
 import type { ForgottenTab, Workspace } from "../vault/workspace";
 import type { Bookmarks } from "./bookmarks";
 import { type MenuItem, showContextMenu } from "./context-menu";
@@ -31,6 +33,8 @@ export interface NoteFilesHost {
   toast: (message: string, action?: { label: string; run: () => void }) => void;
   notePath: () => string;
   open: (path: string, newTab?: boolean) => Promise<void>;
+  /** Opens a note the way following a link does, so the tab's trail branches from here. */
+  follow: (path: string, newTab: boolean, anchor?: string) => Promise<void>;
   bookmarks: Bookmarks;
   /** Redraws whatever depends on which files exist. */
   redraw: () => Promise<void>;
@@ -58,6 +62,8 @@ export class NoteFiles {
   private moving = "";
   private moveRunning = false;
   private readonly rows: RowActions;
+  /** A note made from a missing link and not yet written to. Leaving it empty takes it away again. */
+  private untouched = "";
 
   constructor(private readonly host: NoteFilesHost) {
     this.folderPicker = new Palette(
@@ -90,6 +96,60 @@ export class NoteFiles {
     } catch (error) {
       toast(error instanceof Error ? error.message : "The note could not be created.");
     }
+  }
+
+  /** Creates the note a missing link names, where Obsidian would, and opens it in Edit. An existing file is never replaced. */
+  async createFromLink(target: string): Promise<void> {
+    const { vault, toast, follow, editing, notePath } = this.host;
+    const { new_location, folder } = await this.obsidianNewNotePlace();
+    const named = linkedNotePath(target, { location: new_location, folder, here: folderOf(notePath()) });
+    if (named.kind === "refused") return toast(named.reason);
+    const { path } = named;
+    const existing = vault.index.notes.find((note) => note.toLowerCase() === path.toLowerCase());
+    if (existing) return follow(existing, false);
+    try {
+      const outcome = await vault.save(path, "", null);
+      if (outcome.kind !== "saved") return toast(`“${path}” is already on disk but hidden from the vault, so it was left alone.`);
+      await vault.applyChanges([path]);
+      this.host.tree.expectEdit();
+      await follow(path, false);
+      this.untouched = path;
+      await editing.open();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "The note could not be created.");
+    }
+  }
+
+  /** ⌘-click on a link in Edit: follows it, or creates the note it names. */
+  followWikilink(link: string, newTab: boolean): void {
+    const [name, anchor] = link.split("#");
+    const found = this.host.vault.index.resolve(name);
+    if (found.kind === "found") void this.host.follow(found.path, newTab, anchor);
+    else if (found.kind === "missing" && name.trim()) void this.createFromLink(name);
+  }
+
+  /**
+   * Called whenever the window shows something. A note made from a missing link that was left without a word is moved
+   * to the Trash once nothing shows it, so a stray click leaves the vault as it was.
+   */
+  shown(current: string): void {
+    const path = this.untouched;
+    const showing = (view: View) => view.kind === "note" && view.path === path;
+    if (!path || path === current || this.host.workspace.tabs.some((tab) => showing(tab.trail.current.view))) return;
+    this.untouched = "";
+    void this.discardIfEmpty(path);
+  }
+
+  private async discardIfEmpty(path: string): Promise<void> {
+    const { vault, redraw } = this.host;
+    try {
+      if ((await vault.source.readText(path)) !== "") return;
+      await vault.source.trashNote(path);
+    } catch {
+      return;
+    }
+    await vault.applyChanges([]);
+    await redraw();
   }
 
   async startRename(path: string): Promise<void> {

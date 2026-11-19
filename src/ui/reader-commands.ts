@@ -1,7 +1,7 @@
-import { native } from "../platform";
+import { isDesktop, native } from "../platform";
 import { ancestors } from "../vault/tree";
 import { type Bookmark, currentHeading } from "./bookmarks";
-import { type Command, labelOf } from "./commands";
+import { type Command, labelOf, type Origin } from "./commands";
 import { showContextMenu } from "./context-menu";
 import { isPointerAction } from "./input-origin";
 import { bindHeadingLinks, copyLink } from "./note-links";
@@ -384,7 +384,7 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "git status commit push",
       inField: true,
       desktop: true,
-      run: (origin) => r.openSyncPanel(origin === "click" ? "click" : "other"),
+      run: (origin) => openSyncPanel(r, origin),
     },
     {
       id: "history",
@@ -428,6 +428,14 @@ export function readerCommands(r: Reader): Command[] {
     { id: "close-tab", keys: ["mod+w"], inField: () => r.onBlank, run: () => closeFrontTab(r) },
     ...tabNumbers,
   ];
+}
+
+/** The status bar's button toggles the sync sheet beside it. The keyboard and palette only open it. */
+function openSyncPanel(r: Reader, origin: Origin): void {
+  if (origin !== "click") {
+    if (isDesktop) r.sync.panel.open();
+  } else if (isDesktop) r.sync.panel.toggle(r.els.sync);
+  else toast("Git sync runs in the desktop app");
 }
 
 /** A blank tab may close with its palette open, and hands back the tab it was opened from. */

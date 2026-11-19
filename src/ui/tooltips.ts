@@ -1,9 +1,10 @@
 import { fillDestination, linkDestination, outsideLink, placeUnderLink } from "./link-tooltip";
+import { missingLink, missingTip } from "./missing-link";
 
 const SHOW_DELAY_MS = 550;
 const WARM_MS = 800;
 
-const targetOf = (el: Element): HTMLElement | null => el.closest<HTMLElement>("[data-tip]") ?? outsideLink(el);
+const targetOf = (el: Element): HTMLElement | null => el.closest<HTMLElement>("[data-tip]") ?? outsideLink(el) ?? missingLink(el);
 
 /** Shows `data-tip` labels and where outside links go. A tooltip opened soon after another skips the delay. */
 export function bindTooltips(root: HTMLElement): void {
@@ -31,7 +32,7 @@ export function bindTooltips(root: HTMLElement): void {
       placeUnderLink(tip, target, pointerY);
       return;
     }
-    tip.textContent = target.dataset.tip ?? "";
+    tip.textContent = target.dataset.tip ?? (target.dataset.missing === undefined ? "" : missingTip(target));
     if (target.dataset.key) {
       const kbd = document.createElement("kbd");
       kbd.textContent = target.dataset.key;
@@ -87,7 +88,10 @@ export function bindTooltips(root: HTMLElement): void {
   });
 
   root.addEventListener("focusin", (e) => {
-    const link = e.target instanceof HTMLElement && e.target.matches(":focus-visible") ? outsideLink(e.target) : null;
+    const link =
+      e.target instanceof HTMLElement && e.target.matches(":focus-visible")
+        ? (outsideLink(e.target) ?? missingLink(e.target))
+        : null;
     if (link && link !== current) arrive(link, null);
   });
   root.addEventListener("focusout", (e) => {
