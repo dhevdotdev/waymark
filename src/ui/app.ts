@@ -1,4 +1,4 @@
-import { desktopVaultSource, isDesktop, native } from "../platform";
+import { type CaptureRequest, desktopVaultSource, isDesktop, native } from "../platform";
 import { PrefStore, type Prefs } from "../prefs";
 import { Highlighter } from "../render/highlight";
 import { applyTheme, FAMILIES, findFamily, type Scheme } from "../themes";
@@ -6,6 +6,8 @@ import { noteNamed, type OpenRequest, vaultHolding } from "../vault/open-request
 import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { bindAppMenu } from "./app-menu";
+import { saveCapture } from "./capture-save";
+import { startCaptureShortcut } from "./capture-shortcut";
 import { resolveColor } from "./colors";
 import { toast } from "./overlays";
 import { type Metrics, Reader } from "./reader";
@@ -65,6 +67,10 @@ export class App {
       await this.prefs.flush();
     });
 
+    if (isDesktop && !this.prefs.ephemeral) {
+      void startCaptureShortcut(this.prefs.value.captureShortcut);
+      await native.onCaptureSave((request) => void this.answerCapture(request));
+    }
     const early = override ? [] : await native.takeOpenRequests().catch(() => []);
     const first = this.vaultAsked(early) ?? this.prefs.value.lastVault;
     if (devSource) await this.loadVault(devSource, "dev", "Vault", initial);
@@ -114,6 +120,19 @@ export class App {
     const found = noteNamed(this.reader.vault.index, path);
     if (found.kind === "refused") return this.tell(found.reason);
     await this.reader.open(found.path, { anchor: request.heading ?? undefined });
+  }
+
+  /** Saves what the capture window sends into the open vault, and tells it where the note went or why it did not. */
+  private async answerCapture({ id, text }: CaptureRequest): Promise<void> {
+    const reader = this.reader;
+    if (!text.trim()) return native.answerCapture({ id, problem: "There is nothing to save." });
+    if (!reader) return native.answerCapture({ id, problem: "Open a vault in Waymark first. Nothing was saved." });
+    try {
+      const host = { vault: reader.vault, notePath: reader.notePath, refresh: (paths: string[]) => reader.onVaultChanged(paths) };
+      await native.answerCapture({ id, saved: await saveCapture(host, text) });
+    } catch (error) {
+      await native.answerCapture({ id, problem: error instanceof Error ? error.message : "The note could not be saved." });
+    }
   }
 
   private tell(message: string): void {

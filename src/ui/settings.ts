@@ -1,6 +1,7 @@
 import { isDesktop } from "../platform";
 import type { PrefStore, Prefs } from "../prefs";
 import { FAMILIES, type Scheme } from "../themes";
+import { captureProblem, recordShortcut, shortcutLabel, stopRecording, tryCaptureShortcut } from "./capture-shortcut";
 import { bindRadioKeys, checkRadio, radioAttrs } from "./choice-group";
 import { returnFocus } from "./modal-layer";
 import { dismissOnOutside, fadeOut, toast } from "./overlays";
@@ -60,9 +61,61 @@ function template(p: Prefs, scheme: Scheme): string {
              ${toggle("Check every 15 minutes", "background", Boolean(p.backgroundMinutes))}
              ${toggle("Back up every 10 minutes", "backup", Boolean(p.backupMinutes))}
              <p class="pop-note">Checks only fetch. Backup commits every change and pushes it, and stops rather than force-pushing or merging.</p>
+           </div>
+           <div class="pop-section">
+             <div class="pop-label" id="settings-capture">Quick capture</div>
+             <div class="capture-shortcut">
+               <span id="settings-capture-key">Shortcut</span>
+               <button class="shortcut-key" data-capture-shortcut aria-labelledby="settings-capture settings-capture-key" aria-describedby="settings-capture-note"></button>
+             </div>
+             <p class="pop-note" id="settings-capture-note" aria-live="polite"></p>
            </div>`
         : ""
     }`;
+}
+
+const CAPTURE_NOTE = "Writes a note from any app while Waymark is running. Click the shortcut to change it.";
+const RECORDING_NOTE = "Press the new shortcut. Escape keeps the current one, and Delete turns quick capture off.";
+
+/** The shortcut button and the note under it, from the saved shortcut and whether it works. */
+function showCapture(pop: HTMLElement, accelerator: string, note?: string): void {
+  const button = pop.querySelector<HTMLElement>("[data-capture-shortcut]");
+  const line = pop.querySelector<HTMLElement>("#settings-capture-note");
+  if (!button || !line) return;
+  button.classList.remove("is-recording");
+  button.classList.toggle("is-off", !accelerator);
+  button.textContent = shortcutLabel(accelerator);
+  const problem = captureProblem();
+  line.classList.toggle("is-problem", Boolean(note ?? problem));
+  line.textContent =
+    note ??
+    (problem
+      ? `${shortcutLabel(accelerator)} is not working: ${problem} Choose another shortcut.`
+      : accelerator
+        ? CAPTURE_NOTE
+        : "Quick capture is off. Click the shortcut to choose one.");
+}
+
+/** Records a new shortcut, keeps it only if it registers, and says why when it does not. */
+async function changeCaptureShortcut(pop: HTMLElement, host: SettingsHost): Promise<void> {
+  const button = pop.querySelector<HTMLElement>("[data-capture-shortcut]")!;
+  button.classList.add("is-recording");
+  button.textContent = "Type shortcut";
+  const line = pop.querySelector<HTMLElement>("#settings-capture-note")!;
+  line.classList.remove("is-problem");
+  line.textContent = RECORDING_NOTE;
+  const next = await recordShortcut();
+  const current = host.prefs.value.captureShortcut;
+  if (next === null || next === current) return showCapture(pop, current);
+  const reason = await tryCaptureShortcut(next);
+  if (reason === null) {
+    host.prefs.update((p) => {
+      p.captureShortcut = next;
+    });
+    return showCapture(pop, next);
+  }
+  const kept = current && !captureProblem() ? ` ${shortcutLabel(current)} still opens quick capture.` : "";
+  showCapture(pop, current, `${shortcutLabel(next)} cannot be used: ${reason}${kept}`);
 }
 
 const BACKUP_MINUTES = 10;
@@ -90,6 +143,7 @@ let stopDismissing: (() => void) | null = null;
 export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   const existing = document.querySelector<HTMLElement>(".popover.settings:not(.is-leaving)");
   if (existing) {
+    stopRecording();
     stopDismissing?.();
     returnFocus(anchor, existing);
     fadeOut(existing);
@@ -107,11 +161,13 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
 
   const r = anchor.getBoundingClientRect();
   pop.style.bottom = `${window.innerHeight - r.top + 8}px`;
+  pop.style.maxBlockSize = `${r.top - 16}px`;
   pop.style.right = `${Math.max(8, window.innerWidth - r.right - 4)}px`;
   pop.style.transformOrigin = `calc(100% - ${r.width / 2 + 4}px) bottom`;
 
   /* Escape gives focus back to the gear; a press elsewhere leaves it where the press puts it. */
   const close = (e: Event) => {
+    stopRecording();
     if (e instanceof KeyboardEvent) returnFocus(anchor, pop);
     fadeOut(pop);
     anchor.classList.remove("is-on");
@@ -119,8 +175,10 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
   stopDismissing = dismissOnOutside([pop, anchor], close);
   bindRadioKeys(pop);
 
+  if (isDesktop) showCapture(pop, host.prefs.value.captureShortcut);
   pop.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
+    if (target.closest("[data-capture-shortcut]")) void changeCaptureShortcut(pop, host);
     const swatch = target.closest<HTMLElement>("[data-family]");
     const family = swatch?.dataset.family;
     if (swatch && family) {
@@ -145,6 +203,7 @@ export function toggleSettings(anchor: HTMLElement, host: SettingsHost): void {
     if (appearance) {
       host.setAppearance(appearance);
       pop.innerHTML = template(host.prefs.value, host.scheme());
+      if (isDesktop) showCapture(pop, host.prefs.value.captureShortcut);
       pop.querySelector<HTMLElement>(`[data-appearance="${appearance}"]`)?.focus();
     }
   });

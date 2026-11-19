@@ -11,7 +11,7 @@ use objc2::ffi::class_addMethod;
 use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
 use objc2::sel;
 use objc2_app_kit::{NSApplication, NSApplicationTerminateReply};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 static QUITTING: AtomicBool = AtomicBool::new(false);
 /// AppKit is waiting for `replyToApplicationShouldTerminate:`. Replying, rather than exiting the
@@ -20,6 +20,15 @@ static TERMINATE_PENDING: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<AppHandle> = OnceLock::new();
 
 const SAVE_LIMIT: Duration = Duration::from_secs(5);
+
+/// Closing the capture window cancels the capture. Closing the main window quits, as the app has one.
+pub(crate) fn close_requested(app: &AppHandle, label: &str) {
+    if label == crate::capture::LABEL {
+        crate::capture::capture_close(app.clone(), app.state(), 0, true);
+    } else {
+        quit_after_saving(app);
+    }
+}
 
 /// Gives the frontend a moment to save before the app goes away. The timer covers a frontend that never answers.
 pub(crate) fn quit_after_saving(app: &AppHandle) {

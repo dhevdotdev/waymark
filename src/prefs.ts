@@ -51,6 +51,8 @@ export interface Prefs {
   diffWrap: boolean;
   keySound: SwitchProfile | "off";
   keyVolume: KeyVolume;
+  /** The global shortcut for quick capture, as Tauri writes it. Empty turns capture off. */
+  captureShortcut: string;
 }
 
 const DEFAULTS: Prefs = {
@@ -77,6 +79,7 @@ const DEFAULTS: Prefs = {
   diffWrap: true,
   keySound: "tactile",
   keyVolume: "medium",
+  captureShortcut: "Control+Alt+Space",
 };
 
 const LOCAL_KEY = "waymark.prefs";

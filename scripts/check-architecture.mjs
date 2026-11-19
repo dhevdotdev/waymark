@@ -18,6 +18,7 @@ const LAYERS = {
   "selftest-organize": ["ui", "platform", "vault", "selftest-recovery"],
   "selftest-recovery": ["ui", "platform", "vault"],
   main: ["ui", "vault", "platform", "selftest"],
+  capture: ["platform", "prefs", "themes"],
 };
 
 const DOM_FREE = ["vault"];

@@ -174,6 +174,8 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
         let id = event.id().0.as_str();
         if id == QUIT {
             crate::quit::quit_after_saving(app);
+        } else if crate::capture::has_focus(app) {
+            // The note commands act on the main window, which is not the one being typed in.
         } else if every_item().any(|item| item.id == id) {
             let _ = app.emit("menu-command", id);
         }

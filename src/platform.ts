@@ -62,6 +62,13 @@ export interface BackupReport {
   status: GitStatus;
 }
 
+export interface CaptureRequest {
+  id: number;
+  text: string;
+}
+
+export type CaptureAnswer = { id: number; saved: string } | { id: number; problem: string };
+
 export interface VaultInfo {
   root: string;
   name: string;
@@ -124,6 +131,28 @@ export const native = {
     if (!isDesktop) return;
     const { listen } = await import("@tauri-apps/api/event");
     await listen("open-requests", handler);
+  },
+  setCaptureShortcut: (accelerator: string) => call<void>("set_capture_shortcut", { accelerator }),
+  closeCapture: (lingerMs: number, returnFocus: boolean) => call<void>("capture_close", { lingerMs, returnFocus }),
+  /** The capture window hands its text to the main window, which owns the vault. */
+  async onCaptureSave(handler: (request: CaptureRequest) => void): Promise<void> {
+    if (!isDesktop) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen<CaptureRequest>("capture-save", (e) => handler(e.payload));
+  },
+  async answerCapture(answer: CaptureAnswer): Promise<void> {
+    if (!isDesktop) return;
+    const { emitTo } = await import("@tauri-apps/api/event");
+    await emitTo("capture", "capture-saved", answer);
+  },
+  async askToCapture(request: CaptureRequest): Promise<void> {
+    const { emitTo } = await import("@tauri-apps/api/event");
+    await emitTo("main", "capture-save", request);
+  },
+  async onCaptureEvent(event: "capture-open" | "capture-saved", handler: (payload: unknown) => void): Promise<void> {
+    if (!isDesktop) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen(event, (e) => handler(e.payload));
   },
   async onMenuCommand(handler: (id: string) => void): Promise<void> {
     if (!isDesktop) return;
