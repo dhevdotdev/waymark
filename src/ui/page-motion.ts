@@ -164,7 +164,7 @@ export class PageMotion {
 
   /** Flies a copy of the clicked text into the title while the title's own copy grows out of it, then the body rises after it. */
   private carry(doc: HTMLElement, from: Measured): boolean {
-    const title = doc.querySelector<HTMLElement>(".doc-title");
+    const title = doc.querySelector<HTMLElement>(".doc-own-title") ?? doc.querySelector<HTMLElement>(".doc-title");
     if (!title) return false;
     const to = title.getBoundingClientRect();
     if (!inSight(title, to)) return false;

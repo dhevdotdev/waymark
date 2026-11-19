@@ -68,6 +68,13 @@
 .doc-editing .cm-h2 {
   font-size: var(--text-h2);
 }
+/* Matches Read, where this heading stands in for the hidden title and keeps the title's room above and below. */
+.doc-editing .cm-h1.cm-own-title {
+  padding-block-start: var(--s7);
+}
+.doc-editing.has-own-title > .doc-head + .edit-surface {
+  margin-top: 0;
+}
 .doc-editing .cm-h3 {
   font-weight: 600;
 }
@@ -1165,6 +1172,9 @@ button.task-box:focus-visible {
 }
 .doc-editing .cm-h2 + .cm-blank {
   line-height: 12px;
+}
+.doc-editing .cm-own-title + .cm-blank {
+  line-height: calc(var(--s3) + var(--s5));
 }
 .doc-editing .cm-h3 + .cm-blank {
   line-height: 8px;

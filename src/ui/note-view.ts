@@ -1,5 +1,6 @@
 import { isDesktop } from "../platform";
 import { headingKey } from "../vault/index";
+import { opensWithTitle } from "../vault/own-title";
 import type { VaultStore } from "../vault/store";
 import { ancestors } from "../vault/tree";
 import { findRanges, paint, scrollToRange } from "./find";
@@ -64,6 +65,7 @@ export class NoteView {
     /* A second link followed during the fade must not dip the page again. */
     const midFade = (this.els.scroller.querySelector(":scope > .doc-enter")?.getAnimations().length ?? 0) > 0;
     if (this.motion.leave(entrance) && !midFade) doc.classList.add("doc-enter");
+    this.markOwnTitle(doc, path, body);
     doc.append(this.heading(path), body);
     this.folds.mount(doc, path, this.vault.texts.get(path) ?? "");
     this.els.scroller.replaceChildren(doc);
@@ -128,6 +130,14 @@ export class NoteView {
     p.textContent = detail;
     box.append(strong, p);
     this.els.scroller.replaceChildren(box);
+  }
+
+  /** A note whose first heading already says its name shows that heading as the title, once. */
+  private markOwnTitle(doc: HTMLElement, path: string, body: DocumentFragment): void {
+    const first = body.firstElementChild;
+    const owns = first?.tagName === "H1" && opensWithTitle(this.vault.texts.get(path) ?? "", this.vault.index.title(path));
+    doc.classList.toggle("has-own-title", owns);
+    if (owns) first.classList.add("doc-own-title");
   }
 
   private heading(path: string): HTMLElement {

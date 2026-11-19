@@ -183,6 +183,7 @@ export class NoteEditing {
         ),
         editor: createEditor(surface, {
           text,
+          title,
           lineSeparator: separator,
           onChange: (next) => session.draft.update(next),
           onStats: (stats) => this.stats.editing(stats),

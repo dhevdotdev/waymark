@@ -12,12 +12,14 @@ import {
   type TransactionSpec,
 } from "@codemirror/state";
 import { EditorView, keymap, placeholder, showTooltip, type Tooltip, tooltips, ViewPlugin } from "@codemirror/view";
+import { opensWithTitle } from "../vault/own-title";
 import { previewBlocks } from "./editor-blocks";
 import { drawnCaret } from "./editor-caret";
 import { findPanel } from "./editor-find";
 import { editorFolds, type FoldAction, type FoldOptions, foldAction, foldSaved } from "./editor-folds";
 import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { lineKeys } from "./editor-keys";
+import { ownTitle } from "./editor-title";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
 import { bindRoving, setStop } from "./roving";
@@ -51,6 +53,8 @@ export interface EditorOptions extends InsertOptions, PreviewOptions, FoldOption
   openWikilink: (target: string, newTab: boolean) => void;
   openUrl: (url: string) => void;
   renderInline: (text: string) => DocumentFragment;
+  /** The note's name, so a first heading that repeats it can stand as the title. */
+  title: string;
 }
 
 export interface EditorHandle {
@@ -329,6 +333,8 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
       .catch((error: unknown) => console.warn("Code colours not loaded", error));
   };
   const frozenState = (frozen: boolean): Extension => [EditorState.readOnly.of(frozen), EditorView.editable.of(!frozen)];
+  const ownsTitle = opensWithTitle(options.text, options.title);
+  parent.closest(".doc")?.classList.toggle("has-own-title", ownsTitle);
   const view = new EditorView({
     parent,
     state: EditorState.create({
@@ -340,6 +346,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions): Edito
         EditorView.lineWrapping,
         markdown({ base: markdownLanguage }),
         livePreview(options),
+        ownTitle(ownsTitle),
         editorFolds(options),
         blocks.extension,
         editorInsert(options),

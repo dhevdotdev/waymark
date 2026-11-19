@@ -18,6 +18,8 @@ const NOTES = {
   "Folding.md": `# Folding\n\nIntro.\n\n## Setup\n\n${filler("Setup")}\n\n### Install\n\n${filler("Install")}\n\n### Configure\n\nConfigure holds the word zebrafish.\n\n## Usage\n\n${filler("Usage", 12)}\n\n\`\`\`bash\n# not a heading\n\`\`\`\n\n## Setup\n\nSecond setup.\n\n## Empty\n`,
   "Pointer.md": "# Pointer\n\nSee [[Folding#Configure]] for details.\n",
   "Tight.md": "# Tight\n\n## First\nbody line\n## Second\nmore\n",
+  "Own title.md": "---\ntags: [x]\n---\n\n#  own   TITLE\n\nThe body.\n\n## Part\n\nMore.\n",
+  "Another title.md": "# Something else\n\nThe body.\n",
 };
 
 const app = await serveFixture();
@@ -386,6 +388,60 @@ try {
     JSON.stringify(moved["Folded.md"]) === '["setup#0"]' && !moved["Folding.md"] && (await state()).includes("H2*"),
     JSON.stringify(moved),
   );
+
+  await open("Another title.md");
+  /** Where a title sits inside the page, and its size, so a find bar or a banner above the page does not count. */
+  const titleBox = (selector) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(`.scroller > .doc ${sel}`);
+      const top = el.getBoundingClientRect().top - el.closest(".doc").getBoundingClientRect().top;
+      return `${top} ${getComputedStyle(el).fontSize}`;
+    }, selector);
+  const plainTitle = await titleBox(".doc-title");
+  check(
+    "a first heading that is not the note's name stays under the title",
+    (await page.locator(".doc-title").isVisible()) && (await page.locator(".doc > h1").isVisible()),
+  );
+  await open("Own title.md");
+  const shownTitles = await page.evaluate(() =>
+    [...document.querySelectorAll(".doc-title, .doc > h1")].filter((e) => e.checkVisibility()).map((e) => e.textContent),
+  );
+  check(
+    "a note that opens with its own name as a heading shows the name once",
+    JSON.stringify(shownTitles) === '["own   TITLE"]',
+    JSON.stringify(shownTitles),
+  );
+  check(
+    "that heading stands where the title stands, at the title's size",
+    (await titleBox("> h1.doc-own-title")) === plainTitle,
+    `${await titleBox("> h1")} for ${plainTitle}`,
+  );
+  const ownTop = await topOf(".doc > h1");
+  check("it keeps its fold control", (await page.locator(".doc > h1 .fold-toggle").count()) === 1);
+  const bodyTop = await topOf(".doc > h1 + p");
+  /** Where a line's text starts, below the room an editor line keeps above it. */
+  const textTop = (selector) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      return el.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(el).paddingTop);
+    }, selector);
+  await page.keyboard.press("Meta+e");
+  await page.waitForSelector(".cm-own-title");
+  await pause(300);
+  check(
+    "Edit shows the heading as the title, in the same place, with the body where it was",
+    !(await page.locator(".doc-title").isVisible()) &&
+      Math.abs((await textTop(".cm-own-title")) - ownTop) < 0.5 &&
+      Math.abs(
+        (await page.evaluate(
+          () => [...document.querySelectorAll(".cm-line")].find((l) => l.textContent === "The body.").getBoundingClientRect().top,
+        )) - bodyTop,
+      ) < 0.5,
+    `${await textTop(".cm-own-title")} for ${ownTop}`,
+  );
+  await page.keyboard.press("Meta+e");
+  await pause(300);
+  check("the file is never changed for it", (await disk("Own title.md")) === NOTES["Own title.md"]);
 
   check("nothing threw", errors.length === 0, errors[0]);
 } catch (error) {

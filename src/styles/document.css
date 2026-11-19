@@ -37,7 +37,14 @@
   margin-inline: calc(-1 * var(--hang));
 }
 
-/* Title block */
+/* Title block. A note that opens with its own name as a heading shows that heading as the title instead, once. */
+.doc.has-own-title > .doc-head {
+  display: none;
+}
+.doc-own-title {
+  text-wrap: balance;
+  font-variant-numeric: lining-nums;
+}
 .doc-title {
   font-size: var(--text-title);
   line-height: 1.12;
@@ -1181,6 +1188,13 @@ button.callout-title:focus-visible {
 }
 .doc.doc > .doc-head + * {
   margin-top: var(--s5);
+}
+/* The heading standing in for the title takes the title's place: its margin above, and the title's room below. */
+.doc.doc.has-own-title > .doc-head + .doc-own-title {
+  margin-top: var(--s7);
+}
+.doc.doc > .doc-own-title + * {
+  margin-top: calc(var(--s3) + var(--s5));
 }
 .doc.doc > .backlinks {
   margin-top: var(--s7);
