@@ -1185,6 +1185,11 @@ kbd {
 .trail-lines path.is-on-path {
   stroke: var(--accent);
 }
+/* A stop opened directly, not by a link, hangs from where the tab was by a dotted line, so the drawing never claims a link that is not there. */
+.trail-lines path.is-jump {
+  stroke-dasharray: 0 3.5;
+  stroke-width: 1.6;
+}
 .trail-row {
   position: relative;
   display: flex;
@@ -1598,6 +1603,94 @@ kbd {
 }
 .rail-link-context {
   grid-column: 2;
+  color: var(--chrome-ink-3);
+  font-size: 0.75rem;
+}
+/* Unlinked mentions fold under the backlinks. The heading is the section's label, so it reads as one. */
+.mentions-toggle {
+  appearance: none;
+  inline-size: 100%;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  cursor: default;
+  font-family: inherit;
+  text-align: start;
+  transition: color var(--t-hover) ease;
+}
+.mentions-toggle:focus-visible {
+  outline: none;
+}
+.mentions-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: -2px;
+  border-radius: var(--r-chip);
+}
+.mentions-toggle:focus-visible .mentions-label {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.mentions-toggle[aria-expanded="false"] .rail-section-chevron {
+  rotate: -90deg;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mentions-toggle:hover {
+    color: var(--ink);
+  }
+}
+.mentions[hidden] {
+  display: none;
+}
+.mention {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 1px 8px 5px 29px;
+}
+.mention-quote {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  border-radius: var(--r-chip);
+  color: var(--chrome-ink-3);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: color var(--t-hover) ease;
+}
+.mention-quote mark {
+  background: var(--mark);
+  color: var(--chrome-ink);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.mention-quote:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.mention-link {
+  margin: 0;
+  font-size: 0.75rem;
+}
+.mention-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mention-quote:hover {
+    color: var(--chrome-ink);
+  }
+  .mention-link:hover {
+    color: var(--ink);
+  }
+}
+.mentions-more {
+  margin: 0;
+  padding: 2px 8px 4px 29px;
   color: var(--chrome-ink-3);
   font-size: 0.75rem;
 }

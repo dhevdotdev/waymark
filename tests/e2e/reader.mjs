@@ -266,6 +266,26 @@ check("palette fuzzy match ranks the right note first", /Tide charts/.test(first
 await page.keyboard.press("Enter");
 await idle(page);
 check("palette opens the note", (await title()).startsWith("Tide charts"));
+const jumpedStop = page.locator(".trail-row.is-current");
+check(
+  "a note opened from the palette joins the trail instead of hiding it",
+  (await page.locator(".trail-row").count()) > 1 &&
+    (await jumpedStop.locator(".trail-name").textContent()).startsWith("Tide charts"),
+  String(await page.locator(".trail-row").count()),
+);
+/** The line into the current stop, which is dotted when no link led there. */
+const lineIntoCurrent = () =>
+  page.evaluate(() => {
+    const id = document.querySelector(".trail-row.is-current")?.dataset.trail;
+    const line = document.querySelector(`.trail-lines path[data-to="${id}"]`);
+    return line ? { jump: line.classList.contains("is-jump"), dashes: getComputedStyle(line).strokeDasharray } : null;
+  });
+const intoJump = await lineIntoCurrent();
+check(
+  "its stop hangs from the note before by a dotted line, because no link led there",
+  intoJump?.jump && intoJump.dashes !== "none",
+  JSON.stringify(intoJump),
+);
 
 await page.keyboard.press("Meta+k");
 await idle(page);
@@ -707,11 +727,17 @@ await idle(page);
 check("a right-button press does not resize", (await railWidth()) === railAtStart, `${await railWidth()}`);
 
 // Each tab keeps its own trail of followed links
+await page.keyboard.press("Meta+t");
+await idle(page);
 await page.evaluate(async () => {
   const f = window.waymark;
   await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
 await idle(page);
+while ((await page.locator(".tab").count()) > 1) {
+  await page.locator(".tab:not(.is-active) .tab-close").first().click({ force: true });
+  await idle(page);
+}
 const trailPane = page.locator(".rail-trail");
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 const focusedRow = () => page.evaluate(() => document.activeElement?.closest(".trail-row")?.textContent ?? "");
@@ -1054,12 +1080,25 @@ check(
   !(await trailSection.isVisible()) && (await page.locator(".trail").isHidden()),
 );
 await followLink();
-await page.locator(".tree-folder.is-open .nav-item:not(.is-current)").last().click();
+const offTrail = await page.evaluate(() => {
+  const onTrail = new Set([...document.querySelectorAll(".trail-name")].map((n) => n.textContent));
+  return [...document.querySelectorAll(".tree-folder.is-open .nav-item")].findIndex(
+    (row) => !onTrail.has((row.dataset.path ?? "").split("/").pop().replace(/\.md$/, "")),
+  );
+});
+await page.locator(".tree-folder.is-open .nav-item").nth(offTrail).click();
 await idle(page);
-check("opening an unrelated note from Files starts a new trail", !(await trailSection.isVisible()));
+check(
+  "opening an unrelated note from Files keeps the trail and hangs the note from where the tab was",
+  (await trailSection.isVisible()) && (await page.locator(".trail-row").count()) === 3 && (await lineIntoCurrent())?.jump,
+  `${await page.locator(".trail-row").count()} ${JSON.stringify(await lineIntoCurrent())}`,
+);
 await page.keyboard.press("Meta+[");
 await idle(page);
-check("Back brings the previous trail back", (await page.locator(".trail-row").count()) === 2);
+check(
+  "Back returns to the note before the jump, on the same trail",
+  (await page.locator(".trail-row").count()) === 3 && (await lineIntoCurrent())?.jump === false,
+);
 
 // Twenty-odd stops with branches, in a short window, with the real wheel
 {
@@ -1185,6 +1224,8 @@ const loop = await page.evaluate(() => {
     for (const b of f.vault.links.out.get(a) ?? []) if (a !== b && f.vault.links.out.get(b)?.has(a)) return [a, b];
   return null;
 });
+await page.keyboard.press("Meta+t");
+await idle(page);
 await page.evaluate(async ([a]) => {
   await window.waymark.open(a);
 }, loop);

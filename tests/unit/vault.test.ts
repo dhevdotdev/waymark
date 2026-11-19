@@ -3,7 +3,7 @@ import { stripComments } from "../../src/render/comments";
 import { detectCommunities } from "../../src/vault/communities";
 import { loadYaml, parseFrontmatter } from "../../src/vault/frontmatter";
 import { headingKey, VaultIndex } from "../../src/vault/index";
-import { Trail, type View } from "../../src/vault/trail";
+import { MOST_STOPS, Trail, type View } from "../../src/vault/trail";
 import { ancestors, buildTree } from "../../src/vault/tree";
 
 const files = [
@@ -260,16 +260,77 @@ describe("trail", () => {
     expect(here(t)).toBe("c");
   });
 
-  it("starts a new trail on a jump and can return to the old one", () => {
+  it("keeps a jump on the trail, hung from where the tab was and marked as a jump", () => {
     const t = new Trail(note("a"));
     t.follow(note("b"));
     t.jump(note("x"));
-    expect(t.size).toBe(1);
+    expect(t.size).toBe(3);
+    expect(t.layout().map((p) => [t.view(p.id), p.jumped])).toEqual([
+      [note("a"), false],
+      [note("b"), false],
+      [note("x"), true],
+    ]);
+    expect(t.layout()[2].parent).toBe(t.layout()[1].id);
     t.back();
     expect(here(t)).toBe("b");
-    expect(t.size).toBe(2);
+    expect(t.size).toBe(3);
     t.forward();
     expect(here(t)).toBe("x");
+  });
+
+  it("moves to a jumped-to note already on the trail instead of adding it again", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
+    t.jump(note("a"));
+    expect(t.size).toBe(2);
+    expect(here(t)).toBe("a");
+    t.back();
+    expect(here(t)).toBe("b");
+  });
+
+  it("keeps jumps and the way back through them after a restart", () => {
+    const t = new Trail(note("a"));
+    t.follow(note("b"));
+    t.jump(note("x"));
+    t.follow(note("y"));
+    const restored = Trail.restore(JSON.parse(JSON.stringify(t.save())), () => true)!;
+    expect(restored.layout().map((p) => p.jumped)).toEqual([false, false, true, false]);
+    restored.back();
+    restored.back();
+    expect(here(restored)).toBe("b");
+    restored.back();
+    expect(here(restored)).toBe("a");
+    expect(restored.canBack).toBe(false);
+  });
+
+  it("restores trails saved before jumps were marked as made of links", () => {
+    const restored = Trail.restore(
+      {
+        nodes: [
+          { id: 1, view: note("a"), parent: null, scroll: 0, collapsed: false },
+          { id: 2, view: note("b"), parent: 1, scroll: 0, collapsed: false },
+        ],
+        root: 1,
+        current: 2,
+        visits: [1, 2],
+        position: 1,
+      },
+      () => true,
+    )!;
+    expect(restored.layout().map((p) => p.jumped)).toEqual([false, false]);
+  });
+
+  it("lets the oldest stops go once the trail is full, keeping the current one", () => {
+    const t = new Trail(note("n0"));
+    for (let i = 1; i <= MOST_STOPS + 5; i++) t.jump(note(`n${i}`));
+    expect(t.size).toBe(MOST_STOPS);
+    expect(here(t)).toBe(`n${MOST_STOPS + 5}`);
+    expect(t.layout()[0].parent).toBeNull();
+    expect(t.view(t.layout()[0].id)).toEqual(note("n6"));
+    let steps = 0;
+    while (t.back()) steps++;
+    expect(steps).toBe(MOST_STOPS - 1);
+    expect(here(t)).toBe("n6");
   });
 
   it("steps back when the note the tab is on is removed", () => {

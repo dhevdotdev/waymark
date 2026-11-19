@@ -13,6 +13,8 @@ export interface TrailNode {
   scroll: number;
   /** Side branches are folded away, leaving the main line and the way to the current note. */
   collapsed: boolean;
+  /** Reached by opening it directly, from Files, Search or the palette, rather than by a link from its parent. */
+  jumped: boolean;
 }
 
 export interface SavedTrail {
@@ -34,7 +36,11 @@ export interface Placement {
   collapsed: boolean;
   /** Stops out of sight because this one is folded. */
   folded: number;
+  jumped: boolean;
 }
+
+/** Past this many stops the oldest go, so a tab used for weeks keeps a trail that can still be read. */
+export const MOST_STOPS = 100;
 
 const sameView = (a: View, b: View) =>
   (a.kind === "note" && b.kind === "note") || (a.kind === "base" && b.kind === "base") ? a.path === b.path : a.kind === b.kind;
@@ -68,10 +74,10 @@ function isTrailNode(value: unknown): value is TrailNode {
 
 /**
  * The map of where one tab has been. Following a link grows a branch from the
- * current note; going elsewhere starts a new trail, and Back can still return
- * to the old one. A note appears once per trail, so a link to a note already
- * on the map simply moves there. Back and Forward retrace the stops actually
- * made, whatever shape the map has.
+ * current note, and opening a note directly hangs it from the current note
+ * too, marked as a jump. A note appears once per trail, so going to a note
+ * already on the map simply moves there. Back and Forward retrace the stops
+ * actually made, whatever shape the map has.
  */
 export class Trail {
   private nodes = new Map<number, TrailNode>();
@@ -80,8 +86,6 @@ export class Trail {
   private nextId = 1;
   private visits: number[];
   private position = 0;
-  private before: SavedTrail[] = [];
-  private after: SavedTrail[] = [];
 
   constructor(view: View, scroll = 0) {
     this.root = this.cur = this.add(view, null, scroll).id;
@@ -119,6 +123,7 @@ export class Trail {
         parent: node.parent,
         scroll: node.scroll,
         collapsed: "collapsed" in node && node.collapsed === true,
+        jumped: "jumped" in node && node.jumped === true,
       });
       trail.nextId = Math.max(trail.nextId, node.id + 1);
     }
@@ -141,10 +146,17 @@ export class Trail {
     return trail;
   }
 
-  private add(view: View, parent: number | null, scroll = 0): TrailNode {
-    const node: TrailNode = { id: this.nextId++, view, parent, scroll, collapsed: false };
+  private add(view: View, parent: number | null, scroll = 0, jumped = false): TrailNode {
+    const node: TrailNode = { id: this.nextId++, view, parent, scroll, collapsed: false, jumped };
     this.nodes.set(node.id, node);
     return node;
+  }
+
+  /** Takes the oldest stops off once there are too many. The current one always stays. */
+  private trim(): void {
+    while (this.nodes.size > MOST_STOPS) {
+      this.remove(Math.min(...[...this.nodes.keys()].filter((id) => id !== this.cur)));
+    }
   }
 
   private find(view: View): TrailNode | undefined {
@@ -194,11 +206,11 @@ export class Trail {
   }
 
   get canBack(): boolean {
-    return this.position > 0 || this.before.length > 0;
+    return this.position > 0;
   }
 
   get canForward(): boolean {
-    return this.position < this.visits.length - 1 || this.after.length > 0;
+    return this.position < this.visits.length - 1;
   }
 
   /** Every view on the trail, newest first. */
@@ -216,22 +228,19 @@ export class Trail {
   /** Follows a link from the current note. */
   follow(view: View): void {
     if (this.fillBlank(view)) return;
-    const existing = this.find(view);
-    this.visit(existing ? existing.id : this.add(view, this.cur).id);
-    this.after = [];
+    this.go(view, false);
   }
 
-  /** Goes somewhere not linked from here: on this trail if it is already there, otherwise a new one. */
+  /** Goes somewhere not linked from here. It joins the trail like a link, marked as a jump. */
   jump(view: View): void {
     if (this.fillBlank(view)) return;
+    this.go(view, true);
+  }
+
+  private go(view: View, jumped: boolean): void {
     const existing = this.find(view);
-    if (existing) {
-      this.visit(existing.id);
-      return;
-    }
-    this.before.push(this.snapshot());
-    this.startFresh(view);
-    this.after = [];
+    this.visit(existing ? existing.id : this.add(view, this.cur, 0, jumped).id);
+    this.trim();
   }
 
   select(id: number): void {
@@ -248,30 +257,17 @@ export class Trail {
       if (node.view.kind === "note" && node.view.path === from) node.view = { kind: "note", path: to };
     };
     this.nodes.forEach(move);
-    for (const saved of [...this.before, ...this.after]) saved.nodes.forEach(move);
   }
 
   back(): boolean {
-    if (this.position > 0) {
-      this.cur = this.visits[--this.position];
-      return true;
-    }
-    const previous = this.before.pop();
-    if (!previous) return false;
-    this.after.push(this.snapshot());
-    this.load(previous);
+    if (!this.canBack) return false;
+    this.cur = this.visits[--this.position];
     return true;
   }
 
   forward(): boolean {
-    if (this.position < this.visits.length - 1) {
-      this.cur = this.visits[++this.position];
-      return true;
-    }
-    const next = this.after.pop();
-    if (!next) return false;
-    this.before.push(this.snapshot());
-    this.load(next);
+    if (!this.canForward) return false;
+    this.cur = this.visits[++this.position];
     return true;
   }
 
@@ -334,7 +330,15 @@ export class Trail {
       const kept = children.find((c) => onRoute.has(c.id)) ?? children[0];
       const shown = node.collapsed ? children.filter((c) => c === kept) : children;
       const folded = children.filter((c) => !shown.includes(c)).reduce((sum, c) => sum + this.stopsFrom(c.id), 0);
-      out.push({ id: node.id, parent: node.parent, level, branches: children.length, collapsed: node.collapsed, folded });
+      out.push({
+        id: node.id,
+        parent: node.parent,
+        level,
+        branches: children.length,
+        collapsed: node.collapsed,
+        folded,
+        jumped: node.jumped,
+      });
       const [main, ...sides] = children.filter((c) => shown.includes(c));
       const mainLine = children[0] === main ? main : undefined;
       for (const side of mainLine ? sides : [main, ...sides]) if (side) place(side, level + 1);

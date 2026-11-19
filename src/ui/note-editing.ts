@@ -170,7 +170,7 @@ export class NoteEditing {
       const { scroller } = els;
       const anchor = readingAnchor(scroller);
       const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-      const title = scroller.querySelector(".doc-title")?.textContent ?? vault.index.title(path);
+      const title = scroller.querySelector(".doc-head .doc-title")?.textContent ?? vault.index.title(path);
       const { page, banner, surface, heading } = this.mountPage(title);
       const session: Session = {
         path,
@@ -183,6 +183,7 @@ export class NoteEditing {
         ),
         editor: createEditor(surface, {
           text,
+          title,
           lineSeparator: separator,
           onChange: (next) => session.draft.update(next),
           onStats: (stats) => this.stats.editing(stats),

@@ -10,12 +10,14 @@ import { railFloats } from "./media";
 import { MorphArrows } from "./morph-arrows";
 import type { NoteEditing } from "./note-editing";
 import { NoteHistory, type NoteHistoryHost } from "./note-history";
+import { linkTargetOf } from "./note-links";
 import { toast } from "./overlays";
 import { glidePanel } from "./panel-glide";
 import { bindEdgeDrag } from "./panel-resize";
 import { PanelSections, type RailSection } from "./panel-sections";
 import type { PropertyEditor } from "./property-editor";
 import type { ShellElements } from "./shell";
+import { UnlinkedMentions } from "./unlinked-mentions";
 
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 440;
@@ -23,7 +25,8 @@ const MAX_WIDTH = 440;
 export type RailPane = "links" | "info";
 
 export interface InspectorHost extends NoteHistoryHost {
-  openFromGraph: (path: string, newTab: boolean) => void;
+  /** Opens a note reached from this one, optionally marking `find` in it. */
+  openLinked: (path: string, newTab: boolean, find?: string) => void;
   prefs: PrefStore;
   editing: () => NoteEditing;
 }
@@ -40,6 +43,7 @@ export class Inspector {
   private readonly propertySlot = document.createElement("div");
   private readonly facts = document.createElement("dl");
   private propertyEditor: Promise<PropertyEditor> | null = null;
+  private readonly mentions: UnlinkedMentions;
   readonly sections: PanelSections;
 
   constructor(
@@ -50,6 +54,14 @@ export class Inspector {
     folded: Record<RailSection, boolean>,
   ) {
     this.history = new NoteHistory(host);
+    this.mentions = new UnlinkedMentions({
+      vault,
+      linkTarget: (path) => linkTargetOf(vault.index, path),
+      open: (path, find, newTab) => host.openLinked(path, newTab, find),
+      write: (path, edit) => host.editing().writer.change(path, edit),
+      redraw: () => this.refresh(),
+      toast,
+    });
     els.reader.append(this.floating.root);
     els.scroller.addEventListener("foldchange", () => this.floating.markFolds());
     const expand = els.shell.querySelector<HTMLElement>(".rail-graph-open")!;
@@ -206,9 +218,10 @@ export class Inspector {
         box.append(a);
       }
     };
-    group("Linked from", from, true);
-    group("Links to", to, false);
     if (!from.length && !to.length) box.append(this.empty("No links to or from this note."));
+    group("Linked from", from, true);
+    this.mentions.render(box, this.current);
+    group("Links to", to, false);
     const total = new Set([...from, ...to]).size;
     const button = shell.querySelector<HTMLElement>('[data-rail="links"]')!;
     button.querySelector(".icon-count")!.textContent = total ? String(total) : "";
@@ -271,7 +284,7 @@ export class Inspector {
     const incoming = links.in.get(this.current) ?? new Set<string>();
     const ids = new Set([...out, ...incoming]);
     if (!this.localGraph) {
-      this.localGraph = new LocalGraph((id, newTab) => this.host.openFromGraph(id, newTab));
+      this.localGraph = new LocalGraph((id, newTab) => this.host.openLinked(id, newTab));
       box.append(this.localGraph.root);
     }
     this.sections.setEmpty("graph", ids.size === 0);
