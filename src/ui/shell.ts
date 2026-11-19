@@ -80,14 +80,14 @@ function template(options: ShellOptions): string {
           </div>
           <div class="search-results" id="search-results" role="listbox" aria-label="Search results"></div>
         </div>
-        <div class="sidebar-resize" aria-hidden="true"></div>
+        <button type="button" class="sidebar-resize" aria-label="Sidebar width"></button>
       </nav>
       <main class="reader">
         <div class="pane-head"><div class="crumbs"></div><span class="edit-state" data-state="saved" aria-live="polite"></span><span class="pane-meta"></span><div class="seg mode-switch" role="group" aria-label="Reading or editing"><button class="seg-btn is-on" data-act="mode-read" data-tip="Read" data-key="⌘E" aria-pressed="true">Read</button><button class="seg-btn" data-act="mode-edit" data-tip="Edit" data-key="⌘E" aria-pressed="false">Edit</button></div></div>
         <div class="scroller" id="note-panel" role="tabpanel" tabindex="-1"><article class="doc"></article></div>
       </main>
       <aside class="rail" id="inspector" aria-label="Inspector">
-        <div class="rail-resize" aria-hidden="true"></div>
+        <button type="button" class="rail-resize" aria-label="Inspector width"></button>
         <div class="rail-inner">
           <div class="rail-body">
             <div class="rail-pane rail-links" data-pane="links"></div>

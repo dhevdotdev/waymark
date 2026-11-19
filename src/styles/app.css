@@ -615,6 +615,22 @@ kbd {
   mask-image: linear-gradient(to bottom, black, black calc(100% - 28px), transparent);
 }
 .sidebar-resize,
+.rail-resize,
+.rail-section-resize {
+  padding: 0;
+  border: 0;
+  background: none;
+  appearance: none;
+}
+/* A focused edge shows the same hairline as a hovered one, at once, in place of the ring. */
+:is(.sidebar-resize, .rail-resize, .rail-section-resize):focus-visible {
+  outline: none;
+}
+:is(.sidebar-resize, .rail-resize, .rail-section-resize):focus-visible::after {
+  opacity: 1;
+  transition: none;
+}
+.sidebar-resize,
 .rail-resize {
   position: absolute;
   z-index: 2;
