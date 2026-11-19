@@ -1,4 +1,5 @@
-//! The packaged app's self-test hooks. Nothing here runs unless the test harness sets its variables.
+//! The packaged app's self-test hooks. The commands exist only in a build with the `selftest`
+//! feature, and nothing here runs unless the test harness also sets its variables.
 
 use objc2::runtime::{AnyObject, Bool};
 use objc2::{MainThreadMarker, msg_send};
@@ -6,9 +7,13 @@ use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSFloatingWindowLevel, NSWindow,
     NSWindowCollectionBehavior,
 };
+#[cfg(feature = "selftest")]
 use serde::Serialize;
-use tauri::{ActivationPolicy, App, AppHandle, Runtime, WebviewWindow};
+#[cfg(feature = "selftest")]
+use tauri::AppHandle;
+use tauri::{ActivationPolicy, App, Runtime, WebviewWindow};
 
+#[cfg(feature = "selftest")]
 #[derive(Serialize)]
 pub struct SelfTest {
     pub vault: String,
@@ -19,7 +24,8 @@ pub struct SelfTest {
 /// True for a run that must leave the Mac alone: no window in sight and no focus taken.
 /// `WAYMARK_SELFTEST_STAY` is the screenshot helper, which needs a window to capture.
 pub fn unseen() -> bool {
-    std::env::var_os("WAYMARK_SELFTEST_OUT").is_some()
+    cfg!(feature = "selftest")
+        && std::env::var_os("WAYMARK_SELFTEST_OUT").is_some()
         && std::env::var_os("WAYMARK_SELFTEST_STAY").is_none()
 }
 
@@ -80,6 +86,7 @@ fn show_without_being_seen<R: Runtime>(window: &WebviewWindow<R>) {
 
 /// QA hook: when WAYMARK_SELFTEST_OUT is set, the frontend runs its in-app checks
 /// against WAYMARK_SELFTEST_VAULT and reports back through `selftest_report`.
+#[cfg(feature = "selftest")]
 #[tauri::command]
 pub fn selftest_config() -> Option<SelfTest> {
     std::env::var("WAYMARK_SELFTEST_OUT").ok()?;
@@ -90,11 +97,13 @@ pub fn selftest_config() -> Option<SelfTest> {
     })
 }
 
+#[cfg(feature = "selftest")]
 #[tauri::command]
 pub fn selftest_log(line: String) {
     eprintln!("[selftest] {line}");
 }
 
+#[cfg(feature = "selftest")]
 #[tauri::command]
 pub fn selftest_report(app: AppHandle, report: serde_json::Value) -> Result<(), String> {
     let out = std::env::var("WAYMARK_SELFTEST_OUT").map_err(|e| e.to_string())?;

@@ -271,6 +271,8 @@ function launch(vault, mode, out, home, during) {
 
 let failed = 0;
 let unsure = 0;
+if (!(await readFile(APP)).includes("[selftest] "))
+  throw new Error("This bundle has no self-test commands. Build it with: pnpm tauri build --bundles app --features selftest");
 const modes = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
 for (const mode of modes.length ? modes : Object.keys(SETUP)) {
   const base = await mkdtemp(path.join(tmpdir(), "waymark-native-"));

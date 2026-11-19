@@ -99,6 +99,9 @@ function signingIdentity() {
 }
 
 if (!existsSync(BUILT)) throw new Error("Build the app first: pnpm tauri build --bundles app");
+// `pnpm test:native` leaves a bundle with the self-test commands in the same place, and it must never be installed.
+if (readFileSync(path.join(BUILT, "Contents/MacOS/waymark")).includes("[selftest] "))
+  throw new Error("This bundle was built for the self-test. Build it again first: pnpm tauri build --bundles app");
 const identity = signingIdentity();
 run("codesign", "--force", "--deep", "--sign", identity, "--keychain", KEYCHAIN, BUILT);
 run("codesign", "--verify", "--deep", BUILT);

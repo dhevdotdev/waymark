@@ -607,8 +607,11 @@ pub fn run() {
             write_prefs,
             dock_icon::set_dock_icon,
             window_state::show_window,
+            #[cfg(feature = "selftest")]
             selftest::selftest_config,
+            #[cfg(feature = "selftest")]
             selftest::selftest_report,
+            #[cfg(feature = "selftest")]
             selftest::selftest_log
         ])
         .build(tauri::generate_context!())

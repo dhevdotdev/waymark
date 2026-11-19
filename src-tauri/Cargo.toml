@@ -9,6 +9,10 @@ rust-version = "1.90"
 name = "waymark_lib"
 crate-type = ["rlib"]
 
+[features]
+# The packaged self-test's commands. Only `pnpm test:native` builds with it.
+selftest = []
+
 [build-dependencies]
 tauri-build = { version = "2.7.4", features = [] }
 
