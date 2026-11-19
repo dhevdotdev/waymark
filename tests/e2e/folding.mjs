@@ -96,7 +96,7 @@ try {
   const folded = await state();
   check(
     "a pointer fold hides the section and the headings inside it",
-    folded === "HEADER H1 P H2* P- P- P- H3- P- P- P- H3- P- H2 P P P P P P P P P P P P DIV H2 P H2 SECTION",
+    folded === "H1 P H2* P- P- P- H3- P- P- P- H3- P- H2 P P P P P P P P P P P P DIV H2 P H2 SECTION",
     folded,
   );
   check("the folded heading stays exactly where it was", Math.abs((await topOf(".doc > h2")) - before) < 0.5);
@@ -140,7 +140,7 @@ try {
   check(
     "⌥⇧⌘[ folds every section",
     (await state()) ===
-      "HEADER H1* P- H2*- P- P- P- H3*- P- P- P- H3*- P- H2*- P- P- P- P- P- P- P- P- P- P- P- P- DIV- H2*- P- H2- SECTION",
+      "H1* P- H2*- P- P- P- H3*- P- P- P- H3*- P- H2*- P- P- P- P- P- P- P- P- P- P- P- P- DIV- H2*- P- H2- SECTION",
     await state(),
   );
   await page.keyboard.press("Meta+Alt+Shift+BracketRight");
@@ -152,7 +152,7 @@ try {
   await page.reload();
   await page.waitForFunction(() => window.waymark?.metrics.indexMs > 0);
   await pause(500);
-  check("folds survive a restart", (await state()).startsWith("HEADER H1 P H2* P- P- P- H3- P- P- P- H3*- P-"), await state());
+  check("folds survive a restart", (await state()).startsWith("H1 P H2* P- P- P- H3- P- P- P- H3*- P-"), await state());
   const outline = await page.evaluate(() =>
     [...document.querySelectorAll(".floating-outline a")].map(
       (a) => `${a.textContent}${a.classList.contains("is-folded") ? "*" : ""}${a.classList.contains("is-hidden") ? "-" : ""}`,
@@ -167,7 +167,7 @@ try {
   await pointerClick('.floating-outline a[data-target="h-install"]');
   check(
     "an outline click unfolds what hid the heading",
-    (await state()).startsWith("HEADER H1 P H2 P P P H3 P P P H3* P"),
+    (await state()).startsWith("H1 P H2 P P P H3 P P P H3* P"),
     await state(),
   );
   check("the outline follows", (await page.locator(".floating-outline a.is-hidden").count()) === 0);
