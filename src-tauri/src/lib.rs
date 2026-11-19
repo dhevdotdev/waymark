@@ -4,6 +4,7 @@ mod folders;
 mod git;
 mod menu;
 mod navigation;
+mod open_requests;
 mod quit;
 mod selftest;
 mod trash;
@@ -533,6 +534,7 @@ pub fn run() {
         .plugin(navigation::guard())
         .manage(Vault::default())
         .manage(Watcher::default())
+        .manage(open_requests::Pending::default())
         .manage(Arc::new(trash::TrashLog::default()))
         .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -607,6 +609,7 @@ pub fn run() {
             write_prefs,
             dock_icon::set_dock_icon,
             window_state::show_window,
+            open_requests::take_open_requests,
             #[cfg(feature = "selftest")]
             selftest::selftest_config,
             #[cfg(feature = "selftest")]
@@ -632,6 +635,7 @@ pub fn run() {
             api.prevent_close();
             quit::quit_after_saving(app);
         }
+        RunEvent::Opened { urls } => open_requests::receive(app, &urls),
         _ => {}
     });
 }

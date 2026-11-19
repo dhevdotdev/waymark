@@ -42,6 +42,7 @@ const RUNS = [
   [["graph", "reduced"], 13],
   [["scrolling"], 13],
   [["edge"], 9],
+  [["open-requests"], 5],
   [["panel-motion", "reduced"], 9],
   [["dialogs"], 7],
   [["search-motion"], 7],

@@ -1,3 +1,4 @@
+import type { OpenRequest } from "./vault/open-request";
 import type { FileStat, VaultSettings, VaultSource, WriteOutcome } from "./vault/source";
 
 export const isDesktop = "__TAURI_INTERNALS__" in window;
@@ -117,6 +118,13 @@ export const native = {
   },
   menuItems: () => call<{ id: string; keys: string | null; enabled: boolean }[]>("menu_items"),
   setMenuEnabled: (states: Record<string, boolean>) => call<void>("set_menu_enabled", { states }),
+  /** Notes handed over by Finder or a waymark:// link since the last call. */
+  takeOpenRequests: () => (isDesktop ? call<OpenRequest[]>("take_open_requests") : Promise.resolve([])),
+  async onOpenRequests(handler: () => void): Promise<void> {
+    if (!isDesktop) return;
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen("open-requests", handler);
+  },
   async onMenuCommand(handler: (id: string) => void): Promise<void> {
     if (!isDesktop) return;
     const { listen } = await import("@tauri-apps/api/event");
