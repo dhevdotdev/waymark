@@ -30,6 +30,10 @@ function followLink(r: Reader, shell: HTMLElement, link: HTMLElement, e: MouseEv
     });
     return;
   }
+  if (link.dataset.missing !== undefined) {
+    void r.files.createFromLink(link.dataset.missing);
+    return;
+  }
   if (!link.dataset.path) return;
   const newTab = e.metaKey || e.button === 1;
   void r.open(link.dataset.path, {

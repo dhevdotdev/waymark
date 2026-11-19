@@ -61,6 +61,7 @@ function template(options: ShellOptions): string {
           <div class="titlebar-tools">
             <button class="icon-btn has-count" data-act="rail-links" data-rail="links" data-tip="Links" aria-label="Links" aria-pressed="false" aria-controls="inspector">${icons.link}<span class="icon-count"></span></button>
             <button class="icon-btn" data-act="rail-info" data-rail="info" data-tip="Info" aria-label="Info" aria-pressed="false" aria-controls="inspector">${icons.info}</button>
+            <button class="icon-btn zen-exit" data-act="zen" data-tip="Leave zen mode" data-key="⌘⇧\\" aria-label="Leave zen mode">${icons.unzen}</button>
             <button class="icon-btn" data-act="note-menu" data-tip="More" aria-label="More actions for this note" aria-haspopup="menu" aria-expanded="false">${icons.more}</button>
           </div>
         </div>

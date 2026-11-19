@@ -23,7 +23,8 @@ export interface EditingHost {
   reshow: () => Promise<void>;
   toast: (message: string) => void;
   incomingCommits: () => number;
-  open: (path: string, newTab: boolean, anchor?: string) => void;
+  /** ⌘-click on a wikilink: follows it, or creates the note it names. */
+  followWikilink: (link: string, newTab: boolean) => void;
   openUrl: (url: string) => void;
   renderInline: (text: string, path: string) => DocumentFragment;
   rename: (path: string, name: string) => Promise<boolean>;
@@ -185,11 +186,7 @@ export class NoteEditing {
           lineSeparator: separator,
           onChange: (next) => session.draft.update(next),
           onStats: (stats) => this.stats.editing(stats),
-          openWikilink: (link, newTab) => {
-            const [name, anchor] = link.split("#");
-            const found = vault.index.resolve(name);
-            if (found.kind === "found") this.host.open(found.path, newTab, anchor);
-          },
+          openWikilink: this.host.followWikilink,
           openUrl: this.host.openUrl,
           renderInline: (cell) => this.host.renderInline(cell, this.session?.path ?? path),
           assetUrl: (target) => this.assetUrl(target),

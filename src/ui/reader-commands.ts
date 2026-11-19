@@ -1,7 +1,7 @@
-import { native } from "../platform";
+import { isDesktop, native } from "../platform";
 import { ancestors } from "../vault/tree";
 import { type Bookmark, currentHeading } from "./bookmarks";
-import { type Command, labelOf } from "./commands";
+import { type Command, labelOf, type Origin } from "./commands";
 import { showContextMenu } from "./context-menu";
 import { isPointerAction } from "./input-origin";
 import { bindHeadingLinks, copyLink } from "./note-links";
@@ -13,6 +13,8 @@ import { viewExists } from "./restore-tabs";
 import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
 import { focusedTable } from "./table-focus";
+import { VaultSwitcher } from "./vault-switcher";
+import { Zen } from "./zen";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -48,6 +50,16 @@ export function readerCommands(r: Reader): Command[] {
     exists: (view) => viewExists(r.vault.index, view),
   });
   bindHeadingLinks({ shell: r.els.shell, index: () => r.vault.index, path: () => r.notePath, toast });
+  const vaults = new VaultSwitcher({
+    recent: () => prefs.value.recentVaults,
+    current: deps.root,
+    exists: (paths) => native.existingFolders(paths),
+    switchTo: deps.switchVault,
+    openAnother: deps.openAnotherVault,
+    forget: deps.forgetVault,
+    toast,
+  });
+  const zen = new Zen(r.els.shell, r.els.scroller);
   const { tree } = r.sidebar;
   const inEditor = () => document.activeElement?.closest(".cm-content") != null;
   const sortButton = () => r.els.shell.querySelector<HTMLElement>('[data-act="sort-files"]');
@@ -227,7 +239,10 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘⇧E",
       keywords: "folders tree sidebar",
       inField: true,
-      run: () => r.sidebar.showFiles(),
+      run: () => {
+        zen.leave();
+        r.sidebar.showFiles();
+      },
     },
     {
       id: "search",
@@ -236,10 +251,12 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘⇧F",
       keywords: "find full text",
       inField: true,
-      run: (origin) =>
+      run: (origin) => {
+        zen.leave();
         r.sidebar.showSearch(
           r.palette.takeQuery() ?? (origin === "key" ? window.getSelection()?.toString().trim() || undefined : undefined),
-        ),
+        );
+      },
     },
     {
       id: "graph",
@@ -276,7 +293,7 @@ export function readerCommands(r: Reader): Command[] {
       label: "Toggle sidebar",
       keys: ["mod+\\"],
       hint: "⌘\\",
-      run: () => r.sidebar.toggle(),
+      run: () => (zen.leave() ? r.sidebar.toggle(true) : r.sidebar.toggle()),
     },
     {
       id: "rail",
@@ -284,7 +301,18 @@ export function readerCommands(r: Reader): Command[] {
       keys: ["mod+alt+\\"],
       hint: "⌥⌘\\",
       keywords: "linked notes properties",
-      run: () => r.inspector.toggle(),
+      run: () => {
+        if (!zen.leave() || !r.inspector.isShowing) r.inspector.toggle();
+      },
+    },
+    {
+      id: "zen",
+      label: () => (zen.isOn ? "Leave zen mode" : "Zen mode"),
+      keys: ["mod+shift+\\"],
+      hint: "⌘⇧\\",
+      keywords: "focus distraction free hide panels chrome",
+      inField: true,
+      run: () => zen.toggle(),
     },
     {
       id: "fold-toggle",
@@ -328,7 +356,10 @@ export function readerCommands(r: Reader): Command[] {
       inField: true,
       needsNote: true,
       when: () => r.trail.available,
-      run: () => r.trail.togglePanel(),
+      run: () => {
+        zen.leave();
+        r.trail.togglePanel();
+      },
     },
     {
       id: "settings",
@@ -384,7 +415,7 @@ export function readerCommands(r: Reader): Command[] {
       keywords: "git status commit push",
       inField: true,
       desktop: true,
-      run: (origin) => r.openSyncPanel(origin === "click" ? "click" : "other"),
+      run: (origin) => openSyncPanel(r, origin),
     },
     {
       id: "history",
@@ -406,6 +437,13 @@ export function readerCommands(r: Reader): Command[] {
     },
     { id: "reveal", label: "Reveal note in Finder", desktop: true, needsNote: true, run: () => void native.reveal(r.current) },
     { id: "terminal", label: "Open vault in Terminal", desktop: true, run: () => void native.openTerminal() },
+    {
+      id: "switch-vault",
+      label: "Switch vault…",
+      keywords: "recent open folder change",
+      desktop: true,
+      run: () => void vaults.open(),
+    },
     { id: "open-vault", label: "Open another vault…", desktop: true, run: () => deps.openAnotherVault() },
     { id: "close-vault", label: "Close vault", desktop: true, run: () => deps.closeVault() },
     {
@@ -428,6 +466,14 @@ export function readerCommands(r: Reader): Command[] {
     { id: "close-tab", keys: ["mod+w"], inField: () => r.onBlank, run: () => closeFrontTab(r) },
     ...tabNumbers,
   ];
+}
+
+/** The status bar's button toggles the sync sheet beside it. The keyboard and palette only open it. */
+function openSyncPanel(r: Reader, origin: Origin): void {
+  if (origin !== "click") {
+    if (isDesktop) r.sync.panel.open();
+  } else if (isDesktop) r.sync.panel.toggle(r.els.sync);
+  else toast("Git sync runs in the desktop app");
 }
 
 /** A blank tab may close with its palette open, and hands back the tab it was opened from. */

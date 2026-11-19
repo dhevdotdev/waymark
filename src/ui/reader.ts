@@ -32,6 +32,7 @@ import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
+import { escapeZen } from "./zen";
 
 export type { Metrics, OpenOptions, ReaderDeps };
 
@@ -125,7 +126,7 @@ export class Reader {
       folds: this.noteView.foldStore,
       reshow: () => this.show({ keepScroll: true }),
       incomingCommits: () => this.sync.panel.status?.behind ?? 0,
-      open: (path, newTab, anchor) => void this.open(path, { newTab, focus: true, anchor, via: "link" }),
+      followWikilink: (link, newTab) => this.files.followWikilink(link, newTab),
       openUrl: (url) => void native.openExternal(url),
       renderInline: (text, path) => renderInlineMarkdown(text, path, this.renderContext()),
       rename: (path, name) => this.files.renameTo(path, name),
@@ -169,6 +170,7 @@ export class Reader {
       toast,
       notePath: () => this.notePath,
       open: (path, newTab) => this.open(path, { newTab, focus: true }),
+      follow: (path, newTab, anchor) => this.open(path, { newTab, focus: true, anchor, via: "link" }),
       redraw: () => this.redraw(),
       syncBusy: () => this.sync.busy,
     });
@@ -373,13 +375,6 @@ export class Reader {
     else this.closeTab(this.workspace.activeIndex);
   }
 
-  openSyncPanel(origin: "click" | "other"): void {
-    if (origin === "other") {
-      if (isDesktop) this.sync.panel.open();
-    } else if (isDesktop) this.sync.panel.toggle(this.els.sync);
-    else toast("Git sync runs in the desktop app");
-  }
-
   openSettings(): void {
     const anchor = this.els.shell.querySelector<HTMLElement>('[data-act="settings"]')!;
     toggleSettings(anchor, {
@@ -452,7 +447,7 @@ export class Reader {
     else if (shell.matches(".sidebar-peek, .rail-peek")) shell.classList.remove("sidebar-peek", "rail-peek");
     else if (this.sidebar.isSearching && !inField) this.sidebar.showFiles();
     else if (this.onBlank && !inField) this.dismissBlank();
-    else paint("search", []);
+    else if (!escapeZen(shell, inField)) paint("search", []);
   }
 
   /** Cancels a new tab: the tab it opened beside comes back, rather than whichever sits to the right. */
@@ -630,6 +625,7 @@ export class Reader {
     const { trail } = this.tab;
     this.renderTabs();
     this.trail.render();
+    this.files.shown(this.onBlank ? "" : this.current);
     shell.classList.toggle("is-graph", this.onGraph);
     shell.classList.toggle("is-blank", this.onBlank);
     shell.classList.toggle("is-base", this.onBase);

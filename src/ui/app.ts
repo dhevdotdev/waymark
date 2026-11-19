@@ -6,6 +6,7 @@ import type { VaultSource } from "../vault/source";
 import { VaultStore } from "../vault/store";
 import { bindAppMenu } from "./app-menu";
 import { resolveColor } from "./colors";
+import { toast } from "./overlays";
 import { type Metrics, Reader } from "./reader";
 import { Sound } from "./sound";
 import { showWelcome } from "./welcome";
@@ -70,7 +71,7 @@ export class App {
   }
 
   async openVault(path: string): Promise<void> {
-    await this.reader?.editing.close();
+    if (!(await this.leaveVault())) return;
     const info = await native.openVault(path);
     this.prefs.update((p) => {
       p.lastVault = info.root;
@@ -132,9 +133,13 @@ export class App {
         this.applyTheme();
       },
       openAnotherVault: () => void this.pickVault(),
+      switchVault: (path) => void this.openVault(path).catch((err: Error) => toast(err.message)),
+      forgetVault: (path) =>
+        this.prefs.update((p) => {
+          p.recentVaults = p.recentVaults.filter((r) => r !== path);
+        }),
       closeVault: async () => {
-        await this.reader?.editing.close();
-        this.reader?.persist();
+        if (!(await this.leaveVault())) return;
         this.prefs.update((p) => {
           p.lastVault = null;
         });
@@ -143,6 +148,17 @@ export class App {
     });
     if (isDesktop) void bindAppMenu(this.reader);
     await this.reader.start(t0, initial);
+  }
+
+  /** Saves the note being edited and where everything was, so another vault or the welcome page can take over. */
+  private async leaveVault(): Promise<boolean> {
+    const reader = this.reader;
+    if (!reader) return true;
+    reader.spots.record();
+    if (!(await reader.editing.close())) return false;
+    reader.persist();
+    await this.prefs.flush();
+    return true;
   }
 
   private async pickVault(): Promise<void> {

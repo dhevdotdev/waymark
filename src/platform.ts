@@ -88,6 +88,7 @@ async function call<T>(cmd: string, args?: InvokeBody, options?: InvokeOptions):
 
 export const native = {
   openVault: (path: string) => call<VaultInfo>("open_vault", { path }),
+  existingFolders: (paths: string[]) => call<boolean[]>("existing_folders", { paths }),
   reveal: (path?: string) => call<void>("reveal", { path }),
   clipboardText: () => (isDesktop ? call<string>("clipboard_text") : navigator.clipboard.readText()),
   copyText: (text: string) => (isDesktop ? call<void>("clipboard_write", { text }) : navigator.clipboard.writeText(text)),

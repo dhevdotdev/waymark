@@ -49,4 +49,5 @@ export const icons = {
   plus: svg(`<path d="M8 3.5v9M3.5 8h9"/>`),
   minus: svg(`<path d="M3.5 8h9"/>`),
   fit: svg(`<path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3"/>`),
+  unzen: svg(`<path d="M6 3v3H3M10 3v3h3M13 10h-3v3M3 10h3v3"/>`),
 };

@@ -1,11 +1,12 @@
 import { fillDestination, linkDestination, outsideLink, placeUnderLink } from "./link-tooltip";
+import { missingLink, missingTip } from "./missing-link";
 
 const SHOW_DELAY_MS = 550;
 const WARM_MS = 800;
 
 const TIP_ID = "tooltip";
 
-const targetOf = (el: Element): HTMLElement | null => el.closest<HTMLElement>("[data-tip]") ?? outsideLink(el);
+const targetOf = (el: Element): HTMLElement | null => el.closest<HTMLElement>("[data-tip]") ?? outsideLink(el) ?? missingLink(el);
 
 /** A row or tab names itself in full unless its label is cut short, so only a cut label gets a tooltip. */
 function worthShowing(target: HTMLElement): boolean {
@@ -60,7 +61,7 @@ export function bindTooltips(root: HTMLElement): void {
       placeUnderLink(tip, target, pointerY);
       return;
     }
-    tip.textContent = target.dataset.tip ?? "";
+    tip.textContent = target.dataset.tip ?? (target.dataset.missing === undefined ? "" : missingTip(target));
     if (target.dataset.key) {
       const kbd = document.createElement("kbd");
       kbd.textContent = target.dataset.key;
