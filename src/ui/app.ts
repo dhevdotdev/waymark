@@ -12,6 +12,8 @@ import { showWelcome } from "./welcome";
 
 const MAX_RECENT_VAULTS = 8;
 
+const paperColour = () => resolveColor("var(--paper)").match(/\d+/g)!.map(Number).slice(0, 3) as [number, number, number];
+
 /** Everything that outlives one vault: preferences, theme, and which vault is open. */
 export class App {
   readonly metrics: Metrics = {};
@@ -42,6 +44,7 @@ export class App {
     window.addEventListener("blur", () => this.sound.keys.forgetHeld());
     if (this.prefs.value.keySound !== "off") void this.sound.keys.load(this.prefs.value.keySound);
     this.applyTheme();
+    if (isDesktop) native.showWindow(paperColour()).catch((error: unknown) => console.warn("Window not shown", error));
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     window.addEventListener("keydown", (e) => this.reader?.handleKey(e), true);
     window.addEventListener("beforeunload", () => {
@@ -193,8 +196,7 @@ export class App {
   /** The window shows its own colour in newly exposed space while it grows, before the page has resized. */
   private matchWindowToPage(): void {
     if (!isDesktop) return;
-    const [red, green, blue] = resolveColor("var(--paper)").match(/\d+/g)!.map(Number);
-    native.setWindowColor([red, green, blue]).catch((error: unknown) => console.warn("Window colour not set", error));
+    native.setWindowColor(paperColour()).catch((error: unknown) => console.warn("Window colour not set", error));
   }
 
   private async syncCodeTheme(): Promise<void> {
