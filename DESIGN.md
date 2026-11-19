@@ -107,7 +107,7 @@ A change goes through the editor when the note is open there, as one undo step u
 
 ## Trails
 
-Each tab remembers where following links has taken it. A second link from the same note starts a side branch. A link to a note already on the trail moves there and adds nothing. Opening something from Files, Search or ⌘K starts a new trail, and Back returns to the old one. Trails are saved with the tabs. `src/vault/trail.ts` holds the model.
+Each tab remembers where it has been. Following a link grows the trail from the current note, and a second link from the same note starts a side branch. Opening a note from Files, Search, ⌘K or a bookmark joins the trail the same way, hung from the note the tab was on by a dotted line instead of a solid one, because no link led there. Starting a fresh trail on every jump was tried and rejected: the section and its count vanished, which read as the trail being thrown away. Going to a note already on the trail moves there and adds nothing, and Back and Forward retrace the stops actually made. Trails are saved with the tabs, jumps included, so Back works the same after a relaunch. Past 100 stops the oldest go first, so a tab used for weeks still has a trail worth reading. `src/vault/trail.ts` holds the model.
 
 Nothing about the trail sits above the note. ⌘Y brings the Trail section into view on the current stop, opening the panel or the section if it has to, and pressing it again undoes what that opened.
 

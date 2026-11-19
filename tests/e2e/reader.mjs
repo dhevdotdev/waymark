@@ -266,6 +266,18 @@ check("palette fuzzy match ranks the right note first", /Tide charts/.test(first
 await page.keyboard.press("Enter");
 await idle(page);
 check("palette opens the note", (await title()).startsWith("Tide charts"));
+const jumpedStop = page.locator(".trail-row.is-current");
+check(
+  "a note opened from the palette joins the trail instead of hiding it",
+  (await page.locator(".trail-row").count()) > 1 &&
+    (await jumpedStop.locator(".trail-name").textContent()).startsWith("Tide charts"),
+  String(await page.locator(".trail-row").count()),
+);
+check(
+  "its stop hangs from the note before by a dotted line, because no link led there",
+  (await page.locator(".trail-lines path.is-jump").count()) === 1 &&
+    (await page.locator(".trail-lines path.is-jump").evaluate((p) => getComputedStyle(p).strokeDasharray !== "none")),
+);
 
 await page.keyboard.press("Meta+k");
 await idle(page);
@@ -707,11 +719,17 @@ await idle(page);
 check("a right-button press does not resize", (await railWidth()) === railAtStart, `${await railWidth()}`);
 
 // Each tab keeps its own trail of followed links
+await page.keyboard.press("Meta+t");
+await idle(page);
 await page.evaluate(async () => {
   const f = window.waymark;
   await f.open(f.vault.index.notes.find((p) => p.endsWith("Compass declination and magnetic north.md")));
 });
 await idle(page);
+while ((await page.locator(".tab").count()) > 1) {
+  await page.locator(".tab:not(.is-active) .tab-close").first().click({ force: true });
+  await idle(page);
+}
 const trailPane = page.locator(".rail-trail");
 const titleTop = () => page.locator(".doc-title").evaluate((t) => t.getBoundingClientRect().top);
 const focusedRow = () => page.evaluate(() => document.activeElement?.closest(".trail-row")?.textContent ?? "");

@@ -67,7 +67,7 @@ export class TrailActions {
     const inspector = this.host.inspector();
     if (this.host.tab().trail.current.view.kind !== "note") return;
     if (!this.available) {
-      toast("This tab has no trail yet. Follow a link to start one.");
+      toast("This tab has no trail yet. Open another note to start one.");
       return;
     }
     const open = inspector.isShowing && inspector.sections.isOpen("trail");

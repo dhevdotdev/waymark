@@ -192,6 +192,7 @@ export class TrailPanel {
             : `M${fromX} ${fromY}V${toY - ELBOW}Q${fromX} ${toY} ${fromX + ELBOW} ${toY}H${toX - clear}`,
         );
         line.classList.toggle("is-on-path", onPath.has(entry.id));
+        line.classList.toggle("is-jump", entry.jumped);
         return line;
       });
     this.lines.replaceChildren(...paths);

@@ -16,7 +16,7 @@
 
 **View**: what a tab shows: a note, a graph, or blank until something is chosen.
 
-**Trail**: the map of where one tab has been. It is a branching graph, not a list. Following a link grows it. Jumping from the tree or the palette starts a new one.
+**Trail**: the map of where one tab has been. It is a branching graph, not a list. Following a link grows it. Jumping from the tree, Search or the palette grows it too, drawn with a dotted line because no link led there.
 
 **Stop**: one place on a trail.
 

@@ -1185,6 +1185,11 @@ kbd {
 .trail-lines path.is-on-path {
   stroke: var(--accent);
 }
+/* A stop opened directly, not by a link, hangs from where the tab was by a dotted line, so the drawing never claims a link that is not there. */
+.trail-lines path.is-jump {
+  stroke-dasharray: 0 3.5;
+  stroke-width: 1.6;
+}
 .trail-row {
   position: relative;
   display: flex;
