@@ -505,6 +505,15 @@ try {
       return top > 0 && top < innerHeight;
     }),
   );
+  const currentHeading = await page.$$eval(".fo-item[aria-current]", (items) =>
+    items.map((a) => `${a.getAttribute("aria-current")}:${a.classList.contains("is-active")}`),
+  );
+  check(
+    "the outline marks the heading being read as the current location",
+    currentHeading.join() === "location:true" &&
+      (await page.locator(".fo-item").last().getAttribute("aria-current")) === "location",
+    currentHeading.join(),
+  );
   await page.mouse.move(400, 400);
   await page.keyboard.press("Meta+e");
   await page.waitForSelector(".cm-content");
@@ -538,15 +547,6 @@ try {
   check("cells show formatting", (await page.locator(".cm-table-widget td strong").textContent()) === "bold");
   check("an escaped pipe reads as a pipe", (await cell(2, 2).textContent()) === "with | pipe");
   check("alignment is kept", (await cell(1, 1).evaluate((c) => c.style.textAlign)) === "right");
-  const currentHeading = await page.$$eval(".fo-item[aria-current]", (items) =>
-    items.map((a) => `${a.getAttribute("aria-current")}:${a.classList.contains("is-active")}`),
-  );
-  check(
-    "the outline marks the heading being read as the current location",
-    currentHeading.join() === "location:true" &&
-      (await page.locator(".fo-item").last().getAttribute("aria-current")) === "location",
-    currentHeading.join(),
-  );
   check("a quoted table stays as text", (await page.locator(".cm-table-line").count()) === 3);
 
   await cell(1, 0).click();
