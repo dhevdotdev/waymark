@@ -271,10 +271,43 @@ try {
   await writesSettled(page, 200);
   check("selecting text offers formatting", (await page.locator(".edit-bubble-btn").count()) === 6);
   check("the toolbar is on screen", (await page.locator(".edit-bubble").boundingBox()).y > 0);
+  const bubbleStops = await page.$$eval(".edit-bubble-btn", (b) => b.map((x) => x.getAttribute("tabindex")).join());
+  check("the toolbar is one Tab stop", bubbleStops === ",-1,-1,-1,-1,-1", bubbleStops);
+  const bubbleFocus = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+  await page.locator(".edit-bubble-btn.is-bold").focus();
+  await page.keyboard.press("ArrowRight");
+  const second = await bubbleFocus();
+  await page.keyboard.press("End");
+  const last = await bubbleFocus();
+  await page.keyboard.press("ArrowRight");
+  const wrapped = await bubbleFocus();
+  check(
+    "the arrows move along the toolbar, End reaches its end and the arrows wrap",
+    second === "Italic" && last === "Quote" && wrapped === "Bold",
+    `${second} ${last} ${wrapped}`,
+  );
   await page.locator(".edit-bubble-btn.is-bold").click();
   await saved();
   await writesSettled(page, 600);
   check("the bubble formats the selection", (await disk("Tasks.md")).includes("**Last line.**"));
+  const boldLine = await page.locator(".cm-line", { hasText: "Last line." }).boundingBox();
+  await page.mouse.move(boldLine.x + 1, boldLine.y + boldLine.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(boldLine.x + 300, boldLine.y + boldLine.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await idle(page);
+  const beforeKey = await disk("Tasks.md");
+  const offered = await page.locator(".edit-bubble-btn").count();
+  await page.locator(".edit-bubble-btn.is-strikethrough").focus();
+  await page.keyboard.press("Enter");
+  await saved();
+  await writesSettled(page, 600);
+  const afterKey = await disk("Tasks.md");
+  check(
+    "a toolbar button pressed from the keyboard formats the selection",
+    offered === 6 && afterKey !== beforeKey && afterKey.includes("~~") && !beforeKey.includes("~~"),
+    afterKey.split("\n").find((l) => l.includes("Last line.")),
+  );
   await page.keyboard.press("Meta+f");
   await idle(page);
   check("find opens inside the editor", await page.locator(".cm-search").isVisible());

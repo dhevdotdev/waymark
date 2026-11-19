@@ -20,6 +20,7 @@ import { editorInsert, type InsertOptions, pastePlain } from "./editor-insert";
 import { lineKeys } from "./editor-keys";
 import { icons } from "./icons";
 import { frontmatterEnd, livePreview, type PreviewOptions, redrawPreview } from "./live-preview";
+import { bindRoving, setStop } from "./roving";
 import { tableEditor } from "./table-editor";
 
 export { prepareEditorMath } from "./editor-blocks";
@@ -251,12 +252,18 @@ const bubbleButtons = EditorView.updateListener.of((update) => {
       button.title = title;
       button.setAttribute("aria-label", title);
       button.className = `edit-bubble-btn is-${title.split(" ")[0].toLowerCase()}`;
+      setStop(button, !dom.childElementCount);
       button.addEventListener("mousedown", (e) => {
         e.preventDefault();
         run(update.view);
       });
+      /* The pointer acts on press, so the selection is still there; a click with no press came from the keyboard. */
+      button.addEventListener("click", (e) => {
+        if (e.detail === 0) run(update.view);
+      });
       dom.append(button);
     }
+    bindRoving(dom, { items: () => [...dom.querySelectorAll<HTMLElement>(".edit-bubble-btn")] });
   }
 });
 
