@@ -350,6 +350,7 @@
 .cm-table-grip {
   border-radius: var(--r-chip);
   cursor: grab;
+  touch-action: none;
 }
 .cm-table-grip[hidden] {
   display: none;

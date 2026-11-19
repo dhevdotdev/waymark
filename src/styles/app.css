@@ -247,6 +247,10 @@ kbd {
     opacity var(--t-menu) ease,
     scale var(--t-press) var(--ease-out);
 }
+/* A tab is dragged to reorder it, and the strip never scrolls, so a touch or pen press is always a drag. */
+.tab {
+  touch-action: none;
+}
 .tab + .tab::before {
   content: "";
   position: absolute;
