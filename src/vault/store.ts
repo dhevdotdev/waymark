@@ -171,7 +171,8 @@ export class VaultStore {
     this.updateSearch(path);
   }
 
-  private aliasesIn(path: string): string[] {
+  /** The note's `aliases` as written. */
+  aliasesIn(path: string): string[] {
     const { data } = parseFrontmatter(this.texts.get(path) ?? "");
     const aliases = data.aliases ?? data.alias;
     if (!aliases) return [];

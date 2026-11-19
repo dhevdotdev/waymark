@@ -109,7 +109,7 @@ export class Reader {
           void this.sync.panel.detail.showWorktreeDiff(change, change.unstaged === " " || !change.unstaged),
         showCommit: (commit, path) => void this.sync.panel.detail.showCommit(commit, path),
         showAllHistory: (path) => this.sync.panel.open(undefined, { historyPath: path }),
-        openFromGraph: (path, newTab) => void this.open(path, { newTab, focus: !newTab, via: "link" }),
+        openLinked: (path, newTab, find) => void this.open(path, { newTab, focus: !newTab, via: "link", find }),
         prefs,
         editing: () => this.editing,
       },

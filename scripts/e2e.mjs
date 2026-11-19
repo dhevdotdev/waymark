@@ -34,6 +34,7 @@ const RUNS = [
   [["surfaces", "reduced"], 16],
   [["blocks"], 15],
   [["missing-links"], 15],
+  [["mentions"], 12],
   [["zen"], 12],
   [["zen", "reduced"], 12],
   [["spatial-motion"], 15],

@@ -5,11 +5,16 @@ import { outsideHref, outsideLink } from "./link-tooltip";
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
 
-/** The vault's own link form: the note's name, or its path when another note shares the name. */
-function wikilinkTo(index: VaultIndex, path: string, heading: string | null): string {
+/** What a link to the note names: the note's name, or its path when another note shares the name. */
+export function linkTargetOf(index: VaultIndex, path: string): string {
   const name = nameOf(path);
   const shared = index.notes.filter((note) => nameOf(note).toLowerCase() === name.toLowerCase()).length > 1;
-  const target = shared ? path.replace(/\.md$/i, "") : name;
+  return shared ? path.replace(/\.md$/i, "") : name;
+}
+
+/** The vault's own link form. */
+function wikilinkTo(index: VaultIndex, path: string, heading: string | null): string {
+  const target = linkTargetOf(index, path);
   /* These characters would end or split a link, so Obsidian replaces them with spaces too. */
   const section = heading
     ?.replace(/[#|^:[\]]/g, " ")
