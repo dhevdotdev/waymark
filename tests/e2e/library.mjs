@@ -98,7 +98,7 @@ await page.route(/\/src\/platform\.ts/, async (route) => {
   if (!response) return;
   await route.fulfill({ response, body: `${await response.text()}\n;Object.assign(git, window.__fakeGit ?? {});\n` });
 });
-await page.route(/\/src\/ui\/(sync-controller|reader|note-files)\.ts/, async (route) => {
+await page.route(/\/src\/ui\/(sync-controller|reader|reader-commands|note-files)\.ts/, async (route) => {
   const response = await fetchRoute(route);
   if (!response) return;
   const body = (await response.text()).replace(
@@ -190,6 +190,7 @@ try {
   const sheetBox = await page.locator(".sync-sheet").boundingBox();
   const sheetPixels = async () => {
     await page.mouse.move(4, 4);
+    await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
     await idle(page);
     return page.screenshot({ clip: sheetBox });
   };
@@ -203,6 +204,11 @@ try {
   );
   await page.keyboard.press("Escape");
   await writesSettled(page, 450);
+  const focusedAfterDiff = await page.evaluate(() => {
+    const el = document.activeElement;
+    return { row: !!el?.closest(".change-name, .change-row"), what: el ? `${el.tagName}.${el.className}` : "none" };
+  });
+  check("closing a diff puts focus back on the change it came from", focusedAfterDiff.row, focusedAfterDiff.what);
   check("coming back from a diff shows the whole sync sheet", beforeDiff.equals(await sheetPixels()));
   await page.keyboard.press("Escape");
   await writesSettled(page, 350);

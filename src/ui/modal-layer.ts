@@ -6,6 +6,16 @@ const FOCUSABLE =
   "a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
 
 const stack: HTMLElement[] = [];
+
+/** The control a pointer last pressed. A Mac never focuses a clicked button, so a layer it opens returns focus to this. */
+let pressed: HTMLElement | null = null;
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    pressed = e.target instanceof Element ? e.target.closest<HTMLElement>(FOCUSABLE) : null;
+  },
+  true,
+);
 const madeInert = new Set<HTMLElement>();
 
 /** Makes every top-level surface except the topmost layer inert, so a layer opened over another shuts that one too. */
@@ -38,14 +48,20 @@ export function takeFocus(el: HTMLElement | null): void {
 }
 
 /**
- * Gives focus back to `opener` when it would otherwise be lost: focus is still inside `layer`, which is leaving, or
+ * Gives focus back to `opener`, or to the control that replaced it under the same `data-control`, when focus would
+ * otherwise be lost: it is still inside `layer`, which is leaving, or
  * nowhere. Focus that has already gone somewhere else stays there.
  */
 export function returnFocus(opener: Element | null, layer: Element): void {
   const now = document.activeElement;
   if (now && now !== document.body && !layer.contains(now)) return;
-  if (opener instanceof HTMLElement && opener.isConnected && !opener.closest("[inert], .is-leaving"))
-    opener.focus({ preventScroll: true });
+  const control = opener instanceof HTMLElement ? opener.dataset.control : undefined;
+  const target =
+    opener instanceof HTMLElement && !opener.isConnected && control
+      ? document.querySelector<HTMLElement>(`[data-control="${CSS.escape(control)}"]`)
+      : opener;
+  if (target instanceof HTMLElement && target.isConnected && !target.closest("[inert], .is-leaving"))
+    target.focus({ preventScroll: true });
 }
 
 /**
@@ -57,7 +73,7 @@ export function holdModal(
   layer: HTMLElement,
   options: { controls?: () => HTMLElement[]; escape?: () => void } = {},
 ): (restoreFocus?: boolean) => void {
-  const opener = document.activeElement;
+  const opener = isPointerAction() && pressed?.isConnected ? pressed : document.activeElement;
   const within = options.controls ?? (() => [...layer.querySelectorAll<HTMLElement>(FOCUSABLE)]);
   const onKey = (e: KeyboardEvent) => {
     if (stack.at(-1) !== layer) return;
