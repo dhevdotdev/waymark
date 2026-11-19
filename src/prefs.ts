@@ -1,4 +1,5 @@
 import { isDesktop, native } from "./platform";
+import { FAMILIES } from "./themes";
 
 interface VaultState {
   /** One saved trail per tab. Read through Trail.restore, which validates it. */
@@ -80,9 +81,14 @@ const DEFAULTS: Prefs = {
 
 const LOCAL_KEY = "waymark.prefs";
 
+/** Every preference that is one of a fixed set. A saved value outside its set takes the default. */
 const CHOICES: { [K in keyof Prefs]?: readonly Prefs[K][] } = {
+  family: FAMILIES.map((f) => f.id),
   appearance: ["system", "light", "dark"],
   railPane: ["links", "info"],
+  fileSort: ["name", "modified"],
+  keySound: ["off", "linear", "tactile", "clicky"],
+  keyVolume: ["soft", "medium", "loud"],
 };
 
 /** Read from disk or browser storage, so each key is checked and falls back to its own default. */
