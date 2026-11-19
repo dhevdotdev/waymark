@@ -32,6 +32,7 @@ import { rememberNote, startPage } from "./start-page";
 import { SyncController } from "./sync-controller";
 import { renderTabStrip } from "./tab-strip";
 import { bindTooltips } from "./tooltips";
+import { escapeZen } from "./zen";
 
 export type { Metrics, OpenOptions, ReaderDeps };
 
@@ -446,7 +447,7 @@ export class Reader {
     else if (shell.matches(".sidebar-peek, .rail-peek")) shell.classList.remove("sidebar-peek", "rail-peek");
     else if (this.sidebar.isSearching && !inField) this.sidebar.showFiles();
     else if (this.onBlank && !inField) this.dismissBlank();
-    else paint("search", []);
+    else if (!escapeZen(shell, inField)) paint("search", []);
   }
 
   /** Cancels a new tab: the tab it opened beside comes back, rather than whichever sits to the right. */

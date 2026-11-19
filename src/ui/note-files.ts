@@ -324,7 +324,7 @@ export class NoteFiles {
   }
 
   private get treeIsVisible(): boolean {
-    return !this.host.sidebar.hidden && !this.host.sidebar.closest(".sidebar-closed");
+    return !this.host.sidebar.hidden && !this.host.sidebar.closest(".sidebar-closed, .is-zen");
   }
 
   /** A row the user can see and type on, or null if it is hidden in a closed folder or sidebar. */

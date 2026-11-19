@@ -14,6 +14,7 @@ import { applySound } from "./settings";
 import { TabActions } from "./tab-actions";
 import { focusedTable } from "./table-focus";
 import { VaultSwitcher } from "./vault-switcher";
+import { Zen } from "./zen";
 
 const TEXT_SCALE_STEP = 0.0625;
 const TEXT_SCALE_MIN = 0.8125;
@@ -58,6 +59,7 @@ export function readerCommands(r: Reader): Command[] {
     forget: deps.forgetVault,
     toast,
   });
+  const zen = new Zen(r.els.shell, r.els.scroller);
   const { tree } = r.sidebar;
   const inEditor = () => document.activeElement?.closest(".cm-content") != null;
   const sortButton = () => r.els.shell.querySelector<HTMLElement>('[data-act="sort-files"]');
@@ -237,7 +239,10 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘⇧E",
       keywords: "folders tree sidebar",
       inField: true,
-      run: () => r.sidebar.showFiles(),
+      run: () => {
+        zen.leave();
+        r.sidebar.showFiles();
+      },
     },
     {
       id: "search",
@@ -246,10 +251,12 @@ export function readerCommands(r: Reader): Command[] {
       hint: "⌘⇧F",
       keywords: "find full text",
       inField: true,
-      run: (origin) =>
+      run: (origin) => {
+        zen.leave();
         r.sidebar.showSearch(
           r.palette.takeQuery() ?? (origin === "key" ? window.getSelection()?.toString().trim() || undefined : undefined),
-        ),
+        );
+      },
     },
     {
       id: "graph",
@@ -286,7 +293,7 @@ export function readerCommands(r: Reader): Command[] {
       label: "Toggle sidebar",
       keys: ["mod+\\"],
       hint: "⌘\\",
-      run: () => r.sidebar.toggle(),
+      run: () => (zen.leave() ? r.sidebar.toggle(true) : r.sidebar.toggle()),
     },
     {
       id: "rail",
@@ -294,7 +301,18 @@ export function readerCommands(r: Reader): Command[] {
       keys: ["mod+alt+\\"],
       hint: "⌥⌘\\",
       keywords: "linked notes properties",
-      run: () => r.inspector.toggle(),
+      run: () => {
+        if (!zen.leave() || !r.inspector.isShowing) r.inspector.toggle();
+      },
+    },
+    {
+      id: "zen",
+      label: () => (zen.isOn ? "Leave zen mode" : "Zen mode"),
+      keys: ["mod+shift+\\"],
+      hint: "⌘⇧\\",
+      keywords: "focus distraction free hide panels chrome",
+      inField: true,
+      run: () => zen.toggle(),
     },
     {
       id: "fold-toggle",
@@ -338,7 +356,10 @@ export function readerCommands(r: Reader): Command[] {
       inField: true,
       needsNote: true,
       when: () => r.trail.available,
-      run: () => r.trail.togglePanel(),
+      run: () => {
+        zen.leave();
+        r.trail.togglePanel();
+      },
     },
     {
       id: "settings",

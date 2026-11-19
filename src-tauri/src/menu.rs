@@ -51,6 +51,7 @@ const VIEW: &[Option<Item>] = &[
     None,
     item("sidebar", "Toggle Sidebar", "CmdOrCtrl+\\"),
     item("rail", "Toggle Side Panel", "CmdOrCtrl+Alt+\\"),
+    item("zen", "Zen Mode", "CmdOrCtrl+Shift+\\"),
     item("trail", "Show Trail", "CmdOrCtrl+Y"),
     item("graph", "Graph", "CmdOrCtrl+G"),
     None,

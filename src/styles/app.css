@@ -103,6 +103,43 @@ kbd {
   --col-right: 0px;
 }
 
+/*
+ * Zen: the note alone. Only the class changes, so each panel keeps its own state and leaving restores it. The title
+ * bar, pane head and status bar keep their room, so the note never moves up or down, and the title bar's contents
+ * come back under the pointer without moving anything. A save that failed and a sync that needs attention still show.
+ */
+.shell.is-zen {
+  --col-left: 0px;
+  --col-right: 0px;
+}
+.shell.is-zen :is(.sidebar, .rail) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+.shell.is-zen :is(.pane-head, .statusbar) {
+  visibility: hidden;
+}
+.shell.is-zen .edit-state:is([data-state="conflict"], [data-state="missing"], [data-state="failed"]),
+.shell.is-zen .sync-btn[data-tone="warn"] {
+  visibility: visible;
+}
+.shell.is-zen .titlebar > * {
+  opacity: 0;
+  transition: opacity var(--t-hover) var(--ease-out);
+}
+.shell.is-zen .titlebar:is(:hover, :focus-within) > * {
+  opacity: 1;
+}
+:root[data-input="keyboard"] .shell.is-zen .titlebar > * {
+  transition: none;
+}
+.shell.is-zen .titlebar-tools [data-rail],
+.shell:not(.is-zen) .zen-exit {
+  display: none;
+}
+
 .titlebar {
   grid-column: 1 / -1;
   display: flex;
@@ -140,12 +177,12 @@ kbd {
   height: 100%;
   padding: 0 8px 0 84px;
 }
-.shell.sidebar-closed .titlebar-lead {
+.shell:is(.sidebar-closed, .is-zen) .titlebar-lead {
   width: auto;
 }
 /* A sidebar dragged narrower than the whole lead drops the name before anything collides. */
 @media (min-width: 901px) {
-  .shell:not(.sidebar-closed) .titlebar-lead {
+  .shell:not(.sidebar-closed, .is-zen) .titlebar-lead {
     container: lead / inline-size;
   }
 }
