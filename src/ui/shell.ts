@@ -78,7 +78,7 @@ function template(options: ShellOptions): string {
           <div class="search-head">
             <div class="search-field">${icons.search}<input type="text" spellcheck="false" autocomplete="off" placeholder="Search inside notes" aria-label="Search inside notes" /><button class="icon-btn" data-act="search-clear" aria-label="Clear search">${icons.close}</button></div>
           </div>
-          <div class="search-results" role="listbox" aria-label="Search results"></div>
+          <div class="search-results" id="search-results" role="listbox" aria-label="Search results"></div>
         </div>
         <div class="sidebar-resize" aria-hidden="true"></div>
       </nav>

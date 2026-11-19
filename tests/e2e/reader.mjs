@@ -278,6 +278,36 @@ check(
   !(await page.isVisible(".palette")) && (await page.inputValue(".search-field input")) === "harbour approach",
 );
 check("and shows its results", (await page.locator(".search-hit").count()) > 0);
+const combobox = () =>
+  page.evaluate(() => {
+    const input = document.querySelector(".search-field input");
+    const hits = [...document.querySelectorAll(".search-hit")];
+    return {
+      role: input.getAttribute("role"),
+      expanded: input.getAttribute("aria-expanded"),
+      list: document.getElementById(input.getAttribute("aria-controls"))?.getAttribute("role"),
+      active: input.getAttribute("aria-activedescendant"),
+      selected: hits.findIndex((h) => h.classList.contains("is-selected")),
+      selectedId: document.querySelector(".search-hit.is-selected")?.id,
+      hits: hits.length,
+      focusInField: document.activeElement === input,
+    };
+  });
+const field = await combobox();
+check(
+  "the search field is a combobox pointing at the highlighted result",
+  field.role === "combobox" && field.expanded === "true" && field.list === "listbox" && field.active === field.selectedId,
+  JSON.stringify(field),
+);
+await page.keyboard.press("PageDown");
+const paged = await combobox();
+check(
+  "Page Down moves the highlight a page at once and keeps typing in the field",
+  paged.selected >= Math.min(2, paged.hits - 1) && paged.active === paged.selectedId && paged.focusInField,
+  JSON.stringify(paged),
+);
+await page.keyboard.press("PageUp");
+check("Page Up comes back", (await combobox()).selected === 0);
 await page.keyboard.press("Escape");
 await idle(page);
 await page.keyboard.press("Meta+k");

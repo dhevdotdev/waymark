@@ -33,6 +33,11 @@ export class SearchPane {
       this.run();
     });
     this.input.addEventListener("keydown", (e) => this.onKey(e));
+    /* The field keeps focus while a result is chosen, so the highlight it points at stays the one in use. */
+    this.results.addEventListener("mousedown", (e) => e.preventDefault());
+    this.input.setAttribute("role", "combobox");
+    this.input.setAttribute("aria-controls", this.results.id);
+    this.input.setAttribute("aria-autocomplete", "list");
     this.run();
   }
 
@@ -75,6 +80,8 @@ export class SearchPane {
     this.clearButton.setAttribute("aria-label", label);
     this.clearButton.dataset.tip = label;
     this.results.replaceChildren();
+    this.input.removeAttribute("aria-activedescendant");
+    this.input.setAttribute("aria-expanded", String(this.hits.length > 0 && !!this.query.trim()));
     if (!this.query.trim()) {
       this.results.append(this.hint());
       return;
@@ -93,6 +100,8 @@ export class SearchPane {
   private onKey(e: KeyboardEvent): void {
     if (e.key === "ArrowDown") this.select(this.selected + 1);
     else if (e.key === "ArrowUp") this.select(this.selected - 1);
+    else if (e.key === "PageDown") this.select(this.pageFrom(1));
+    else if (e.key === "PageUp") this.select(this.pageFrom(-1));
     else if (e.key === "Enter") this.openHit(this.selected, e.metaKey);
     else if (e.key === "Escape") {
       e.stopPropagation();
@@ -108,8 +117,25 @@ export class SearchPane {
       const on = Number(row.dataset.hit) === this.selected;
       row.classList.toggle("is-selected", on);
       row.setAttribute("aria-selected", String(on));
-      if (on) row.scrollIntoView({ block: "nearest" });
+      if (!on) continue;
+      row.scrollIntoView({ block: "nearest" });
+      this.input.setAttribute("aria-activedescendant", row.id);
     }
+  }
+
+  /** The result a page away: the furthest one that would share the view with the one selected now. */
+  private pageFrom(direction: 1 | -1): number {
+    const rows = [...this.results.querySelectorAll<HTMLElement>(".search-hit")];
+    const from = rows[this.selected]?.getBoundingClientRect();
+    if (!from) return this.selected;
+    const reach = this.results.clientHeight;
+    let to = this.selected;
+    for (let i = this.selected + direction; rows[i]; i += direction) {
+      const r = rows[i].getBoundingClientRect();
+      if ((direction > 0 ? r.bottom - from.top : from.bottom - r.top) > reach) break;
+      to = i;
+    }
+    return to === this.selected ? this.selected + direction : to;
   }
 
   private hint(): HTMLElement {
@@ -136,6 +162,8 @@ export class SearchPane {
   private hitRow(hit: Hit, index: number): HTMLElement {
     const row = document.createElement("button");
     row.className = "search-hit";
+    row.id = `search-hit-${index}`;
+    row.tabIndex = -1;
     row.dataset.hit = String(index);
     row.setAttribute("role", "option");
     const title = document.createElement("span");
