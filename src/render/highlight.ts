@@ -87,8 +87,15 @@ export class Highlighter {
   private loadedThemes = new Set<string>();
   private remembered = new Map<string, CodeToken[]>();
   private themes = { light: "catppuccin-latte", dark: "catppuccin-mocha" };
+  private ready: Promise<void> | null = null;
 
-  async init(): Promise<void> {
+  /** Starts the highlighter once. Every later vault reuses it, because its compiled grammars live in memory that never shrinks. */
+  init(): Promise<void> {
+    this.ready ??= this.start();
+    return this.ready;
+  }
+
+  private async start(): Promise<void> {
     this.core = await createHighlighterCore({
       themes: [],
       langs: [],

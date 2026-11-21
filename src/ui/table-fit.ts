@@ -4,7 +4,7 @@
  * header sticks to the nearest one.
  */
 export function watchTableFit(scroller: HTMLElement): void {
-  const watched = new WeakSet<Element>();
+  const watched = new Set<Element>();
   const sizes = new ResizeObserver((entries) => {
     for (const { target } of entries) {
       const wrap = target.closest(".table-wrap");
@@ -14,6 +14,14 @@ export function watchTableFit(scroller: HTMLElement): void {
   let frame = 0;
   const find = () => {
     frame = 0;
+    /* An observer keeps what it watches alive, so tables from a note that has gone are let go. */
+    for (const wrap of watched) {
+      if (wrap.isConnected) continue;
+      watched.delete(wrap);
+      sizes.unobserve(wrap);
+      const table = wrap.querySelector("table");
+      if (table) sizes.unobserve(table);
+    }
     for (const wrap of scroller.querySelectorAll(".table-wrap")) {
       if (watched.has(wrap)) continue;
       watched.add(wrap);
